@@ -1,0 +1,7 @@
+package: github.com/30x/apidVerifyAPIKey
+import:
+- package: github.com/30x/apid
+- package: github.com/30x/apidApigeeSync
+testImport:
+- package: github.com/onsi/ginkgo/ginkgo
+- package: github.com/onsi/gomega
