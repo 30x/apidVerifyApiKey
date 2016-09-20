@@ -33,7 +33,7 @@ func initPlugin(services apid.Services) error {
 	}
 
 	var count int
-	row := db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table';")
+	row := db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='company';")
 	if err := row.Scan(&count); err != nil {
 		log.Panic("Unable to setup database", err)
 	}
