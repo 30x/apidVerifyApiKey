@@ -1,0 +1,171 @@
+host: playground.apistudio.io
+swagger: '2.0'
+info:
+  version: 0.0.1
+  title: Edge X Verify API Key
+  contact:
+    name: Apigee, Inc.
+    url: http://www.apigee.com/
+    email: sales@apigee.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+basePath: /verifiers
+schemes:
+  - http
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /:
+    get:
+      description: List verifiers
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - "apikey"
+  /apikey:
+    post:
+      description: Verify API key valid and return message context
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          type: string
+          description: authCode from /deployments/current
+        - name: _
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/VerifyAPIKeyRequest'
+      responses:
+        '200':
+          description: The result of the request
+          schema:
+            type: object
+            enum:
+              - $ref: '#/definitions/VerifyAPIKeyResponseSuccess'
+              - $ref: '#/definitions/VerifyAPIKeyResponseFailed'
+          examples:
+            application/json:
+              responseType: APIKeyContext
+              resultCode: "SUCCESS"
+              result:
+                key: abc123
+                expiresAt: 1234567890
+                issuedAt: 1234567890
+                status: abc123
+                redirectionURIs: abc123
+                developerAppName: abc123
+                developerId: abc123
+        default:
+          description: 4xx or 5xx errors
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+
+definitions:
+
+  ErrorResult:
+    type: object
+    required:
+      - errorCode
+      - reason
+    properties:
+      errorCode:
+        type: number
+      reason:
+        type: string
+
+  VerifyAPIKeyRequest:
+    type: object
+    required:
+      - action
+      - key
+      - uriPath
+    properties:
+      action:
+        enum:
+          - "verify"
+      key:
+        type: string
+      uriPath:
+        type: string
+
+  VerifyAPIKeyResponse:
+    type: object
+    required:
+      - type
+    properties:
+      type:
+        type: string
+      result:
+        description: present if type is NOT ErrorResult, override me
+        type: object
+      error:
+        description: present if type is ErrorResult, override me
+        type: object
+
+  VerifyAPIKeyResponseSuccess:
+    allOf:
+      - $ref: '#/definitions/VerifyAPIKeyResponse'
+      - type: object
+        properties:
+          result:
+            type: object
+            properties:
+              key:
+                type: string
+              expiresAt:
+                type: integer
+              issuedAt:
+                type: integer
+              status:
+                type: string
+              redirectionURIs:
+                type: string
+              developerAppName:
+                type: string
+              developerId:
+                type: string
+    example:
+      type: "APIKeyContext"
+      result:
+        key: "abc123"
+        expiresAt: 1234567890
+        issuedAt: 1234567890
+        status: "abc123"
+        redirectionURIs: "abc123"
+        developerAppName: "abc123"
+        developerId: "abc123"
+
+  VerifyAPIKeyResponseFailed:
+    allOf:
+      - $ref: '#/definitions/VerifyAPIKeyResponse'
+      - type: object
+        properties:
+          error:
+            $ref: '#/definitions/ErrorResult'
+    example:
+      type: "ErrorResult"
+      error:
+        errorCode: 606
+        reason: "APIKey expired"
+
+  ErrorResponse:
+    required:
+      - errorCode
+      - reason
+    properties:
+      errorCode:
+        type: number
+      reason:
+        type: string
+    example:
+      errorCode: 607
+      reason: "Something wrong!"
