@@ -1,7 +1,6 @@
 package apidVerifyApiKey
 
 import (
-	"encoding/json"
 	"regexp"
 	"strings"
 )
@@ -14,9 +13,10 @@ import (
  */
 func validatePath(basePath, requestBase string) bool {
 
-	var basePaths []string
-	json.Unmarshal([]byte(basePath), &basePaths)
-	for _, a := range basePaths {
+	s := strings.TrimPrefix(basePath, "{")
+	s = strings.TrimSuffix(s, "}")
+	fs := strings.Split(s, ",")
+	for _, a := range fs {
 		str1 := strings.Replace(a, "**", "(.*)", -1)
 		str2 := strings.Replace(a, "*", "([^/]+)", -1)
 		if a != str1 {
@@ -41,5 +41,5 @@ func validatePath(basePath, requestBase string) bool {
 	}
 
 	/* if the i/p resource is empty, no checks need to be made */
-	return len(basePaths) == 0
+	return len(fs) == 0
 }

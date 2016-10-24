@@ -98,12 +98,7 @@ func verifyAPIKey(key, path, env, org, action string) ([]byte, error) {
 		return errorResponse(reason, errorCode)
 	}
 
-	/*
-	 * NOTE: that here c.expired_at has been commented out because it is not
-	 * kept track of by Cassandra (hence always defaults to -1). FIXME
-	 */
-
-	sSql = "SELECT ap.res_names, ap.env, c.issued_at, c.status, a.cback_url, d.username, d.id FROM APP_CREDENTIAL AS c INNER JOIN APP AS a ON c.app_id = a.id INNER JOIN DEVELOPER AS d ON a.dev_id = d.id INNER JOIN APP_AND_API_PRODUCT_MAPPER as mp ON mp.app_cred_id = c.id INNER JOIN API_PRODUCT as ap ON ap.id = mp.api_prdt_id WHERE (UPPER(d.sts) = 'ACTIVE' AND mp.api_prdt_id = ap.id AND mp.app_id = a.id AND mp.app_cred_id = c.id AND UPPER(mp.api_prdt_status) = 'APPROVED' AND UPPER(a.status) = 'APPROVED' AND UPPER(c.status) = 'APPROVED' AND c.id = '" + key + "' AND c.org = '" + org + "');"
+	sSql = "SELECT ap.api_resources, ap.environments, c.issued_at, c.app_status, a.callback_url, d.username, d.id FROM APP_CREDENTIAL AS c INNER JOIN APP AS a ON c.app_id = a.id INNER JOIN DEVELOPER AS d ON a.developer_id = d.id INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp ON mp.appcred_id = c.id INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id WHERE (UPPER(d.status) = 'ACTIVE' AND mp.apiprdt_id = ap.id AND mp.app_id = a.id AND mp.appcred_id = c.id AND UPPER(mp.status) = 'APPROVED' AND UPPER(a.status) = 'APPROVED' AND UPPER(c.status) = 'APPROVED' AND c.id = '" + key + "' AND c._apid_scope = '" + org + "');"
 
 	err = db.QueryRow(sSql).Scan(&resName, &resEnv, &issuedAt, &status,
 		&redirectionURIs, &developerAppName, &developerId)
