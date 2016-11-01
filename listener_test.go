@@ -12,17 +12,69 @@ var _ = Describe("listener", func() {
 
 	It("should store data from ApigeeSync in the database", func(done Done) {
 
-		var event = common.ChangeList{}
-		rowitemp := common.Row{}
-		scv := &common.ColumnVal{
-			Value: "api_product_0",
-			Type:  1,
-		}
-		rowitem["id"] = scv
-		event.Changes = []Change{
+		var event = ChangeSet{}
+		event.Changes = []ChangePayload{
 			{
-				Table:  "api_product",
-				NewRow: rowitemp,
+				Data: DataPayload{
+					EntityType: "apiproduct",
+					Operation:  "create",
+					PldCont: Payload{
+						Organization: "test_org",
+						AppName:      "Api_product_sync",
+						Resources:    []string{"/**", "/test"},
+						Environments: []string{"Env_0", "Env_1"},
+					},
+				},
+			},
+			{
+				Data: DataPayload{
+					EntityType:       "developer",
+					Operation:        "create",
+					EntityIdentifier: "developer_id_sync",
+					PldCont: Payload{
+						Organization: "test_org",
+						Email:        "person_sync@apigee.com",
+						Status:       "Active",
+						UserName:     "user_sync",
+						FirstName:    "user_first_name_sync",
+						LastName:     "user_last_name_sync",
+					},
+				},
+			},
+			{
+				Data: DataPayload{
+					EntityType:       "app",
+					Operation:        "create",
+					EntityIdentifier: "application_id_sync",
+					PldCont: Payload{
+						Organization: "test_org",
+						Email:        "person_sync@apigee.com",
+						Status:       "Approved",
+						AppName:      "application_id_sync",
+						DeveloperId:  "developer_id_sync",
+						CallbackUrl:  "call_back_url",
+					},
+				},
+			},
+			{
+				Data: DataPayload{
+					EntityType:       "credential",
+					Operation:        "create",
+					EntityIdentifier: "credential_sync",
+					PldCont: Payload{
+						Organization:   "test_org",
+						AppId:          "application_id_sync",
+						Status:         "Approved",
+						ConsumerSecret: "consumer_secret_sync",
+						IssuedAt:       349583485,
+						ApiProducts: []Apip{
+							{
+								ApiProduct: "Api_product_sync",
+								Status:     "Approved",
+							},
+						},
+					},
+				},
 			},
 		}
 
