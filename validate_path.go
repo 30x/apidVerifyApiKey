@@ -39,7 +39,6 @@ func validatePath(basePath, requestBase string) bool {
 		 * FIXME: SINGLE_FORWARD_SLASH_PATTERN not supported yet
 		 */
 	}
-
 	/* if the i/p resource is empty, no checks need to be made */
-	return len(fs) == 0
+	return s == ""
 }

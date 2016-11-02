@@ -20,11 +20,11 @@ var _ = Describe("Validate Path", func() {
 		Expect(s).Should(BeTrue())
 	})
 	It("validation4", func() {
-		s := validatePath("{\"/**\"}", "/foo")
+		s := validatePath("{/**}", "/foo")
 		Expect(s).Should(BeTrue())
 	})
 	It("validation5", func() {
-		s := validatePath("{\"/**\"}", "foo")
+		s := validatePath("{/**}", "foo")
 		Expect(s).Should(BeFalse())
 	})
 	It("validation6", func() {
