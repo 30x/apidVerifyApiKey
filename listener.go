@@ -80,30 +80,30 @@ func processChange(changes *common.ChangeList) {
 	for _, payload := range changes.Changes {
 
 		switch payload.Table {
-		case "public.developer":
+		case "kms.developer", "public.developer":
 			switch payload.Operation {
 			case 1:
 				insertCreateDeveloper(payload.NewRow, db)
 			}
 
-		case "public.app":
+		case "kms.app", "public.app":
 			switch payload.Operation {
 			case 1:
 				insertCreateApplication(payload.NewRow, db)
 			}
 
-		case "public.app_credential":
+		case "kms.app_credential", "public.app_credential":
 			switch payload.Operation {
 			case 1:
 				insertCreateCredential(payload.NewRow, db)
 			}
-		case "public.api_product":
+		case "kms.api_product", "public.api_product":
 			switch payload.Operation {
 			case 1:
 				insertAPIproduct(payload.NewRow, db)
 			}
 
-		case "public.app_credential_apiproduct_mapper":
+		case "kms.app_credential_apiproduct_mapper", "public.app_credential_apiproduct_mapper":
 			switch payload.Operation {
 			case 1:
 				insertApiProductMapper(payload.NewRow, db)
