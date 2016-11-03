@@ -170,27 +170,27 @@ var _ = Describe("listener", func() {
 
 		event.Changes = []common.Change{
 			{
-				Table:     "public.api_product",
+				Table:     "kms.api_product",
 				NewRow:    srvItems,
 				Operation: 1,
 			},
 			{
-				Table:     "public.developer",
+				Table:     "kms.developer",
 				NewRow:    devItems,
 				Operation: 1,
 			},
 			{
-				Table:     "public.app",
+				Table:     "kms.app",
 				NewRow:    appItems,
 				Operation: 1,
 			},
 			{
-				Table:     "public.app_credential",
+				Table:     "kms.app_credential",
 				NewRow:    credItems,
 				Operation: 1,
 			},
 			{
-				Table:     "public.app_credential_apiproduct_mapper",
+				Table:     "kms.app_credential_apiproduct_mapper",
 				NewRow:    mpItems,
 				Operation: 1,
 			},

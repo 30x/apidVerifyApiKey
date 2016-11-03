@@ -242,7 +242,7 @@ func insertTestData(db *sql.DB) {
 		}
 		srvItems["tenant_id"] = scv
 
-		res := insertCreateDeveloper(srvItems, db)
+		res := insertDeveloper(srvItems, db)
 		Expect(res).Should(BeTrue())
 	}
 
@@ -289,7 +289,7 @@ func insertTestData(db *sql.DB) {
 				Type:  1,
 			}
 			srvItems["tenant_id"] = scv
-			res := insertCreateApplication(srvItems, db)
+			res := insertApplication(srvItems, db)
 			Expect(res).Should(BeTrue())
 		}
 		k = j
@@ -328,7 +328,7 @@ func insertTestData(db *sql.DB) {
 			Type:  1,
 		}
 		srvItems["tenant_id"] = scv
-		res := insertCreateCredential(srvItems, db)
+		res := insertCredential(srvItems, db)
 		Expect(res).Should(BeTrue())
 	}
 
@@ -369,7 +369,7 @@ func insertTestData(db *sql.DB) {
 			Type:  1,
 		}
 		srvItems["tenant_id"] = scv
-		res := insertApiProductMapper(srvItems, db)
+		res := insertAPIProductMapper(srvItems, db)
 		Expect(res).Should(BeTrue())
 	}
 
