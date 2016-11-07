@@ -160,6 +160,7 @@ var _ = Describe("api", func() {
 func insertTestData(db *sql.DB) {
 
 	for i := 0; i < 10; i++ {
+		var rows []common.Row
 		srvItems := common.Row{}
 		result := strconv.FormatInt(int64(i), 10)
 
@@ -192,11 +193,13 @@ func insertTestData(db *sql.DB) {
 			Type:  1,
 		}
 		srvItems["tenant_id"] = scv
-		res := insertAPIproduct(srvItems, db)
+		rows = append(rows, srvItems)
+		res := insertAPIproducts(rows, db)
 		Expect(res).Should(BeTrue())
 	}
 
 	for i := 0; i < 10; i++ {
+		var rows []common.Row
 		srvItems := common.Row{}
 		result := strconv.FormatInt(int64(i), 10)
 
@@ -242,7 +245,8 @@ func insertTestData(db *sql.DB) {
 		}
 		srvItems["tenant_id"] = scv
 
-		res := insertDeveloper(srvItems, db)
+		rows = append(rows, srvItems)
+		res := insertDevelopers(rows, db)
 		Expect(res).Should(BeTrue())
 	}
 
@@ -250,6 +254,7 @@ func insertTestData(db *sql.DB) {
 	for i := 0; i < 10; i++ {
 		resulti := strconv.FormatInt(int64(i), 10)
 		for j = k; j < 10+k; j++ {
+			var rows []common.Row
 
 			srvItems := common.Row{}
 			resultj := strconv.FormatInt(int64(j), 10)
@@ -289,13 +294,15 @@ func insertTestData(db *sql.DB) {
 				Type:  1,
 			}
 			srvItems["tenant_id"] = scv
-			res := insertApplication(srvItems, db)
+			rows = append(rows, srvItems)
+			res := insertApplications(rows, db)
 			Expect(res).Should(BeTrue())
 		}
 		k = j
 	}
 
 	for i := 0; i < 10; i++ {
+		var rows []common.Row
 		srvItems := common.Row{}
 		result := strconv.FormatInt(int64(i), 10)
 
@@ -328,11 +335,13 @@ func insertTestData(db *sql.DB) {
 			Type:  1,
 		}
 		srvItems["tenant_id"] = scv
-		res := insertCredential(srvItems, db)
+		rows = append(rows, srvItems)
+		res := insertCredentials(rows, db)
 		Expect(res).Should(BeTrue())
 	}
 
 	for i := 0; i < 10; i++ {
+		var rows []common.Row
 		srvItems := common.Row{}
 		result := strconv.FormatInt(int64(i), 10)
 
@@ -369,7 +378,8 @@ func insertTestData(db *sql.DB) {
 			Type:  1,
 		}
 		srvItems["tenant_id"] = scv
-		res := insertAPIProductMapper(srvItems, db)
+		rows = append(rows, srvItems)
+		res := insertAPIProductMappers(rows, db)
 		Expect(res).Should(BeTrue())
 	}
 
