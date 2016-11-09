@@ -15,30 +15,41 @@ func (h *handler) String() string {
 
 func (h *handler) Handle(e apid.Event) {
 
-	snapData, ok := e.(*common.Snapshot)
-	if ok {
-		processSnapshot(snapData)
-	} else {
-		changeSet, ok := e.(*common.ChangeList)
-		if ok {
-			processChange(changeSet)
-		} else {
-			log.Errorf("Received Invalid event. This shouldn't happen!")
-		}
-	}
-	return
-}
-
-func processSnapshot(snapshot *common.Snapshot) {
-
 	res := true
-	log.Debugf("Process Snapshot data")
-
 	db, err := data.DB()
 	if err != nil {
 		panic("Unable to access Sqlite DB")
 	}
 
+	txn, err := db.Begin()
+	if err != nil {
+		log.Error("Unable to create Sqlite transaction")
+		return
+	}
+
+	snapData, ok := e.(*common.Snapshot)
+	if ok {
+		processSnapshot(snapData, db, txn)
+	} else {
+		changeSet, ok := e.(*common.ChangeList)
+		if ok {
+			processChange(changeSet, db, txn)
+		} else {
+			log.Errorf("Received Invalid event. This shouldn't happen!")
+		}
+	}
+	if res == true {
+		txn.Commit()
+	} else {
+		txn.Rollback()
+	}
+	return
+}
+
+func processSnapshot(snapshot *common.Snapshot, db *sql.DB, txn *sql.Tx) bool {
+
+	res := true
+	log.Debugf("Process Snapshot data")
 	/*
 	 * Iterate the tables, and insert the rows,
 	 * Commit them in bulk.
@@ -46,28 +57,29 @@ func processSnapshot(snapshot *common.Snapshot) {
 	for _, payload := range snapshot.Tables {
 		switch payload.Name {
 		case "kms.developer":
-			res = insertDevelopers(payload.Rows, db)
+			res = insertDevelopers(payload.Rows, db, txn)
 		case "kms.app":
-			res = insertApplications(payload.Rows, db)
+			res = insertApplications(payload.Rows, db, txn)
 		case "kms.app_credential":
-			res = insertCredentials(payload.Rows, db)
+			res = insertCredentials(payload.Rows, db, txn)
 		case "kms.api_product":
-			res = insertAPIproducts(payload.Rows, db)
+			res = insertAPIproducts(payload.Rows, db, txn)
 		case "kms.app_credential_apiproduct_mapper":
-			res = insertAPIProductMappers(payload.Rows, db)
+			res = insertAPIProductMappers(payload.Rows, db, txn)
 		}
 		if res == false {
 			log.Error("Error encountered in Downloading Snapshot for VerifyApiKey")
-			return
+			return false
 		}
 	}
 	log.Debug("Downloading Snapshot for VerifyApiKey complete")
+	return true
 }
 
 /*
  * Performs bulk insert of credentials
  */
-func insertCredentials(rows []common.Row, db *sql.DB) bool {
+func insertCredentials(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
 
 	var scope, id, appId, consumerSecret, appstatus, status, tenantId string
 	var issuedAt int64
@@ -77,8 +89,7 @@ func insertCredentials(rows []common.Row, db *sql.DB) bool {
 		log.Error("INSERT Cred Failed: ", err)
 		return false
 	}
-
-	txn, err := db.Begin()
+	defer prep.Close()
 	for _, ele := range rows {
 		ele.Get("_apid_scope", &scope)
 		ele.Get("id", &id)
@@ -100,20 +111,18 @@ func insertCredentials(rows []common.Row, db *sql.DB) bool {
 
 		if err != nil {
 			log.Error("INSERT CRED Failed: ", id, ", ", scope, ")", err)
-			txn.Rollback()
 			return false
 		} else {
 			log.Debug("INSERT CRED Success: (", id, ", ", scope, ")")
 		}
 	}
-	txn.Commit()
 	return true
 }
 
 /*
  * Performs Bulk insert of Applications
  */
-func insertApplications(rows []common.Row, db *sql.DB) bool {
+func insertApplications(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
 
 	var scope, EntityIdentifier, DeveloperId, CallbackUrl, Status, AppName, AppFamily, tenantId, CreatedBy, LastModifiedBy string
 	var CreatedAt, LastModifiedAt int64
@@ -124,7 +133,7 @@ func insertApplications(rows []common.Row, db *sql.DB) bool {
 		return false
 	}
 
-	txn, err := db.Begin()
+	defer prep.Close()
 	for _, ele := range rows {
 
 		ele.Get("_apid_scope", &scope)
@@ -156,13 +165,11 @@ func insertApplications(rows []common.Row, db *sql.DB) bool {
 
 		if err != nil {
 			log.Error("INSERT APP Failed: (", EntityIdentifier, ", ", tenantId, ")", err)
-			txn.Rollback()
 			return false
 		} else {
 			log.Debug("INSERT APP Success: (", EntityIdentifier, ", ", tenantId, ")")
 		}
 	}
-	txn.Commit()
 	return true
 
 }
@@ -170,7 +177,7 @@ func insertApplications(rows []common.Row, db *sql.DB) bool {
 /*
  * Performs bulk insert of Developers
  */
-func insertDevelopers(rows []common.Row, db *sql.DB) bool {
+func insertDevelopers(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
 
 	var scope, EntityIdentifier, Email, Status, UserName, FirstName, LastName, tenantId, CreatedBy, LastModifiedBy, Username string
 	var CreatedAt, LastModifiedAt int64
@@ -181,7 +188,7 @@ func insertDevelopers(rows []common.Row, db *sql.DB) bool {
 		return false
 	}
 
-	txn, err := db.Begin()
+	defer prep.Close()
 	for _, ele := range rows {
 
 		ele.Get("_apid_scope", &scope)
@@ -213,20 +220,18 @@ func insertDevelopers(rows []common.Row, db *sql.DB) bool {
 
 		if err != nil {
 			log.Error("INSERT DEVELOPER Failed: (", EntityIdentifier, ", ", scope, ")", err)
-			txn.Rollback()
 			return false
 		} else {
 			log.Debug("INSERT DEVELOPER Success: (", EntityIdentifier, ", ", scope, ")")
 		}
 	}
-	txn.Commit()
 	return true
 }
 
 /*
  * Performs Bulk insert of API products
  */
-func insertAPIproducts(rows []common.Row, db *sql.DB) bool {
+func insertAPIproducts(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
 
 	var scope, apiProduct, res, env, tenantId string
 
@@ -236,7 +241,7 @@ func insertAPIproducts(rows []common.Row, db *sql.DB) bool {
 		return false
 	}
 
-	txn, err := db.Begin()
+	defer prep.Close()
 	for _, ele := range rows {
 
 		ele.Get("_apid_scope", &scope)
@@ -254,20 +259,18 @@ func insertAPIproducts(rows []common.Row, db *sql.DB) bool {
 
 		if err != nil {
 			log.Error("INSERT API_PRODUCT Failed: (", apiProduct, ", ", tenantId, ")", err)
-			txn.Rollback()
 			return false
 		} else {
 			log.Debug("INSERT API_PRODUCT Success: (", apiProduct, ", ", tenantId, ")")
 		}
 	}
-	txn.Commit()
 	return true
 }
 
 /*
  * Performs a bulk insert of all APP_CREDENTIAL_APIPRODUCT_MAPPER rows
  */
-func insertAPIProductMappers(rows []common.Row, db *sql.DB) bool {
+func insertAPIProductMappers(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
 
 	var ApiProduct, AppId, EntityIdentifier, tenantId, Scope, Status string
 
@@ -277,7 +280,7 @@ func insertAPIProductMappers(rows []common.Row, db *sql.DB) bool {
 		return false
 	}
 
-	txn, err := db.Begin()
+	defer prep.Close()
 	for _, ele := range rows {
 
 		ele.Get("apiprdt_id", &ApiProduct)
@@ -311,7 +314,6 @@ func insertAPIProductMappers(rows []common.Row, db *sql.DB) bool {
 				")",
 				err)
 
-			txn.Rollback()
 			return false
 		} else {
 			log.Debug("INSERT APP_CREDENTIAL_APIPRODUCT_MAPPER Success: (",
@@ -324,145 +326,162 @@ func insertAPIProductMappers(rows []common.Row, db *sql.DB) bool {
 				")")
 		}
 	}
-	txn.Commit()
 	return true
 }
 
-func processChange(changes *common.ChangeList) {
+func processChange(changes *common.ChangeList, db *sql.DB, txn *sql.Tx) bool {
+
+	var rows []common.Row
+	res := true
 
 	log.Debugf("apigeeSyncEvent: %d changes", len(changes.Changes))
-	var rows []common.Row
-
-	db, err := data.DB()
-	if err != nil {
-		panic("Unable to access Sqlite DB")
-	}
-
 	for _, payload := range changes.Changes {
 		rows = nil
 		switch payload.Table {
 		case "kms.developer":
 			switch payload.Operation {
-			case 1:
+			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				insertDevelopers(rows, db)
-			case 2:
-				updateDeveloper(payload.NewRow, payload.OldRow, db)
-			case 3:
-				deleteDeveloper(payload.OldRow, db)
+				res = insertDevelopers(rows, db, txn)
+
+			case common.Update:
+				res = deleteObject("DEVELOPER", payload.OldRow, db, txn)
+				rows = append(rows, payload.NewRow)
+				res = insertDevelopers(rows, db, txn)
+
+			case common.Delete:
+				res = deleteObject("DEVELOPER", payload.OldRow, db, txn)
 			}
 		case "kms.app":
 			switch payload.Operation {
-			case 1:
+			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				insertApplications(rows, db)
-			case 2:
-				updateApplication(payload.NewRow, payload.OldRow, db)
-			case 3:
-				deleteApplication(payload.OldRow, db)
+				res = insertApplications(rows, db, txn)
+
+			case common.Update:
+				res = deleteObject("APP", payload.OldRow, db, txn)
+				rows = append(rows, payload.NewRow)
+				res = insertApplications(rows, db, txn)
+
+			case common.Delete:
+				res = deleteObject("APP", payload.OldRow, db, txn)
 			}
 
 		case "kms.app_credential":
 			switch payload.Operation {
-			case 1:
+			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				insertCredentials(rows, db)
-			case 2:
-				updateCredential(payload.NewRow, payload.OldRow, db)
-			case 3:
-				deleteCredential(payload.OldRow, db)
+				res = insertCredentials(rows, db, txn)
+
+			case common.Update:
+				res = deleteObject("APP_CREDENTIAL", payload.OldRow, db, txn)
+				rows = append(rows, payload.NewRow)
+				res = insertCredentials(rows, db, txn)
+
+			case common.Delete:
+				res = deleteObject("APP_CREDENTIAL", payload.OldRow, db, txn)
 			}
 		case "kms.api_product":
 			switch payload.Operation {
-			case 1:
+			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				insertAPIproducts(rows, db)
-			case 2:
-				updateAPIproduct(payload.NewRow, payload.OldRow, db)
-			case 3:
-				deleteAPIproduct(payload.OldRow, db)
+				res = insertAPIproducts(rows, db, txn)
+
+			case common.Update:
+				res = deleteObject("API_PRODUCT", payload.OldRow, db, txn)
+				rows = append(rows, payload.NewRow)
+				res = insertAPIproducts(rows, db, txn)
+
+			case common.Delete:
+				res = deleteObject("API_PRODUCT", payload.OldRow, db, txn)
 			}
 
 		case "kms.app_credential_apiproduct_mapper":
 			switch payload.Operation {
-			case 1:
+			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				insertAPIProductMappers(rows, db)
-			case 2:
-				updateAPIproductMapper(payload.NewRow, payload.OldRow, db)
-			case 3:
-				deleteAPIproductMapper(payload.OldRow, db)
+				res = insertAPIProductMappers(rows, db, txn)
+
+			case common.Update:
+				res = deleteAPIproductMapper(payload.OldRow, db, txn)
+				rows = append(rows, payload.NewRow)
+				res = insertAPIProductMappers(rows, db, txn)
+
+			case common.Delete:
+				res = deleteAPIproductMapper(payload.OldRow, db, txn)
 			}
 		}
+		if res == false {
+			log.Error("Sql Operation error. Operation rollbacked")
+			return false
+		}
 	}
-}
-
-/*
- * DELETE APP
- */
-func deleteApplication(ele common.Row, db *sql.DB) bool {
 	return true
 }
 
 /*
- * DELETE CRED
+ * DELETE OBJECT as passed in the input
  */
-func deleteCredential(ele common.Row, db *sql.DB) bool {
-	return true
-}
+func deleteObject(object string, ele common.Row, db *sql.DB, txn *sql.Tx) bool {
 
-/*
- * DELETE developer
- */
-func deleteDeveloper(ele common.Row, db *sql.DB) bool {
-	return true
-}
+	var scope, apiProduct string
+	ssql := "DELETE FROM " + object + " WHERE id = $1 AND _apid_scope = $2"
+	prep, err := db.Prepare(ssql)
+	if err != nil {
+		log.Error("DELETE ", object, " Failed: ", err)
+		return false
+	}
+	defer prep.Close()
+	ele.Get("_apid_scope", &scope)
+	ele.Get("id", &apiProduct)
 
-/*
- * DELETE API product
- */
-func deleteAPIproduct(ele common.Row, db *sql.DB) bool {
-	return true
+	_, err = txn.Stmt(prep).Exec(apiProduct, scope)
+	if err != nil {
+		log.Error("DELETE ", object, " Failed: (", apiProduct, ", ", scope, ")", err)
+		return false
+	} else {
+		log.Debug("DELETE ", object, " Success: (", apiProduct, ", ", scope, ")")
+		return true
+	}
+
 }
 
 /*
  * DELETE  APIPRDT MAPPER
  */
-func deleteAPIproductMapper(ele common.Row, db *sql.DB) bool {
-	return true
-}
+func deleteAPIproductMapper(ele common.Row, db *sql.DB, txn *sql.Tx) bool {
+	var ApiProduct, AppId, EntityIdentifier, apid_scope string
 
-/*
- * UPDATE APP
- */
-func updateApplication(ele common.Row, ele2 common.Row, db *sql.DB) bool {
-	return true
-}
+	prep, err := db.Prepare("DELETE FROM APP_CREDENTIAL_APIPRODUCT_MAPPER WHERE apiprdt_id=$1 AND app_id=$2 AND appcred_id=$3 AND _apid_scope=$4;")
+	if err != nil {
+		log.Error("DELETE APP_CREDENTIAL_APIPRODUCT_MAPPER Failed: ", err)
+		return false
+	}
 
-/*
- * UPDATE CRED
- */
-func updateCredential(ele common.Row, ele2 common.Row, db *sql.DB) bool {
-	return true
-}
+	defer prep.Close()
 
-/*
- * UPDATE developer
- */
-func updateDeveloper(ele common.Row, ele2 common.Row, db *sql.DB) bool {
-	return true
-}
+	ele.Get("apiprdt_id", &ApiProduct)
+	ele.Get("app_id", &AppId)
+	ele.Get("appcred_id", &EntityIdentifier)
+	ele.Get("_apid_scope", &apid_scope)
 
-/*
- * UPDATE API product
- */
-func updateAPIproduct(ele common.Row, ele2 common.Row, db *sql.DB) bool {
-	return true
-}
-
-/*
- * UPDATE APIPRDT MAPPER
- */
-func updateAPIproductMapper(ele common.Row, ele2 common.Row, db *sql.DB) bool {
-	return true
+	_, err = txn.Stmt(prep).Exec(ApiProduct, AppId, EntityIdentifier, apid_scope)
+	if err != nil {
+		log.Error("DELETE APP_CREDENTIAL_APIPRODUCT_MAPPER Failed: (",
+			ApiProduct, ", ",
+			AppId, ", ",
+			EntityIdentifier, ", ",
+			apid_scope,
+			")",
+			err)
+		return false
+	} else {
+		log.Debug("DELETE APP_CREDENTIAL_APIPRODUCT_MAPPER Success: (",
+			ApiProduct, ", ",
+			AppId, ", ",
+			EntityIdentifier, ", ",
+			apid_scope,
+			")")
+		return true
+	}
 }

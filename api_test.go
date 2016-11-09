@@ -39,8 +39,10 @@ var _ = Describe("api", func() {
 
 		db, err = apid.Data().DB()
 		Expect(err).NotTo(HaveOccurred())
-		insertTestData(db)
-
+		txn, err := db.Begin()
+		Expect(err).ShouldNot(HaveOccurred())
+		insertTestData(db, txn)
+		txn.Commit()
 		server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if req.URL.Path == apiPath {
 				handleRequest(w, req)
@@ -157,7 +159,7 @@ var _ = Describe("api", func() {
 	})
 })
 
-func insertTestData(db *sql.DB) {
+func insertTestData(db *sql.DB, txn *sql.Tx) {
 
 	for i := 0; i < 10; i++ {
 		var rows []common.Row
@@ -194,7 +196,7 @@ func insertTestData(db *sql.DB) {
 		}
 		srvItems["tenant_id"] = scv
 		rows = append(rows, srvItems)
-		res := insertAPIproducts(rows, db)
+		res := insertAPIproducts(rows, db, txn)
 		Expect(res).Should(BeTrue())
 	}
 
@@ -246,7 +248,7 @@ func insertTestData(db *sql.DB) {
 		srvItems["tenant_id"] = scv
 
 		rows = append(rows, srvItems)
-		res := insertDevelopers(rows, db)
+		res := insertDevelopers(rows, db, txn)
 		Expect(res).Should(BeTrue())
 	}
 
@@ -295,7 +297,7 @@ func insertTestData(db *sql.DB) {
 			}
 			srvItems["tenant_id"] = scv
 			rows = append(rows, srvItems)
-			res := insertApplications(rows, db)
+			res := insertApplications(rows, db, txn)
 			Expect(res).Should(BeTrue())
 		}
 		k = j
@@ -336,7 +338,7 @@ func insertTestData(db *sql.DB) {
 		}
 		srvItems["tenant_id"] = scv
 		rows = append(rows, srvItems)
-		res := insertCredentials(rows, db)
+		res := insertCredentials(rows, db, txn)
 		Expect(res).Should(BeTrue())
 	}
 
@@ -379,7 +381,7 @@ func insertTestData(db *sql.DB) {
 		}
 		srvItems["tenant_id"] = scv
 		rows = append(rows, srvItems)
-		res := insertAPIProductMappers(rows, db)
+		res := insertAPIProductMappers(rows, db, txn)
 		Expect(res).Should(BeTrue())
 	}
 

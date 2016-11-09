@@ -9,11 +9,14 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var count int = 0
 var _ = Describe("listener", func() {
 
 	It("should store data from ApigeeSync in the database", func(done Done) {
 
 		var event = common.ChangeList{}
+		var event2 = common.ChangeList{}
+
 		/* API Product */
 		srvItems := common.Row{}
 		scv := &common.ColumnVal{
@@ -196,31 +199,56 @@ var _ = Describe("listener", func() {
 			},
 		}
 
+		event2.Changes = []common.Change{
+			{
+				Table:     "kms.api_product",
+				OldRow:    srvItems,
+				Operation: 3,
+			},
+			{
+				Table:     "kms.developer",
+				OldRow:    devItems,
+				Operation: 3,
+			},
+			{
+				Table:     "kms.app",
+				OldRow:    appItems,
+				Operation: 3,
+			},
+			{
+				Table:     "kms.app_credential",
+				OldRow:    credItems,
+				Operation: 3,
+			},
+			{
+				Table:     "kms.app_credential_apiproduct_mapper",
+				OldRow:    mpItems,
+				Operation: 3,
+			},
+		}
 		h := &test_handler{
-			"checkDatabase",
+			"checkDatabase post Insertion",
 			func(e apid.Event) {
-
 				// ignore the first event, let standard listener process it
 				changeSet := e.(*common.ChangeList)
 				if len(changeSet.Changes) > 0 {
 					return
 				}
-				processChange(changeSet)
 				rsp, err := verifyAPIKey("ch_app_credential_0", "/test", "Env_0", "test_org0", "verify")
 				Expect(err).ShouldNot(HaveOccurred())
-
 				var respj kmsResponseSuccess
 				json.Unmarshal(rsp, &respj)
 				Expect(respj.Type).Should(Equal("APIKeyContext"))
 				Expect(respj.RspInfo.Key).Should(Equal("ch_app_credential_0"))
-
 				close(done)
 			},
 		}
 
 		apid.Events().Listen(ApigeeSyncEventSelector, h)
-		apid.Events().Emit(ApigeeSyncEventSelector, &event)               // for standard listener
-		apid.Events().Emit(ApigeeSyncEventSelector, &common.ChangeList{}) // for test listener
+		apid.Events().Emit(ApigeeSyncEventSelector, &event)
+		apid.Events().Emit(ApigeeSyncEventSelector, &event2)
+		apid.Events().Emit(ApigeeSyncEventSelector, &event)
+		apid.Events().Emit(ApigeeSyncEventSelector, &common.ChangeList{})
 	})
 
 })
