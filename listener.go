@@ -29,11 +29,11 @@ func (h *handler) Handle(e apid.Event) {
 
 	snapData, ok := e.(*common.Snapshot)
 	if ok {
-		processSnapshot(snapData, db, txn)
+		res = processSnapshot(snapData, db, txn)
 	} else {
 		changeSet, ok := e.(*common.ChangeList)
 		if ok {
-			processChange(changeSet, db, txn)
+			res = processChange(changeSet, db, txn)
 		} else {
 			log.Errorf("Received Invalid event. This shouldn't happen!")
 		}
