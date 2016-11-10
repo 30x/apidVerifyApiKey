@@ -29,11 +29,11 @@ func (h *handler) Handle(e apid.Event) {
 
 	snapData, ok := e.(*common.Snapshot)
 	if ok {
-		res = processSnapshot(snapData, db, txn)
+		res = processSnapshot(snapData, txn)
 	} else {
 		changeSet, ok := e.(*common.ChangeList)
 		if ok {
-			res = processChange(changeSet, db, txn)
+			res = processChange(changeSet, txn)
 		} else {
 			log.Errorf("Received Invalid event. This shouldn't happen!")
 		}
@@ -46,7 +46,7 @@ func (h *handler) Handle(e apid.Event) {
 	return
 }
 
-func processSnapshot(snapshot *common.Snapshot, db *sql.DB, txn *sql.Tx) bool {
+func processSnapshot(snapshot *common.Snapshot, txn *sql.Tx) bool {
 
 	res := true
 	log.Debugf("Process Snapshot data")
@@ -57,15 +57,15 @@ func processSnapshot(snapshot *common.Snapshot, db *sql.DB, txn *sql.Tx) bool {
 	for _, payload := range snapshot.Tables {
 		switch payload.Name {
 		case "kms.developer":
-			res = insertDevelopers(payload.Rows, db, txn)
+			res = insertDevelopers(payload.Rows, txn)
 		case "kms.app":
-			res = insertApplications(payload.Rows, db, txn)
+			res = insertApplications(payload.Rows, txn)
 		case "kms.app_credential":
-			res = insertCredentials(payload.Rows, db, txn)
+			res = insertCredentials(payload.Rows, txn)
 		case "kms.api_product":
-			res = insertAPIproducts(payload.Rows, db, txn)
+			res = insertAPIproducts(payload.Rows, txn)
 		case "kms.app_credential_apiproduct_mapper":
-			res = insertAPIProductMappers(payload.Rows, db, txn)
+			res = insertAPIProductMappers(payload.Rows, txn)
 		}
 		if res == false {
 			log.Error("Error encountered in Downloading Snapshot for VerifyApiKey")
@@ -79,12 +79,12 @@ func processSnapshot(snapshot *common.Snapshot, db *sql.DB, txn *sql.Tx) bool {
 /*
  * Performs bulk insert of credentials
  */
-func insertCredentials(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
+func insertCredentials(rows []common.Row, txn *sql.Tx) bool {
 
 	var scope, id, appId, consumerSecret, appstatus, status, tenantId string
 	var issuedAt int64
 
-	prep, err := db.Prepare("INSERT INTO APP_CREDENTIAL (_apid_scope, id, app_id, consumer_secret, app_status, status, issued_at, tenant_id)VALUES($1,$2,$3,$4,$5,$6,$7,$8);")
+	prep, err := txn.Prepare("INSERT INTO APP_CREDENTIAL (_apid_scope, id, app_id, consumer_secret, app_status, status, issued_at, tenant_id)VALUES($1,$2,$3,$4,$5,$6,$7,$8);")
 	if err != nil {
 		log.Error("INSERT Cred Failed: ", err)
 		return false
@@ -122,12 +122,12 @@ func insertCredentials(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
 /*
  * Performs Bulk insert of Applications
  */
-func insertApplications(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
+func insertApplications(rows []common.Row, txn *sql.Tx) bool {
 
 	var scope, EntityIdentifier, DeveloperId, CallbackUrl, Status, AppName, AppFamily, tenantId, CreatedBy, LastModifiedBy string
 	var CreatedAt, LastModifiedAt int64
 
-	prep, err := db.Prepare("INSERT INTO APP (_apid_scope, id, developer_id,callback_url,status, name, app_family, created_at, created_by,updated_at, updated_by,tenant_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
+	prep, err := txn.Prepare("INSERT INTO APP (_apid_scope, id, developer_id,callback_url,status, name, app_family, created_at, created_by,updated_at, updated_by,tenant_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
 	if err != nil {
 		log.Error("INSERT APP Failed: ", err)
 		return false
@@ -177,12 +177,12 @@ func insertApplications(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
 /*
  * Performs bulk insert of Developers
  */
-func insertDevelopers(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
+func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 
 	var scope, EntityIdentifier, Email, Status, UserName, FirstName, LastName, tenantId, CreatedBy, LastModifiedBy, Username string
 	var CreatedAt, LastModifiedAt int64
 
-	prep, err := db.Prepare("INSERT INTO DEVELOPER (_apid_scope,email,id,tenant_id,status,username,first_name,last_name,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
+	prep, err := txn.Prepare("INSERT INTO DEVELOPER (_apid_scope,email,id,tenant_id,status,username,first_name,last_name,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
 	if err != nil {
 		log.Error("INSERT DEVELOPER Failed: ", err)
 		return false
@@ -231,11 +231,11 @@ func insertDevelopers(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
 /*
  * Performs Bulk insert of API products
  */
-func insertAPIproducts(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
+func insertAPIproducts(rows []common.Row, txn *sql.Tx) bool {
 
 	var scope, apiProduct, res, env, tenantId string
 
-	prep, err := db.Prepare("INSERT INTO API_PRODUCT (id, api_resources, environments, tenant_id,_apid_scope) VALUES($1,$2,$3,$4,$5)")
+	prep, err := txn.Prepare("INSERT INTO API_PRODUCT (id, api_resources, environments, tenant_id,_apid_scope) VALUES($1,$2,$3,$4,$5)")
 	if err != nil {
 		log.Error("INSERT API_PRODUCT Failed: ", err)
 		return false
@@ -270,11 +270,11 @@ func insertAPIproducts(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
 /*
  * Performs a bulk insert of all APP_CREDENTIAL_APIPRODUCT_MAPPER rows
  */
-func insertAPIProductMappers(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
+func insertAPIProductMappers(rows []common.Row, txn *sql.Tx) bool {
 
 	var ApiProduct, AppId, EntityIdentifier, tenantId, Scope, Status string
 
-	prep, err := db.Prepare("INSERT INTO APP_CREDENTIAL_APIPRODUCT_MAPPER(apiprdt_id, app_id, appcred_id, tenant_id, _apid_scope, status) VALUES($1,$2,$3,$4,$5,$6);")
+	prep, err := txn.Prepare("INSERT INTO APP_CREDENTIAL_APIPRODUCT_MAPPER(apiprdt_id, app_id, appcred_id, tenant_id, _apid_scope, status) VALUES($1,$2,$3,$4,$5,$6);")
 	if err != nil {
 		log.Error("INSERT APP_CREDENTIAL_APIPRODUCT_MAPPER Failed: ", err)
 		return false
@@ -329,7 +329,7 @@ func insertAPIProductMappers(rows []common.Row, db *sql.DB, txn *sql.Tx) bool {
 	return true
 }
 
-func processChange(changes *common.ChangeList, db *sql.DB, txn *sql.Tx) bool {
+func processChange(changes *common.ChangeList, txn *sql.Tx) bool {
 
 	var rows []common.Row
 	res := true
@@ -342,73 +342,73 @@ func processChange(changes *common.ChangeList, db *sql.DB, txn *sql.Tx) bool {
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				res = insertDevelopers(rows, db, txn)
+				res = insertDevelopers(rows, txn)
 
 			case common.Update:
-				res = deleteObject("DEVELOPER", payload.OldRow, db, txn)
+				res = deleteObject("DEVELOPER", payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				res = insertDevelopers(rows, db, txn)
+				res = insertDevelopers(rows, txn)
 
 			case common.Delete:
-				res = deleteObject("DEVELOPER", payload.OldRow, db, txn)
+				res = deleteObject("DEVELOPER", payload.OldRow, txn)
 			}
 		case "kms.app":
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				res = insertApplications(rows, db, txn)
+				res = insertApplications(rows, txn)
 
 			case common.Update:
-				res = deleteObject("APP", payload.OldRow, db, txn)
+				res = deleteObject("APP", payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				res = insertApplications(rows, db, txn)
+				res = insertApplications(rows, txn)
 
 			case common.Delete:
-				res = deleteObject("APP", payload.OldRow, db, txn)
+				res = deleteObject("APP", payload.OldRow, txn)
 			}
 
 		case "kms.app_credential":
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				res = insertCredentials(rows, db, txn)
+				res = insertCredentials(rows, txn)
 
 			case common.Update:
-				res = deleteObject("APP_CREDENTIAL", payload.OldRow, db, txn)
+				res = deleteObject("APP_CREDENTIAL", payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				res = insertCredentials(rows, db, txn)
+				res = insertCredentials(rows, txn)
 
 			case common.Delete:
-				res = deleteObject("APP_CREDENTIAL", payload.OldRow, db, txn)
+				res = deleteObject("APP_CREDENTIAL", payload.OldRow, txn)
 			}
 		case "kms.api_product":
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				res = insertAPIproducts(rows, db, txn)
+				res = insertAPIproducts(rows, txn)
 
 			case common.Update:
-				res = deleteObject("API_PRODUCT", payload.OldRow, db, txn)
+				res = deleteObject("API_PRODUCT", payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				res = insertAPIproducts(rows, db, txn)
+				res = insertAPIproducts(rows, txn)
 
 			case common.Delete:
-				res = deleteObject("API_PRODUCT", payload.OldRow, db, txn)
+				res = deleteObject("API_PRODUCT", payload.OldRow, txn)
 			}
 
 		case "kms.app_credential_apiproduct_mapper":
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				res = insertAPIProductMappers(rows, db, txn)
+				res = insertAPIProductMappers(rows, txn)
 
 			case common.Update:
-				res = deleteAPIproductMapper(payload.OldRow, db, txn)
+				res = deleteAPIproductMapper(payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				res = insertAPIProductMappers(rows, db, txn)
+				res = insertAPIProductMappers(rows, txn)
 
 			case common.Delete:
-				res = deleteAPIproductMapper(payload.OldRow, db, txn)
+				res = deleteAPIproductMapper(payload.OldRow, txn)
 			}
 		}
 		if res == false {
@@ -422,11 +422,11 @@ func processChange(changes *common.ChangeList, db *sql.DB, txn *sql.Tx) bool {
 /*
  * DELETE OBJECT as passed in the input
  */
-func deleteObject(object string, ele common.Row, db *sql.DB, txn *sql.Tx) bool {
+func deleteObject(object string, ele common.Row, txn *sql.Tx) bool {
 
 	var scope, apiProduct string
 	ssql := "DELETE FROM " + object + " WHERE id = $1 AND _apid_scope = $2"
-	prep, err := db.Prepare(ssql)
+	prep, err := txn.Prepare(ssql)
 	if err != nil {
 		log.Error("DELETE ", object, " Failed: ", err)
 		return false
@@ -449,10 +449,10 @@ func deleteObject(object string, ele common.Row, db *sql.DB, txn *sql.Tx) bool {
 /*
  * DELETE  APIPRDT MAPPER
  */
-func deleteAPIproductMapper(ele common.Row, db *sql.DB, txn *sql.Tx) bool {
+func deleteAPIproductMapper(ele common.Row, txn *sql.Tx) bool {
 	var ApiProduct, AppId, EntityIdentifier, apid_scope string
 
-	prep, err := db.Prepare("DELETE FROM APP_CREDENTIAL_APIPRODUCT_MAPPER WHERE apiprdt_id=$1 AND app_id=$2 AND appcred_id=$3 AND _apid_scope=$4;")
+	prep, err := txn.Prepare("DELETE FROM APP_CREDENTIAL_APIPRODUCT_MAPPER WHERE apiprdt_id=$1 AND app_id=$2 AND appcred_id=$3 AND _apid_scope=$4;")
 	if err != nil {
 		log.Error("DELETE APP_CREDENTIAL_APIPRODUCT_MAPPER Failed: ", err)
 		return false
