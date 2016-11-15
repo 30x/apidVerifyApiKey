@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	apiPath = "/verifyAPIKey"
+	apiPath = "/verifiers/apikey"
 )
 
 var (
@@ -33,7 +33,7 @@ func initPlugin(services apid.Services) error {
 	}
 
 	var count int
-	row := db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='company';")
+	row := db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='API_PRODUCT' COLLATE NOCASE;")
 	if err := row.Scan(&count); err != nil {
 		log.Panic("Unable to setup database", err)
 	}
@@ -50,7 +50,111 @@ func initPlugin(services apid.Services) error {
 }
 
 func createTables(db *sql.DB) {
-	_, err := db.Exec("CREATE TABLE COMPANY (org varchar(255), id varchar(255), PRIMARY KEY (id, org));CREATE TABLE DEVELOPER (org varchar(255), email varchar(255), id varchar(255), sts varchar(255), username varchar(255), firstname varchar(255), lastname varchar(255), apigee_scope varchar(255), enc_password varchar(255), salt varchar(255), created_at integer, created_by varchar(255), updated_at integer, updated_by varchar(255), PRIMARY KEY (id, org));CREATE TABLE APP (org varchar(255), id varchar(255), dev_id varchar(255) null, cmp_id varchar(255) null, display_name varchar(255), apigee_scope varchar(255), type varchar(255), access_type varchar(255), cback_url varchar(255), status varchar(255), name varchar(255), app_family varchar(255), created_at integer, created_by varchar(255), updated_at integer, updated_by varchar(255), PRIMARY KEY (id, org), FOREIGN KEY (dev_id, org) references DEVELOPER (id, org) ON DELETE CASCADE);CREATE TABLE APP_CREDENTIAL (org varchar(255), id varchar(255), app_id varchar(255), cons_secret varchar(255), method_type varchar(255), status varchar(255), issued_at integer, expire_at integer, created_at integer, created_by varchar(255), updated_at integer, updated_by varchar(255), PRIMARY KEY (id, org), FOREIGN KEY (app_id, org) references app (id, org) ON DELETE CASCADE);CREATE TABLE API_PRODUCT (org varchar(255), id varchar(255), res_names varchar(255), env varchar(255), PRIMARY KEY (id, org));CREATE TABLE COMPANY_DEVELOPER (org varchar(255), dev_id varchar(255), id varchar(255), cmpny_id varchar(255), PRIMARY KEY (id, org), FOREIGN KEY (cmpny_id) references company(id) ON DELETE CASCADE, FOREIGN KEY (dev_id, org) references DEVELOPER(id, org) ON DELETE CASCADE);CREATE TABLE APP_AND_API_PRODUCT_MAPPER (org varchar(255), api_prdt_id varchar(255), app_id varchar(255), app_cred_id varchar(255), api_prdt_status varchar(255), PRIMARY KEY (org, api_prdt_id, app_id, app_cred_id), FOREIGN KEY (api_prdt_id, org) references api_product(id, org) ON DELETE CASCADE, FOREIGN KEY (app_cred_id, org) references app_credential(id, org) ON DELETE CASCADE, FOREIGN KEY (app_id, org) references app(id, org) ON DELETE CASCADE);")
+	_, err := db.Exec(`
+CREATE TABLE api_product (
+    id text,
+    tenant_id text,
+    name text,
+    display_name text,
+    description text,
+    api_resources text[],
+    approval_type text,
+    _apid_scope text,
+    proxies text[],
+    environments text[],
+    quota text,
+    quota_time_unit text,
+    quota_interval int,
+    created_at int64,
+    created_by text,
+    updated_at int64,
+    updated_by text,
+    PRIMARY KEY (tenant_id, id));
+CREATE TABLE developer (
+    id text,
+    tenant_id text,
+    username text,
+    first_name text,
+    last_name text,
+    password text,
+    email text,
+    status text,
+    encrypted_password text,
+    salt text,
+    _apid_scope text,
+    created_at int64,
+    created_by text,
+    updated_at int64,
+    updated_by text,
+    PRIMARY KEY (tenant_id, id)
+);
+CREATE TABLE company (
+    id text,
+    tenant_id text,
+    name text,
+    display_name text,
+    status text,
+    created_at int64,
+    created_by text,
+    updated_at int64,
+    updated_by text,
+    _apid_scope text,
+    PRIMARY KEY (tenant_id, id)
+);
+CREATE TABLE company_developer (
+     tenant_id text,
+     company_id text,
+     developer_id text,
+    roles text[],
+    created_at int64,
+    created_by text,
+    updated_at int64,
+    updated_by text,
+    _apid_scope text,
+    PRIMARY KEY (tenant_id, company_id,developer_id)
+);
+CREATE TABLE app (
+    id text,
+    tenant_id text,
+    name text,
+    display_name text,
+    access_type text,
+    callback_url text,
+    status text,
+    app_family text,
+    company_id text,
+    developer_id text,
+    type int,
+    created_at int64,
+    created_by text,
+    updated_at int64,
+    updated_by text,
+    _apid_scope text,
+    PRIMARY KEY (tenant_id, id)
+);
+CREATE TABLE app_credential (
+    id text,
+    tenant_id text,
+    consumer_secret text,
+    app_id text,
+    method_type text,
+    status text,
+    issued_at int64,
+    expires_at int64,
+    app_status text,
+    _apid_scope text,
+    PRIMARY KEY (tenant_id, id)
+);
+CREATE TABLE app_credential_apiproduct_mapper (
+    tenant_id text,
+    appcred_id text,
+    app_id text,
+    apiprdt_id text,
+    _apid_scope text,
+    status text,
+    PRIMARY KEY (appcred_id, app_id, apiprdt_id,tenant_id)
+);
+`)
 	if err != nil {
 		log.Panic("Unable to initialize DB", err)
 	}

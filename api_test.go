@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"github.com/30x/apid"
 	"github.com/30x/apid/factory"
-	. "github.com/30x/apidApigeeSync" // for direct access to Payload types
+	"github.com/apigee-labs/transicator/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
@@ -39,8 +39,10 @@ var _ = Describe("api", func() {
 
 		db, err = apid.Data().DB()
 		Expect(err).NotTo(HaveOccurred())
-		insertTestData(db)
-
+		txn, err := db.Begin()
+		Expect(err).ShouldNot(HaveOccurred())
+		insertTestData(db, txn)
+		txn.Commit()
 		server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if req.URL.Path == apiPath {
 				handleRequest(w, req)
@@ -66,33 +68,33 @@ var _ = Describe("api", func() {
 			Expect(respj.ErrInfo.ErrorCode).Should(Equal("REQ_ENTRY_NOT_FOUND"))
 
 		})
+		/*
+			It("should reject a key once it's deleted", func() {
+				pd0 := &DataPayload{
+					EntityIdentifier: "app_credential_0",
+				}
+				res := deleteCredential(*pd0, db)
+				Expect(res).Should(BeTrue())
 
-		It("should reject a key once it's deleted", func() {
-			pd0 := &DataPayload{
-				EntityIdentifier: "credential_0",
-			}
-			res := deleteCredential(*pd0, db, "Org_0")
-			Expect(res).Should(BeTrue())
+				var respj kmsResponseFail
+				rsp, err := verifyAPIKey("app_credential_0", "/test", "Env_0", "Org_0", "verify")
+				Expect(err).ShouldNot(HaveOccurred())
 
-			var respj kmsResponseFail
-			rsp, err := verifyAPIKey("credential_0", "/test", "Env_0", "Org_0", "verify")
-			Expect(err).ShouldNot(HaveOccurred())
-
-			json.Unmarshal(rsp, &respj)
-			Expect(respj.Type).Should(Equal("ErrorResult"))
-			Expect(respj.ErrInfo.ErrorCode).Should(Equal("REQ_ENTRY_NOT_FOUND"))
-		})
-
+				json.Unmarshal(rsp, &respj)
+				Expect(respj.Type).Should(Equal("ErrorResult"))
+				Expect(respj.ErrInfo.ErrorCode).Should(Equal("REQ_ENTRY_NOT_FOUND"))
+			})
+		*/
 		It("should successfully verify good keys", func() {
 			for i := 1; i < 10; i++ {
 				resulti := strconv.FormatInt(int64(i), 10)
-				rsp, err := verifyAPIKey("credential_"+resulti, "/test", "Env_0", "Org_0", "verify")
+				rsp, err := verifyAPIKey("app_credential_"+resulti, "/test", "Env_0", "Org_0", "verify")
 				Expect(err).ShouldNot(HaveOccurred())
 
 				var respj kmsResponseSuccess
 				json.Unmarshal(rsp, &respj)
 				Expect(respj.Type).Should(Equal("APIKeyContext"))
-				Expect(respj.RspInfo.Key).Should(Equal("credential_" + resulti))
+				Expect(respj.RspInfo.Key).Should(Equal("app_credential_" + resulti))
 			}
 		})
 	})
@@ -134,7 +136,7 @@ var _ = Describe("api", func() {
 
 			v := url.Values{}
 			v.Add("organization", "Org_0")
-			v.Add("key", "credential_1")
+			v.Add("key", "app_credential_1")
 			v.Add("environment", "Env_0")
 			v.Add("uriPath", "/test")
 			v.Add("action", "verify")
@@ -152,42 +154,101 @@ var _ = Describe("api", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			json.Unmarshal(body, &respj)
 			Expect(respj.Type).Should(Equal("APIKeyContext"))
-			Expect(respj.RspInfo.Key).Should(Equal("credential_1"))
+			Expect(respj.RspInfo.Key).Should(Equal("app_credential_1"))
 		})
 	})
 })
 
-func insertTestData(db *sql.DB) {
+func insertTestData(db *sql.DB, txn *sql.Tx) {
 
 	for i := 0; i < 10; i++ {
+		var rows []common.Row
+		srvItems := common.Row{}
 		result := strconv.FormatInt(int64(i), 10)
-		pd0 := &DataPayload{
-			PldCont: Payload{
-				AppName:      "Api_product_" + result,
-				Resources:    []string{"/**", "/test"},
-				Environments: []string{"Env_0", "Env_1"},
-			},
-		}
 
-		res := insertAPIproduct(*pd0, db, "Org_0")
+		scv := &common.ColumnVal{
+			Value: "api_product_" + result,
+			Type:  1,
+		}
+		srvItems["id"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "{/**, /test}",
+			Type:  1,
+		}
+		srvItems["api_resources"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "{Env_0, Env_1}",
+			Type:  1,
+		}
+		srvItems["environments"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "Org_0",
+			Type:  1,
+		}
+		srvItems["_apid_scope"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "tenant_id_xxxx",
+			Type:  1,
+		}
+		srvItems["tenant_id"] = scv
+		rows = append(rows, srvItems)
+		res := insertAPIproducts(rows, db, txn)
 		Expect(res).Should(BeTrue())
 	}
 
 	for i := 0; i < 10; i++ {
+		var rows []common.Row
+		srvItems := common.Row{}
 		result := strconv.FormatInt(int64(i), 10)
 
-		pd1 := &DataPayload{
-			EntityIdentifier: "developer_id_" + result,
-			PldCont: Payload{
-				Email:     "person_0@apigee.com",
-				Status:    "Active",
-				UserName:  "user_0",
-				FirstName: "user_first_name0",
-				LastName:  "user_last_name0",
-			},
+		scv := &common.ColumnVal{
+			Value: "developer_id_" + result,
+			Type:  1,
 		}
+		srvItems["id"] = scv
 
-		res := insertCreateDeveloper(*pd1, db, "Org_0")
+		scv = &common.ColumnVal{
+			Value: "test@apigee.com",
+			Type:  1,
+		}
+		srvItems["email"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "Active",
+			Type:  1,
+		}
+		srvItems["status"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "Apigee",
+			Type:  1,
+		}
+		srvItems["firstName"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "Google",
+			Type:  1,
+		}
+		srvItems["lastName"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "Org_0",
+			Type:  1,
+		}
+		srvItems["_apid_scope"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "tenant_id_xxxx",
+			Type:  1,
+		}
+		srvItems["tenant_id"] = scv
+
+		rows = append(rows, srvItems)
+		res := insertDevelopers(rows, db, txn)
 		Expect(res).Should(BeTrue())
 	}
 
@@ -195,44 +256,133 @@ func insertTestData(db *sql.DB) {
 	for i := 0; i < 10; i++ {
 		resulti := strconv.FormatInt(int64(i), 10)
 		for j = k; j < 10+k; j++ {
-			resultj := strconv.FormatInt(int64(j), 10)
-			pd2 := &DataPayload{
-				EntityIdentifier: "application_id_" + resultj,
-				PldCont: Payload{
-					Email:       "person_0@apigee.com",
-					Status:      "Approved",
-					AppName:     "application_id_" + resultj,
-					DeveloperId: "developer_id_" + resulti,
-					CallbackUrl: "call_back_url_0",
-				},
-			}
+			var rows []common.Row
 
-			res := insertCreateApplication(*pd2, db, "Org_0")
+			srvItems := common.Row{}
+			resultj := strconv.FormatInt(int64(j), 10)
+
+			scv := &common.ColumnVal{
+				Value: "application_id_" + resultj,
+				Type:  1,
+			}
+			srvItems["id"] = scv
+
+			scv = &common.ColumnVal{
+				Value: "developer_id_" + resulti,
+				Type:  1,
+			}
+			srvItems["developer_id"] = scv
+
+			scv = &common.ColumnVal{
+				Value: "approved",
+				Type:  1,
+			}
+			srvItems["status"] = scv
+
+			scv = &common.ColumnVal{
+				Value: "http://apigee.com",
+				Type:  1,
+			}
+			srvItems["callback_url"] = scv
+
+			scv = &common.ColumnVal{
+				Value: "Org_0",
+				Type:  1,
+			}
+			srvItems["_apid_scope"] = scv
+
+			scv = &common.ColumnVal{
+				Value: "tenant_id_xxxx",
+				Type:  1,
+			}
+			srvItems["tenant_id"] = scv
+			rows = append(rows, srvItems)
+			res := insertApplications(rows, db, txn)
 			Expect(res).Should(BeTrue())
 		}
 		k = j
 	}
 
-	j = 0
-	k = 0
 	for i := 0; i < 10; i++ {
-		resulti := strconv.FormatInt(int64(i), 10)
-		for j = k; j < 10+k; j++ {
-			resultj := strconv.FormatInt(int64(j), 10)
-			pd3 := &DataPayload{
-				EntityIdentifier: "credential_" + resultj,
-				PldCont: Payload{
-					AppId:          "application_id_" + resulti,
-					Status:         "Approved",
-					ConsumerSecret: "consumer_secret_0",
-					IssuedAt:       349583485,
-					ApiProducts:    []Apip{{ApiProduct: "Api_product_0", Status: "Approved"}},
-				},
-			}
+		var rows []common.Row
+		srvItems := common.Row{}
+		result := strconv.FormatInt(int64(i), 10)
 
-			res := insertCreateCredential(*pd3, db, "Org_0")
-			Expect(res).Should(BeTrue())
+		scv := &common.ColumnVal{
+			Value: "app_credential_" + result,
+			Type:  1,
 		}
-		k = j
+		srvItems["id"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "application_id_" + result,
+			Type:  1,
+		}
+		srvItems["app_id"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "approved",
+			Type:  1,
+		}
+		srvItems["status"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "Org_0",
+			Type:  1,
+		}
+		srvItems["_apid_scope"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "tenant_id_xxxx",
+			Type:  1,
+		}
+		srvItems["tenant_id"] = scv
+		rows = append(rows, srvItems)
+		res := insertCredentials(rows, db, txn)
+		Expect(res).Should(BeTrue())
 	}
+
+	for i := 0; i < 10; i++ {
+		var rows []common.Row
+		srvItems := common.Row{}
+		result := strconv.FormatInt(int64(i), 10)
+
+		scv := &common.ColumnVal{
+			Value: "api_product_" + result,
+			Type:  1,
+		}
+		srvItems["apiprdt_id"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "application_id_" + result,
+			Type:  1,
+		}
+		srvItems["app_id"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "app_credential_" + result,
+			Type:  1,
+		}
+		srvItems["appcred_id"] = scv
+		scv = &common.ColumnVal{
+			Value: "approved",
+			Type:  1,
+		}
+		srvItems["status"] = scv
+		scv = &common.ColumnVal{
+			Value: "Org_0",
+			Type:  1,
+		}
+		srvItems["_apid_scope"] = scv
+
+		scv = &common.ColumnVal{
+			Value: "tenant_id_xxxx",
+			Type:  1,
+		}
+		srvItems["tenant_id"] = scv
+		rows = append(rows, srvItems)
+		res := insertAPIProductMappers(rows, db, txn)
+		Expect(res).Should(BeTrue())
+	}
+
 }

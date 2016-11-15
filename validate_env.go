@@ -1,15 +1,16 @@
 package apidVerifyApiKey
 
-import "encoding/json"
+import "strings"
 
 /*
  * Ensure the ENV matches.
  */
-func validateEnv(envLocal, envInPath string) bool {
+func validateEnv(envLocal string, envInPath string) bool {
 
-	var ePaths []string
-	json.Unmarshal([]byte(envLocal), &ePaths)
-	for _, a := range ePaths {
+	s := strings.TrimPrefix(envLocal, "{")
+	s = strings.TrimSuffix(s, "}")
+	fs := strings.Split(s, ",")
+	for _, a := range fs {
 		if a == envInPath {
 			return true
 		}
