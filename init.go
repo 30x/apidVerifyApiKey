@@ -3,7 +3,6 @@ package apidVerifyApiKey
 import (
 	"database/sql"
 	"github.com/30x/apid"
-	"github.com/30x/apidApigeeSync"
 )
 
 const (
@@ -43,7 +42,7 @@ func initPlugin(services apid.Services) error {
 
 	services.API().HandleFunc(apiPath, handleRequest)
 
-	events.Listen(apidApigeeSync.ApigeeSyncEventSelector, &handler{})
+	events.Listen("ApigeeSync", &handler{})
 	log.Debug("end init")
 
 	return nil
