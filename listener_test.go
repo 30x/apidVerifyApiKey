@@ -3,7 +3,6 @@ package apidVerifyApiKey
 import (
 	"encoding/json"
 	"github.com/30x/apid"
-	. "github.com/30x/apidApigeeSync" // for direct access to Payload types
 	"github.com/apigee-labs/transicator/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -244,11 +243,11 @@ var _ = Describe("listener", func() {
 			},
 		}
 
-		apid.Events().Listen(ApigeeSyncEventSelector, h)
-		apid.Events().Emit(ApigeeSyncEventSelector, &event)
-		apid.Events().Emit(ApigeeSyncEventSelector, &event2)
-		apid.Events().Emit(ApigeeSyncEventSelector, &event)
-		apid.Events().Emit(ApigeeSyncEventSelector, &common.ChangeList{})
+		apid.Events().Listen("ApigeeSync", h)
+		apid.Events().Emit("ApigeeSync", &event)
+		apid.Events().Emit("ApigeeSync", &event2)
+		apid.Events().Emit("ApigeeSync", &event)
+		apid.Events().Emit("ApigeeSync", &common.ChangeList{})
 	})
 
 })
