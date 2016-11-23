@@ -20,7 +20,7 @@ import (
 var _ = Describe("api", func() {
 
 	var tmpDir string
-	var db *sql.DB
+	var db apid.DB
 	var server *httptest.Server
 
 	BeforeSuite(func() {
