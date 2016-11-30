@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
 type sucResponseDetail struct {
@@ -34,7 +35,11 @@ type kmsResponseFail struct {
 
 // handle client API
 func handleRequest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+
+	db := getDB()
+	if db == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte("initializing"))
 		return
 	}
 
@@ -42,6 +47,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Unable to parse form"))
+		return
 	}
 
 	f := r.Form
@@ -50,16 +56,11 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		if f.Get(elem) == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(fmt.Sprintf("Missing element: %s", elem)))
+			return
 		}
 	}
 
-	org := f.Get("organization")
-	key := f.Get("key")
-	path := f.Get("uriPath")
-	env := f.Get("environment")
-	action := f.Get("action")
-
-	b, err := verifyAPIKey(key, path, env, org, action)
+	b, err := verifyAPIKey(f)
 	if err != nil {
 		log.Errorf("error: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -71,47 +72,39 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	w.Write(b)
 }
 
-// todo: The following was basically just copied from old APID - needs review.
-
 // returns []byte to be written to client
-func verifyAPIKey(key, path, env, org, action string) ([]byte, error) {
-	var (
-		sSql                               string
-		status, redirectionURIs            string
-		developerAppName, developerId      string
-		resName, resEnv, reason, errorCode string
-		issuedAt, expiresAt                int64
-	)
+func verifyAPIKey(f url.Values) ([]byte, error) {
+
+	db := getDB()
+
+	key := f.Get("key")
+	org := f.Get("organization")
+	path := f.Get("uriPath")
+	env := f.Get("environment")
+	action := f.Get("action")
 
 	if key == "" || org == "" || path == "" || env == "" || action != "verify" {
 		log.Error("Input params Invalid/Incomplete")
-		reason = "Input Params Incomplete or Invalid"
-		errorCode = "INCORRECT_USER_INPUT"
+		reason := "Input Params Incomplete or Invalid"
+		errorCode := "INCORRECT_USER_INPUT"
 		return errorResponse(reason, errorCode)
 	}
 
-	db, err := data.DB()
-	if err != nil {
-		log.Errorf("Unable to access DB")
-		reason = err.Error()
-		errorCode = "SEARCH_INTERNAL_ERROR"
-		return errorResponse(reason, errorCode)
-	}
+	sSql := "SELECT ap.api_resources, ap.environments, c.issued_at, c.status, a.callback_url, d.username, d.id FROM APP_CREDENTIAL AS c INNER JOIN APP AS a ON c.app_id = a.id INNER JOIN DEVELOPER AS d ON a.developer_id = d.id INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp ON mp.appcred_id = c.id INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id WHERE (UPPER(d.status) = 'ACTIVE' AND mp.apiprdt_id = ap.id AND mp.app_id = a.id AND mp.appcred_id = c.id AND UPPER(mp.status) = 'APPROVED' AND UPPER(a.status) = 'APPROVED' AND c.id = '" + key + "' AND c._apid_scope = '" + org + "');"
 
-	sSql = "SELECT ap.api_resources, ap.environments, c.issued_at, c.status, a.callback_url, d.username, d.id FROM APP_CREDENTIAL AS c INNER JOIN APP AS a ON c.app_id = a.id INNER JOIN DEVELOPER AS d ON a.developer_id = d.id INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp ON mp.appcred_id = c.id INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id WHERE (UPPER(d.status) = 'ACTIVE' AND mp.apiprdt_id = ap.id AND mp.app_id = a.id AND mp.appcred_id = c.id AND UPPER(mp.status) = 'APPROVED' AND UPPER(a.status) = 'APPROVED' AND c.id = '" + key + "' AND c._apid_scope = '" + org + "');"
-
-	err = db.QueryRow(sSql).Scan(&resName, &resEnv, &issuedAt, &status,
+	var status, redirectionURIs, developerAppName, developerId, resName, resEnv string
+	var issuedAt int64
+	err := db.QueryRow(sSql).Scan(&resName, &resEnv, &issuedAt, &status,
 		&redirectionURIs, &developerAppName, &developerId)
-	expiresAt = -1
 	switch {
 	case err == sql.ErrNoRows:
-		reason = "API Key verify failed for (" + key + ", " + org + ", " + path + ", " + env + ")"
-		errorCode = "REQ_ENTRY_NOT_FOUND"
+		reason := "API Key verify failed for (" + key + ", " + org + ", " + path + ", " + env + ")"
+		errorCode := "REQ_ENTRY_NOT_FOUND"
 		return errorResponse(reason, errorCode)
 
 	case err != nil:
-		reason = err.Error()
-		errorCode = "SEARCH_INTERNAL_ERROR"
+		reason := err.Error()
+		errorCode := "SEARCH_INTERNAL_ERROR"
 		return errorResponse(reason, errorCode)
 	}
 
@@ -121,8 +114,8 @@ func verifyAPIKey(key, path, env, org, action string) ([]byte, error) {
 	 */
 	result := validatePath(resName, path)
 	if result == false {
-		reason = "Path Validation Failed (" + resName + " vs " + path + ")"
-		errorCode = "PATH_VALIDATION_FAILED"
+		reason := "Path Validation Failed (" + resName + " vs " + path + ")"
+		errorCode := "PATH_VALIDATION_FAILED"
 		return errorResponse(reason, errorCode)
 
 	}
@@ -130,11 +123,12 @@ func verifyAPIKey(key, path, env, org, action string) ([]byte, error) {
 	/* Verify if the ENV matches */
 	result = validateEnv(resEnv, env)
 	if result == false {
-		reason = "ENV Validation Failed (" + resEnv + " vs " + env + ")"
-		errorCode = "ENV_VALIDATION_FAILED"
+		reason := "ENV Validation Failed (" + resEnv + " vs " + env + ")"
+		errorCode := "ENV_VALIDATION_FAILED"
 		return errorResponse(reason, errorCode)
 	}
 
+	var expiresAt int64 = -1
 	resp := kmsResponseSuccess{
 		Type: "APIKeyContext",
 		RspInfo: sucResponseDetail{

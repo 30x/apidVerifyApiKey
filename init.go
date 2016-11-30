@@ -2,6 +2,7 @@ package apidVerifyApiKey
 
 import (
 	"github.com/30x/apid"
+	"sync"
 )
 
 const (
@@ -12,7 +13,22 @@ var (
 	log    apid.LogService
 	data   apid.DataService
 	events apid.EventsService
+	unsafeDB apid.DB
+	dbMux    sync.RWMutex
 )
+
+func getDB() apid.DB {
+	dbMux.RLock()
+	db := unsafeDB
+	dbMux.RUnlock()
+	return db
+}
+
+func setDB(db apid.DB) {
+	dbMux.Lock()
+	unsafeDB = db
+	dbMux.Unlock()
+}
 
 func init() {
 	apid.RegisterPlugin(initPlugin)
@@ -25,21 +41,7 @@ func initPlugin(services apid.Services) error {
 	data = services.Data()
 	events = services.Events()
 
-	db, err := data.DB()
-	if err != nil {
-		log.Panic("Unable to access DB", err)
-	}
-
-	var count int
-	row := db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='API_PRODUCT' COLLATE NOCASE;")
-	if err := row.Scan(&count); err != nil {
-		log.Panic("Unable to setup database", err)
-	}
-	if count == 0 {
-		createTables(db)
-	}
-
-	services.API().HandleFunc(apiPath, handleRequest)
+	services.API().HandleFunc(apiPath, handleRequest).Methods("POST")
 
 	events.Listen("ApigeeSync", &handler{})
 	log.Debug("end init")
@@ -49,7 +51,7 @@ func initPlugin(services apid.Services) error {
 
 func createTables(db apid.DB) {
 	_, err := db.Exec(`
-CREATE TABLE api_product (
+CREATE TABLE IF NOT EXISTS api_product (
     id text,
     tenant_id text,
     name text,
@@ -68,7 +70,7 @@ CREATE TABLE api_product (
     updated_at int64,
     updated_by text,
     PRIMARY KEY (tenant_id, id));
-CREATE TABLE developer (
+CREATE TABLE IF NOT EXISTS developer (
     id text,
     tenant_id text,
     username text,
@@ -86,7 +88,7 @@ CREATE TABLE developer (
     updated_by text,
     PRIMARY KEY (tenant_id, id)
 );
-CREATE TABLE company (
+CREATE TABLE IF NOT EXISTS company (
     id text,
     tenant_id text,
     name text,
@@ -99,7 +101,7 @@ CREATE TABLE company (
     _apid_scope text,
     PRIMARY KEY (tenant_id, id)
 );
-CREATE TABLE company_developer (
+CREATE TABLE IF NOT EXISTS company_developer (
      tenant_id text,
      company_id text,
      developer_id text,
@@ -111,7 +113,7 @@ CREATE TABLE company_developer (
     _apid_scope text,
     PRIMARY KEY (tenant_id, company_id,developer_id)
 );
-CREATE TABLE app (
+CREATE TABLE IF NOT EXISTS app (
     id text,
     tenant_id text,
     name text,
@@ -130,7 +132,7 @@ CREATE TABLE app (
     _apid_scope text,
     PRIMARY KEY (tenant_id, id)
 );
-CREATE TABLE app_credential (
+CREATE TABLE IF NOT EXISTS app_credential (
     id text,
     tenant_id text,
     consumer_secret text,
@@ -143,7 +145,7 @@ CREATE TABLE app_credential (
     _apid_scope text,
     PRIMARY KEY (tenant_id, id)
 );
-CREATE TABLE app_credential_apiproduct_mapper (
+CREATE TABLE IF NOT EXISTS app_credential_apiproduct_mapper (
     tenant_id text,
     appcred_id text,
     app_id text,

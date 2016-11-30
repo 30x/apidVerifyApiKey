@@ -15,65 +15,68 @@ func (h *handler) String() string {
 
 func (h *handler) Handle(e apid.Event) {
 
-	res := true
-	db, err := data.DB()
-	if err != nil {
-		panic("Unable to access Sqlite DB")
-	}
-
-	txn, err := db.Begin()
-	if err != nil {
-		log.Error("Unable to create Sqlite transaction")
-		return
-	}
-
 	snapData, ok := e.(*common.Snapshot)
 	if ok {
-		res = processSnapshot(snapData, txn)
+		processSnapshot(snapData)
 	} else {
 		changeSet, ok := e.(*common.ChangeList)
 		if ok {
-			res = processChange(changeSet, txn)
+			processChange(changeSet)
 		} else {
-			log.Errorf("Received Invalid event. This shouldn't happen!")
+			log.Errorf("Received Invalid event. Ignoring. %v", e)
 		}
-	}
-	if res == true {
-		txn.Commit()
-	} else {
-		txn.Rollback()
 	}
 	return
 }
 
-func processSnapshot(snapshot *common.Snapshot, txn *sql.Tx) bool {
+func processSnapshot(snapshot *common.Snapshot) {
 
-	res := true
-	log.Debugf("Process Snapshot data")
-	/*
-	 * Iterate the tables, and insert the rows,
-	 * Commit them in bulk.
-	 */
-	for _, payload := range snapshot.Tables {
-		switch payload.Name {
-		case "kms.developer":
-			res = insertDevelopers(payload.Rows, txn)
-		case "kms.app":
-			res = insertApplications(payload.Rows, txn)
-		case "kms.app_credential":
-			res = insertCredentials(payload.Rows, txn)
-		case "kms.api_product":
-			res = insertAPIproducts(payload.Rows, txn)
-		case "kms.app_credential_apiproduct_mapper":
-			res = insertAPIProductMappers(payload.Rows, txn)
-		}
-		if res == false {
-			log.Error("Error encountered in Downloading Snapshot for VerifyApiKey")
-			return false
-		}
+	log.Debugf("Snapshot received. Switching to DB version: %s", snapshot.SnapshotInfo)
+
+	db, err := data.DBVersion(snapshot.SnapshotInfo)
+	if err != nil {
+		log.Panicf("Unable to access database: %v", err)
 	}
-	log.Debug("Downloading Snapshot for VerifyApiKey complete")
-	return true
+
+	createTables(db)
+
+	if len(snapshot.Tables) > 0 {
+		txn, err := db.Begin()
+		if err != nil {
+			log.Panicf("Unable to create transaction: %v", err)
+			return
+		}
+
+		/*
+		 * Iterate the tables, and insert the rows,
+		 * Commit them in bulk.
+		 */
+		ok := true
+		for _, payload := range snapshot.Tables {
+			switch payload.Name {
+			case "kms.developer":
+				ok = insertDevelopers(payload.Rows, txn)
+			case "kms.app":
+				ok = insertApplications(payload.Rows, txn)
+			case "kms.app_credential":
+				ok = insertCredentials(payload.Rows, txn)
+			case "kms.api_product":
+				ok = insertAPIproducts(payload.Rows, txn)
+			case "kms.app_credential_apiproduct_mapper":
+				ok = insertAPIProductMappers(payload.Rows, txn)
+			}
+			if !ok {
+				log.Error("Error encountered in Downloading Snapshot for VerifyApiKey")
+				txn.Rollback()
+				return
+			}
+		}
+		log.Debug("Downloading Snapshot for VerifyApiKey complete")
+		txn.Commit()
+	}
+
+	setDB(db)
+	return
 }
 
 /*
@@ -329,10 +332,18 @@ func insertAPIProductMappers(rows []common.Row, txn *sql.Tx) bool {
 	return true
 }
 
-func processChange(changes *common.ChangeList, txn *sql.Tx) bool {
+func processChange(changes *common.ChangeList) {
+
+	db := getDB()
+
+	txn, err := db.Begin()
+	if err != nil {
+		log.Error("Unable to create transaction")
+		return
+	}
 
 	var rows []common.Row
-	res := true
+	ok := true
 
 	log.Debugf("apigeeSyncEvent: %d changes", len(changes.Changes))
 	for _, payload := range changes.Changes {
@@ -342,81 +353,83 @@ func processChange(changes *common.ChangeList, txn *sql.Tx) bool {
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				res = insertDevelopers(rows, txn)
+				ok = insertDevelopers(rows, txn)
 
 			case common.Update:
-				res = deleteObject("DEVELOPER", payload.OldRow, txn)
+				ok = deleteObject("DEVELOPER", payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				res = insertDevelopers(rows, txn)
+				ok = insertDevelopers(rows, txn)
 
 			case common.Delete:
-				res = deleteObject("DEVELOPER", payload.OldRow, txn)
+				ok = deleteObject("DEVELOPER", payload.OldRow, txn)
 			}
 		case "kms.app":
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				res = insertApplications(rows, txn)
+				ok = insertApplications(rows, txn)
 
 			case common.Update:
-				res = deleteObject("APP", payload.OldRow, txn)
+				ok = deleteObject("APP", payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				res = insertApplications(rows, txn)
+				ok = insertApplications(rows, txn)
 
 			case common.Delete:
-				res = deleteObject("APP", payload.OldRow, txn)
+				ok = deleteObject("APP", payload.OldRow, txn)
 			}
 
 		case "kms.app_credential":
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				res = insertCredentials(rows, txn)
+				ok = insertCredentials(rows, txn)
 
 			case common.Update:
-				res = deleteObject("APP_CREDENTIAL", payload.OldRow, txn)
+				ok = deleteObject("APP_CREDENTIAL", payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				res = insertCredentials(rows, txn)
+				ok = insertCredentials(rows, txn)
 
 			case common.Delete:
-				res = deleteObject("APP_CREDENTIAL", payload.OldRow, txn)
+				ok = deleteObject("APP_CREDENTIAL", payload.OldRow, txn)
 			}
 		case "kms.api_product":
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				res = insertAPIproducts(rows, txn)
+				ok = insertAPIproducts(rows, txn)
 
 			case common.Update:
-				res = deleteObject("API_PRODUCT", payload.OldRow, txn)
+				ok = deleteObject("API_PRODUCT", payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				res = insertAPIproducts(rows, txn)
+				ok = insertAPIproducts(rows, txn)
 
 			case common.Delete:
-				res = deleteObject("API_PRODUCT", payload.OldRow, txn)
+				ok = deleteObject("API_PRODUCT", payload.OldRow, txn)
 			}
 
 		case "kms.app_credential_apiproduct_mapper":
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				res = insertAPIProductMappers(rows, txn)
+				ok = insertAPIProductMappers(rows, txn)
 
 			case common.Update:
-				res = deleteAPIproductMapper(payload.OldRow, txn)
+				ok = deleteAPIproductMapper(payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				res = insertAPIProductMappers(rows, txn)
+				ok = insertAPIProductMappers(rows, txn)
 
 			case common.Delete:
-				res = deleteAPIproductMapper(payload.OldRow, txn)
+				ok = deleteAPIproductMapper(payload.OldRow, txn)
 			}
 		}
-		if res == false {
+		if !ok {
 			log.Error("Sql Operation error. Operation rollbacked")
-			return false
+			txn.Rollback()
+			return
 		}
 	}
-	return true
+	txn.Commit()
+	return
 }
 
 /*

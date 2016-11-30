@@ -6,9 +6,9 @@ import (
 	"github.com/apigee-labs/transicator/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"net/url"
 )
 
-var count int = 0
 var _ = Describe("listener", func() {
 
 	It("should store data from ApigeeSync in the database", func(done Done) {
@@ -17,158 +17,120 @@ var _ = Describe("listener", func() {
 		var event2 = common.ChangeList{}
 
 		/* API Product */
-		srvItems := common.Row{}
-		scv := &common.ColumnVal{
-			Value: "ch_api_product_0",
-			Type:  1,
+		srvItems := common.Row{
+			"id": {
+				Value: "ch_api_product_0",
+				Type:  1,
+			},
+			"apid_resources": {
+				Value: "{}",
+				Type:  1,
+			},
+			"environments": {
+				Value: "{Env_0, Env_1}",
+				Type:  1,
+			},
+			"tenant_id": {
+				Value: "tenant_id_0",
+				Type:  1,
+			},
+			"_apid_scope": {
+				Value: "test_org0",
+				Type:  1,
+			},
 		}
-		srvItems["id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "{}",
-			Type:  1,
-		}
-		srvItems["api_resources"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "{Env_0, Env_1}",
-			Type:  1,
-		}
-		srvItems["environments"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "tenant_id_0",
-			Type:  1,
-		}
-		srvItems["tenant_id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "test_org0",
-			Type:  1,
-		}
-		srvItems["_apid_scope"] = scv
 
 		/* DEVELOPER */
-		devItems := common.Row{}
-		scv = &common.ColumnVal{
-			Value: "ch_developer_id_0",
-			Type:  1,
+		devItems := common.Row{
+			"id": {
+				Value: "ch_developer_id_0",
+				Type:  1,
+			},
+			"status": {
+				Value: "Active",
+				Type:  1,
+			},
+			"tenant_id": {
+				Value: "tenant_id_0",
+				Type:  1,
+			},
+			"_apid_scope": {
+				Value: "test_org0",
+				Type:  1,
+			},
 		}
-		devItems["id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "Active",
-			Type:  1,
-		}
-		devItems["status"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "tenant_id_0",
-			Type:  1,
-		}
-		devItems["tenant_id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "test_org0",
-			Type:  1,
-		}
-		devItems["_apid_scope"] = scv
 
 		/* APP */
-		appItems := common.Row{}
-		scv = &common.ColumnVal{
-			Value: "ch_application_id_0",
-			Type:  1,
+		appItems := common.Row{
+			"id": {
+				Value: "ch_application_id_0",
+				Type:  1,
+			},
+			"developer_id": {
+				Value: "ch_developer_id_0",
+				Type:  1,
+			},
+			"status": {
+				Value: "Approved",
+				Type:  1,
+			},
+			"tenant_id": {
+				Value: "tenant_id_0",
+				Type:  1,
+			},
+			"_apid_scope": {
+				Value: "test_org0",
+				Type:  1,
+			},
 		}
-		appItems["id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "ch_developer_id_0",
-			Type:  1,
-		}
-		appItems["developer_id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "tenant_id_0",
-			Type:  1,
-		}
-		appItems["tenant_id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "Approved",
-			Type:  1,
-		}
-		appItems["status"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "test_org0",
-			Type:  1,
-		}
-		appItems["_apid_scope"] = scv
 
 		/* CRED */
-		credItems := common.Row{}
-		scv = &common.ColumnVal{
-			Value: "ch_app_credential_0",
-			Type:  1,
+		credItems := common.Row{
+			"id": {
+				Value: "ch_app_credential_0",
+				Type:  1,
+			},
+			"app_id": {
+				Value: "ch_application_id_0",
+				Type:  1,
+			},
+			"tenant_id": {
+				Value: "tenant_id_0",
+				Type:  1,
+			},
+			"status": {
+				Value: "Approved",
+				Type:  1,
+			},
+			"_apid_scope": {
+				Value: "test_org0",
+				Type:  1,
+			},
 		}
-		credItems["id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "ch_application_id_0",
-			Type:  1,
-		}
-		credItems["app_id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "tenant_id_0",
-			Type:  1,
-		}
-		credItems["tenant_id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "Approved",
-			Type:  1,
-		}
-		credItems["status"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "test_org0",
-			Type:  1,
-		}
-		credItems["_apid_scope"] = scv
 
 		/* APP_CRED_APIPRD_MAPPER */
-		mpItems := common.Row{}
-		scv = &common.ColumnVal{
-			Value: "ch_api_product_0",
-			Type:  1,
+		mpItems := common.Row{
+			"apiprdt_id": {
+				Value: "ch_api_product_0",
+				Type:  1,
+			},
+			"app_id": {
+				Value: "ch_application_id_0",
+				Type:  1,
+			},
+			"appcred_id": {
+				Value: "ch_app_credential_0",
+				Type:  1,
+			},
+			"status": {
+				Value: "Approved",
+				Type:  1,
+			},
+			"_apid_scope": {
+				Value: "test_org0",
+				Type:  1,
+			},
 		}
-		mpItems["apiprdt_id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "ch_application_id_0",
-			Type:  1,
-		}
-		mpItems["app_id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "ch_app_credential_0",
-			Type:  1,
-		}
-		mpItems["appcred_id"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "Approved",
-			Type:  1,
-		}
-		mpItems["status"] = scv
-
-		scv = &common.ColumnVal{
-			Value: "test_org0",
-			Type:  1,
-		}
-		mpItems["_apid_scope"] = scv
 
 		event.Changes = []common.Change{
 			{
@@ -228,12 +190,21 @@ var _ = Describe("listener", func() {
 		h := &test_handler{
 			"checkDatabase post Insertion",
 			func(e apid.Event) {
+				defer GinkgoRecover()
+
 				// ignore the first event, let standard listener process it
 				changeSet := e.(*common.ChangeList)
 				if len(changeSet.Changes) > 0 {
 					return
 				}
-				rsp, err := verifyAPIKey("ch_app_credential_0", "/test", "Env_0", "test_org0", "verify")
+				v := url.Values{
+					"key": []string{"ch_app_credential_0"},
+					"uriPath": []string{"/test"},
+					"environment": []string{"Env_0"},
+					"organization": []string{"test_org0"},
+					"action": []string{"verify"},
+				}
+				rsp, err := verifyAPIKey(v)
 				Expect(err).ShouldNot(HaveOccurred())
 				var respj kmsResponseSuccess
 				json.Unmarshal(rsp, &respj)
