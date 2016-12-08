@@ -34,7 +34,7 @@ func init() {
 	apid.RegisterPlugin(initPlugin)
 }
 
-func initPlugin(services apid.Services) error {
+func initPlugin(services apid.Services) (apid.PluginData, error) {
 	log = services.Log().ForModule("apidVerifyAPIKey")
 	log.Debug("start init")
 
@@ -46,7 +46,7 @@ func initPlugin(services apid.Services) error {
 	events.Listen("ApigeeSync", &handler{})
 	log.Debug("end init")
 
-	return nil
+	return pluginData, nil
 }
 
 func createTables(db apid.DB) {
