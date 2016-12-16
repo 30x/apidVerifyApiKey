@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS api_product (
     description text,
     api_resources text[],
     approval_type text,
-    _apid_scope text,
+    _change_selector text,
     proxies text[],
     environments text[],
     quota text,
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS developer (
     status text,
     encrypted_password text,
     salt text,
-    _apid_scope text,
+    _change_selector text,
     created_at int64,
     created_by text,
     updated_at int64,
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS company (
     created_by text,
     updated_at int64,
     updated_by text,
-    _apid_scope text,
+    _change_selector text,
     PRIMARY KEY (tenant_id, id)
 );
 CREATE TABLE IF NOT EXISTS company_developer (
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS company_developer (
     created_by text,
     updated_at int64,
     updated_by text,
-    _apid_scope text,
+    _change_selector text,
     PRIMARY KEY (tenant_id, company_id,developer_id)
 );
 CREATE TABLE IF NOT EXISTS app (
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS app (
     created_by text,
     updated_at int64,
     updated_by text,
-    _apid_scope text,
+    _change_selector text,
     PRIMARY KEY (tenant_id, id)
 );
 CREATE TABLE IF NOT EXISTS app_credential (
@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS app_credential (
     issued_at int64,
     expires_at int64,
     app_status text,
-    _apid_scope text,
+    _change_selector text,
     PRIMARY KEY (tenant_id, id)
 );
 CREATE TABLE IF NOT EXISTS app_credential_apiproduct_mapper (
@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS app_credential_apiproduct_mapper (
     appcred_id text,
     app_id text,
     apiprdt_id text,
-    _apid_scope text,
+    _change_selector text,
     status text,
     PRIMARY KEY (appcred_id, app_id, apiprdt_id,tenant_id)
 );
@@ -159,3 +159,41 @@ CREATE TABLE IF NOT EXISTS app_credential_apiproduct_mapper (
 		log.Panic("Unable to initialize DB", err)
 	}
 }
+
+
+func createApidClusterTables(db apid.DB) {
+	_, err := db.Exec(`
+CREATE TABLE apid_cluster (
+    id text,
+    instance_id text,
+    name text,
+    description text,
+    umbrella_org_app_name text,
+    created int64,
+    created_by text,
+    updated int64,
+    updated_by text,
+    _change_selector text,
+    snapshotInfo text,
+    lastSequence text,
+    PRIMARY KEY (id)
+);
+CREATE TABLE data_scope (
+    id text,
+    apid_cluster_id text,
+    scope text,
+    org text,
+    env text,
+    created int64,
+    created_by text,
+    updated int64,
+    updated_by text,
+    _change_selector text,
+    PRIMARY KEY (id)
+);
+`)
+	if err != nil {
+		log.Panic("Unable to initialize DB", err)
+	}
+}
+

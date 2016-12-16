@@ -78,19 +78,25 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 	db := getDB()
 
 	key := f.Get("key")
-	org := f.Get("organization")
+	scopeuuid := f.Get("scopeuuid")
 	path := f.Get("uriPath")
-	env := f.Get("environment")
 	action := f.Get("action")
 
-	if key == "" || org == "" || path == "" || env == "" || action != "verify" {
+	if key == "" || scopeuuid == "" || path == "" || action != "verify" {
 		log.Error("Input params Invalid/Incomplete")
 		reason := "Input Params Incomplete or Invalid"
 		errorCode := "INCORRECT_USER_INPUT"
 		return errorResponse(reason, errorCode)
 	}
 
-	sSql := "SELECT ap.api_resources, ap.environments, c.issued_at, c.status, a.callback_url, d.username, d.id FROM APP_CREDENTIAL AS c INNER JOIN APP AS a ON c.app_id = a.id INNER JOIN DEVELOPER AS d ON a.developer_id = d.id INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp ON mp.appcred_id = c.id INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id WHERE (UPPER(d.status) = 'ACTIVE' AND mp.apiprdt_id = ap.id AND mp.app_id = a.id AND mp.appcred_id = c.id AND UPPER(mp.status) = 'APPROVED' AND UPPER(a.status) = 'APPROVED' AND c.id = '" + key + "' AND c._apid_scope = '" + org + "');"
+	sSql := "SELECT ap.api_resources, ap.environments, c.issued_at, c.status, a.callback_url, d.username, d.id " +
+		"FROM APP_CREDENTIAL AS c INNER JOIN APP AS a ON c.app_id = a.id " +
+		"INNER JOIN DEVELOPER AS d ON a.developer_id = d.id " +
+		"INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp ON mp.appcred_id = c.id " +
+		"INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id " +
+		"WHERE (UPPER(d.status) = 'ACTIVE' AND mp.apiprdt_id = ap.id AND mp.app_id = a.id " +
+		"AND mp.appcred_id = c.id AND UPPER(mp.status) = 'APPROVED' AND UPPER(a.status) = 'APPROVED' " +
+		"AND c.id = '" + key + "');"
 
 	var status, redirectionURIs, developerAppName, developerId, resName, resEnv string
 	var issuedAt int64
@@ -98,7 +104,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 		&redirectionURIs, &developerAppName, &developerId)
 	switch {
 	case err == sql.ErrNoRows:
-		reason := "API Key verify failed for (" + key + ", " + org + ", " + path + ", " + env + ")"
+		reason := "API Key verify failed for (" + key + ", " + scopeuuid + ", " + path + ")"
 		errorCode := "REQ_ENTRY_NOT_FOUND"
 		return errorResponse(reason, errorCode)
 
@@ -119,6 +125,8 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 		return errorResponse(reason, errorCode)
 
 	}
+
+	env := getEnvByScopeUUID(scopeuuid);
 
 	/* Verify if the ENV matches */
 	result = validateEnv(resEnv, env)
@@ -141,6 +149,23 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			DeveloperAppNam: developerAppName},
 	}
 	return json.Marshal(resp)
+}
+
+func getEnvByScopeUUID(scopeuuid string) (string) {
+	db := getDB()
+
+	sSql := "SELECT env FROM DATA_SCOPE WHERE id = ?;"
+
+	var env string
+	err := db.QueryRow(sSql, scopeuuid).Scan(&env)
+
+	switch {
+	case err == sql.ErrNoRows:
+		log.Debug("No env with that scopeuuid.")
+	case err != nil:
+		log.Debug(err)
+	}
+	return env;
 }
 
 func errorResponse(reason, errorCode string) ([]byte, error) {
