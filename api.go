@@ -51,7 +51,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	f := r.Form
-	elems := []string{"action", "key", "uriPath", "organization", "environment"}
+	elems := []string{"action", "key", "uriPath", "scopeuuid"}
 	for _, elem := range elems {
 		if f.Get(elem) == "" {
 			w.WriteHeader(http.StatusBadRequest)
