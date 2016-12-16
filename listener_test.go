@@ -200,7 +200,7 @@ var _ = Describe("listener", func() {
 				v := url.Values{
 					"key": []string{"ch_app_credential_0"},
 					"uriPath": []string{"/test"},
-					"scopeuuid": []string{"ABCDE"},
+					"scopeuuid": []string{"XYZ"},
 					"action": []string{"verify"},
 				}
 				rsp, err := verifyAPIKey(v)

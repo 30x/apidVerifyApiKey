@@ -293,6 +293,16 @@ func insertTestData(db apid.DB) {
 		"ABCDE",
 		"some_cluster_id",
 		"some_cluster_id",
+		"tenant_id_xxxx",
+		"test_org0",
+		"Env_0",
+	);
+	txn.Exec("INSERT INTO DATA_SCOPE (id, _change_selector, apid_cluster_id, scope, org, env) " +
+		"VALUES" +
+		"($1,$2,$3,$4,$5,$6)",
+		"XYZ",
+		"test_org0",
+		"somecluster_id",
 		"tenant_id_0",
 		"test_org0",
 		"Env_0",

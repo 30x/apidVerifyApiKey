@@ -89,6 +89,24 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 		return errorResponse(reason, errorCode)
 	}
 
+	var env, tenantId string
+	{
+		err := db.QueryRow("SELECT env, scope FROM DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
+
+		switch {
+		case err == sql.ErrNoRows:
+			reason := "ENV Validation Failed"
+			errorCode := "ENV_VALIDATION_FAILED"
+			return errorResponse(reason, errorCode)
+		case err != nil:
+			reason := err.Error()
+			errorCode := "SEARCH_INTERNAL_ERROR"
+			return errorResponse(reason, errorCode)
+		}
+	}
+
+	log.Debug("Found tenant_id='", tenantId, "' with env='", env, "' for scopeuuid='", scopeuuid,"'")
+
 	sSql := "SELECT ap.api_resources, ap.environments, c.issued_at, c.status, a.callback_url, d.username, d.id " +
 		"FROM APP_CREDENTIAL AS c INNER JOIN APP AS a ON c.app_id = a.id " +
 		"INNER JOIN DEVELOPER AS d ON a.developer_id = d.id " +
@@ -96,11 +114,11 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 		"INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id " +
 		"WHERE (UPPER(d.status) = 'ACTIVE' AND mp.apiprdt_id = ap.id AND mp.app_id = a.id " +
 		"AND mp.appcred_id = c.id AND UPPER(mp.status) = 'APPROVED' AND UPPER(a.status) = 'APPROVED' " +
-		"AND c.id = '" + key + "');"
+		"AND c.id = $1 AND c.tenant_id = $2);"
 
 	var status, redirectionURIs, developerAppName, developerId, resName, resEnv string
 	var issuedAt int64
-	err := db.QueryRow(sSql).Scan(&resName, &resEnv, &issuedAt, &status,
+	err := db.QueryRow(sSql, key, tenantId).Scan(&resName, &resEnv, &issuedAt, &status,
 		&redirectionURIs, &developerAppName, &developerId)
 	switch {
 	case err == sql.ErrNoRows:
@@ -125,8 +143,6 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 		return errorResponse(reason, errorCode)
 
 	}
-
-	env := getEnvByScopeUUID(scopeuuid);
 
 	/* Verify if the ENV matches */
 	result = validateEnv(resEnv, env)
