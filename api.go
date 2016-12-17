@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"github.com/30x/apid"
 )
 
 type sucResponseDetail struct {
@@ -75,7 +76,6 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 // returns []byte to be written to client
 func verifyAPIKey(f url.Values) ([]byte, error) {
 
-	db := getDB()
 
 	key := f.Get("key")
 	scopeuuid := f.Get("scopeuuid")
@@ -91,19 +91,29 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 
 	var env, tenantId string
 	{
-		err := db.QueryRow("SELECT env, scope FROM DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
-
+		db, err := apid.Data().DB();
 		switch {
-		case err == sql.ErrNoRows:
-			reason := "ENV Validation Failed"
-			errorCode := "ENV_VALIDATION_FAILED"
-			return errorResponse(reason, errorCode)
 		case err != nil:
 			reason := err.Error()
 			errorCode := "SEARCH_INTERNAL_ERROR"
 			return errorResponse(reason, errorCode)
 		}
+
+		error := db.QueryRow("SELECT env, scope FROM DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
+
+		switch {
+		case error == sql.ErrNoRows:
+			reason := "ENV Validation Failed"
+			errorCode := "ENV_VALIDATION_FAILED"
+			return errorResponse(reason, errorCode)
+		case error != nil:
+			reason := error.Error()
+			errorCode := "SEARCH_INTERNAL_ERROR"
+			return errorResponse(reason, errorCode)
+		}
 	}
+
+	db := getDB()
 
 	log.Debug("Found tenant_id='", tenantId, "' with env='", env, "' for scopeuuid='", scopeuuid,"'")
 
