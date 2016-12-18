@@ -177,23 +177,6 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 	return json.Marshal(resp)
 }
 
-func getEnvByScopeUUID(scopeuuid string) (string) {
-	db := getDB()
-
-	sSql := "SELECT env FROM DATA_SCOPE WHERE id = ?;"
-
-	var env string
-	err := db.QueryRow(sSql, scopeuuid).Scan(&env)
-
-	switch {
-	case err == sql.ErrNoRows:
-		log.Debug("No env with that scopeuuid.")
-	case err != nil:
-		log.Debug(err)
-	}
-	return env;
-}
-
 func errorResponse(reason, errorCode string) ([]byte, error) {
 
 	log.Error(reason)
