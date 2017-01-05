@@ -19,8 +19,7 @@ var _ = Describe("api", func() {
 			v := url.Values{
 				"key": []string{"credential_x"},
 				"uriPath": []string{"/test"},
-				"environment": []string{"Env_0"},
-				"organization": []string{"Org_0"},
+				"scopeuuid": []string{"ABCDE"},
 				"action": []string{"verify"},
 			}
 			rsp, err := verifyAPIKey(v)
@@ -62,8 +61,7 @@ var _ = Describe("api", func() {
 				v := url.Values{
 					"key": []string{"app_credential_"+resulti},
 					"uriPath": []string{"/test"},
-					"environment": []string{"Env_0"},
-					"organization": []string{"Org_0"},
+					"scopeuuid": []string{"ABCDE"},
 					"action": []string{"verify"},
 				}
 				rsp, err := verifyAPIKey(v)
@@ -85,9 +83,8 @@ var _ = Describe("api", func() {
 			uri.Path = apiPath
 
 			v := url.Values{}
-			v.Add("organization", "Org_0")
 			v.Add("key", "credential_x")
-			v.Add("environment", "Env_0")
+			v.Add("scopeuuid", "ABCDE")
 			v.Add("uriPath", "/test")
 			v.Add("action", "verify")
 
@@ -113,9 +110,8 @@ var _ = Describe("api", func() {
 			uri.Path = apiPath
 
 			v := url.Values{}
-			v.Add("organization", "Org_0")
 			v.Add("key", "app_credential_1")
-			v.Add("environment", "Env_0")
+			v.Add("scopeuuid", "ABCDE")
 			v.Add("uriPath", "/test")
 			v.Add("action", "verify")
 
@@ -131,6 +127,7 @@ var _ = Describe("api", func() {
 			body, err := ioutil.ReadAll(res.Body)
 			Expect(err).ShouldNot(HaveOccurred())
 			json.Unmarshal(body, &respj)
+			log.Info("Result test",respj)
 			Expect(respj.Type).Should(Equal("APIKeyContext"))
 			Expect(respj.RspInfo.Key).Should(Equal("app_credential_1"))
 		})

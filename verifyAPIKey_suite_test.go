@@ -37,6 +37,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	setDB(db)
 	createTables(db)
+	createApidClusterTables(db)
 	insertTestData(db)
 	testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == apiPath {
@@ -90,7 +91,7 @@ func insertTestData(db apid.DB) {
 			Value: "Org_0",
 			Type:  1,
 		}
-		srvItems["_apid_scope"] = scv
+		srvItems["_change_selector"] = scv
 
 		scv = &common.ColumnVal{
 			Value: "tenant_id_xxxx",
@@ -141,7 +142,7 @@ func insertTestData(db apid.DB) {
 			Value: "Org_0",
 			Type:  1,
 		}
-		srvItems["_apid_scope"] = scv
+		srvItems["_change_selector"] = scv
 
 		scv = &common.ColumnVal{
 			Value: "tenant_id_xxxx",
@@ -157,7 +158,7 @@ func insertTestData(db apid.DB) {
 	var j, k int
 	for i := 0; i < 10; i++ {
 		resulti := strconv.FormatInt(int64(i), 10)
-		for j = k; j < 10+k; j++ {
+		for j = k; j < 10 + k; j++ {
 			var rows []common.Row
 
 			srvItems := common.Row{}
@@ -191,7 +192,7 @@ func insertTestData(db apid.DB) {
 				Value: "Org_0",
 				Type:  1,
 			}
-			srvItems["_apid_scope"] = scv
+			srvItems["_change_selector"] = scv
 
 			scv = &common.ColumnVal{
 				Value: "tenant_id_xxxx",
@@ -232,7 +233,7 @@ func insertTestData(db apid.DB) {
 			Value: "Org_0",
 			Type:  1,
 		}
-		srvItems["_apid_scope"] = scv
+		srvItems["_change_selector"] = scv
 
 		scv = &common.ColumnVal{
 			Value: "tenant_id_xxxx",
@@ -275,7 +276,7 @@ func insertTestData(db apid.DB) {
 			Value: "Org_0",
 			Type:  1,
 		}
-		srvItems["_apid_scope"] = scv
+		srvItems["_change_selector"] = scv
 
 		scv = &common.ColumnVal{
 			Value: "tenant_id_xxxx",
@@ -286,6 +287,30 @@ func insertTestData(db apid.DB) {
 		res := insertAPIProductMappers(rows, txn)
 		Expect(res).Should(BeTrue())
 	}
-
+	txn.Exec("INSERT INTO DATA_SCOPE (id, _change_selector, apid_cluster_id, scope, org, env) " +
+		"VALUES" +
+		"($1,$2,$3,$4,$5,$6)",
+		"ABCDE",
+		"some_cluster_id",
+		"some_cluster_id",
+		"tenant_id_xxxx",
+		"test_org0",
+		"Env_0",
+	);
+	txn.Exec("INSERT INTO DATA_SCOPE (id, _change_selector, apid_cluster_id, scope, org, env) " +
+		"VALUES" +
+		"($1,$2,$3,$4,$5,$6)",
+		"XYZ",
+		"test_org0",
+		"somecluster_id",
+		"tenant_id_0",
+		"test_org0",
+		"Env_0",
+	);
+	log.Info("Inserted DATA_SCOPE for test")
 	txn.Commit()
+	var count int64
+	db.QueryRow("select count(*) from data_scope").Scan(&count);
+	log.Info("Found ", count)
+
 }

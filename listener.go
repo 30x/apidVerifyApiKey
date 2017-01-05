@@ -87,14 +87,14 @@ func insertCredentials(rows []common.Row, txn *sql.Tx) bool {
 	var scope, id, appId, consumerSecret, appstatus, status, tenantId string
 	var issuedAt int64
 
-	prep, err := txn.Prepare("INSERT INTO APP_CREDENTIAL (_apid_scope, id, app_id, consumer_secret, app_status, status, issued_at, tenant_id)VALUES($1,$2,$3,$4,$5,$6,$7,$8);")
+	prep, err := txn.Prepare("INSERT INTO APP_CREDENTIAL (_change_selector, id, app_id, consumer_secret, app_status, status, issued_at, tenant_id)VALUES($1,$2,$3,$4,$5,$6,$7,$8);")
 	if err != nil {
 		log.Error("INSERT Cred Failed: ", err)
 		return false
 	}
 	defer prep.Close()
 	for _, ele := range rows {
-		ele.Get("_apid_scope", &scope)
+		ele.Get("_change_selector", &scope)
 		ele.Get("id", &id)
 		ele.Get("app_id", &appId)
 		ele.Get("consumer_secret", &consumerSecret)
@@ -130,7 +130,7 @@ func insertApplications(rows []common.Row, txn *sql.Tx) bool {
 	var scope, EntityIdentifier, DeveloperId, CallbackUrl, Status, AppName, AppFamily, tenantId, CreatedBy, LastModifiedBy string
 	var CreatedAt, LastModifiedAt int64
 
-	prep, err := txn.Prepare("INSERT INTO APP (_apid_scope, id, developer_id,callback_url,status, name, app_family, created_at, created_by,updated_at, updated_by,tenant_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
+	prep, err := txn.Prepare("INSERT INTO APP (_change_selector, id, developer_id,callback_url,status, name, app_family, created_at, created_by,updated_at, updated_by,tenant_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
 	if err != nil {
 		log.Error("INSERT APP Failed: ", err)
 		return false
@@ -139,7 +139,7 @@ func insertApplications(rows []common.Row, txn *sql.Tx) bool {
 	defer prep.Close()
 	for _, ele := range rows {
 
-		ele.Get("_apid_scope", &scope)
+		ele.Get("_change_selector", &scope)
 		ele.Get("id", &EntityIdentifier)
 		ele.Get("developer_id", &DeveloperId)
 		ele.Get("callback_url", &CallbackUrl)
@@ -185,7 +185,7 @@ func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 	var scope, EntityIdentifier, Email, Status, UserName, FirstName, LastName, tenantId, CreatedBy, LastModifiedBy, Username string
 	var CreatedAt, LastModifiedAt int64
 
-	prep, err := txn.Prepare("INSERT INTO DEVELOPER (_apid_scope,email,id,tenant_id,status,username,first_name,last_name,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
+	prep, err := txn.Prepare("INSERT INTO DEVELOPER (_change_selector,email,id,tenant_id,status,username,first_name,last_name,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
 	if err != nil {
 		log.Error("INSERT DEVELOPER Failed: ", err)
 		return false
@@ -194,7 +194,7 @@ func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 	defer prep.Close()
 	for _, ele := range rows {
 
-		ele.Get("_apid_scope", &scope)
+		ele.Get("_change_selector", &scope)
 		ele.Get("email", &Email)
 		ele.Get("id", &EntityIdentifier)
 		ele.Get("tenant_id", &tenantId)
@@ -238,7 +238,7 @@ func insertAPIproducts(rows []common.Row, txn *sql.Tx) bool {
 
 	var scope, apiProduct, res, env, tenantId string
 
-	prep, err := txn.Prepare("INSERT INTO API_PRODUCT (id, api_resources, environments, tenant_id,_apid_scope) VALUES($1,$2,$3,$4,$5)")
+	prep, err := txn.Prepare("INSERT INTO API_PRODUCT (id, api_resources, environments, tenant_id,_change_selector) VALUES($1,$2,$3,$4,$5)")
 	if err != nil {
 		log.Error("INSERT API_PRODUCT Failed: ", err)
 		return false
@@ -247,7 +247,7 @@ func insertAPIproducts(rows []common.Row, txn *sql.Tx) bool {
 	defer prep.Close()
 	for _, ele := range rows {
 
-		ele.Get("_apid_scope", &scope)
+		ele.Get("_change_selector", &scope)
 		ele.Get("id", &apiProduct)
 		ele.Get("api_resources", &res)
 		ele.Get("environments", &env)
@@ -277,7 +277,7 @@ func insertAPIProductMappers(rows []common.Row, txn *sql.Tx) bool {
 
 	var ApiProduct, AppId, EntityIdentifier, tenantId, Scope, Status string
 
-	prep, err := txn.Prepare("INSERT INTO APP_CREDENTIAL_APIPRODUCT_MAPPER(apiprdt_id, app_id, appcred_id, tenant_id, _apid_scope, status) VALUES($1,$2,$3,$4,$5,$6);")
+	prep, err := txn.Prepare("INSERT INTO APP_CREDENTIAL_APIPRODUCT_MAPPER(apiprdt_id, app_id, appcred_id, tenant_id, _change_selector, status) VALUES($1,$2,$3,$4,$5,$6);")
 	if err != nil {
 		log.Error("INSERT APP_CREDENTIAL_APIPRODUCT_MAPPER Failed: ", err)
 		return false
@@ -290,7 +290,7 @@ func insertAPIProductMappers(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("app_id", &AppId)
 		ele.Get("appcred_id", &EntityIdentifier)
 		ele.Get("tenant_id", &tenantId)
-		ele.Get("_apid_scope", &Scope)
+		ele.Get("_change_selector", &Scope)
 		ele.Get("status", &Status)
 
 		/*
@@ -438,14 +438,14 @@ func processChange(changes *common.ChangeList) {
 func deleteObject(object string, ele common.Row, txn *sql.Tx) bool {
 
 	var scope, apiProduct string
-	ssql := "DELETE FROM " + object + " WHERE id = $1 AND _apid_scope = $2"
+	ssql := "DELETE FROM " + object + " WHERE id = $1 AND _change_selector = $2"
 	prep, err := txn.Prepare(ssql)
 	if err != nil {
 		log.Error("DELETE ", object, " Failed: ", err)
 		return false
 	}
 	defer prep.Close()
-	ele.Get("_apid_scope", &scope)
+	ele.Get("_change_selector", &scope)
 	ele.Get("id", &apiProduct)
 
 	_, err = txn.Stmt(prep).Exec(apiProduct, scope)
@@ -465,7 +465,7 @@ func deleteObject(object string, ele common.Row, txn *sql.Tx) bool {
 func deleteAPIproductMapper(ele common.Row, txn *sql.Tx) bool {
 	var ApiProduct, AppId, EntityIdentifier, apid_scope string
 
-	prep, err := txn.Prepare("DELETE FROM APP_CREDENTIAL_APIPRODUCT_MAPPER WHERE apiprdt_id=$1 AND app_id=$2 AND appcred_id=$3 AND _apid_scope=$4;")
+	prep, err := txn.Prepare("DELETE FROM APP_CREDENTIAL_APIPRODUCT_MAPPER WHERE apiprdt_id=$1 AND app_id=$2 AND appcred_id=$3 AND _change_selector=$4;")
 	if err != nil {
 		log.Error("DELETE APP_CREDENTIAL_APIPRODUCT_MAPPER Failed: ", err)
 		return false
@@ -476,7 +476,7 @@ func deleteAPIproductMapper(ele common.Row, txn *sql.Tx) bool {
 	ele.Get("apiprdt_id", &ApiProduct)
 	ele.Get("app_id", &AppId)
 	ele.Get("appcred_id", &EntityIdentifier)
-	ele.Get("_apid_scope", &apid_scope)
+	ele.Get("_change_selector", &apid_scope)
 
 	_, err = txn.Stmt(prep).Exec(ApiProduct, AppId, EntityIdentifier, apid_scope)
 	if err != nil {

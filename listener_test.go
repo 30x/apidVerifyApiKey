@@ -34,7 +34,7 @@ var _ = Describe("listener", func() {
 				Value: "tenant_id_0",
 				Type:  1,
 			},
-			"_apid_scope": {
+			"_change_selector": {
 				Value: "test_org0",
 				Type:  1,
 			},
@@ -54,7 +54,7 @@ var _ = Describe("listener", func() {
 				Value: "tenant_id_0",
 				Type:  1,
 			},
-			"_apid_scope": {
+			"_change_selector": {
 				Value: "test_org0",
 				Type:  1,
 			},
@@ -78,7 +78,7 @@ var _ = Describe("listener", func() {
 				Value: "tenant_id_0",
 				Type:  1,
 			},
-			"_apid_scope": {
+			"_change_selector": {
 				Value: "test_org0",
 				Type:  1,
 			},
@@ -102,7 +102,7 @@ var _ = Describe("listener", func() {
 				Value: "Approved",
 				Type:  1,
 			},
-			"_apid_scope": {
+			"_change_selector": {
 				Value: "test_org0",
 				Type:  1,
 			},
@@ -126,7 +126,7 @@ var _ = Describe("listener", func() {
 				Value: "Approved",
 				Type:  1,
 			},
-			"_apid_scope": {
+			"_change_selector": {
 				Value: "test_org0",
 				Type:  1,
 			},
@@ -200,8 +200,7 @@ var _ = Describe("listener", func() {
 				v := url.Values{
 					"key": []string{"ch_app_credential_0"},
 					"uriPath": []string{"/test"},
-					"environment": []string{"Env_0"},
-					"organization": []string{"test_org0"},
+					"scopeuuid": []string{"XYZ"},
 					"action": []string{"verify"},
 				}
 				rsp, err := verifyAPIKey(v)

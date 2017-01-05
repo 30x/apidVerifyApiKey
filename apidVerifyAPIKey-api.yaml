@@ -88,6 +88,7 @@ definitions:
       - action
       - key
       - uriPath
+      - scopeuuid
     properties:
       action:
         enum:
@@ -95,6 +96,8 @@ definitions:
       key:
         type: string
       uriPath:
+        type: string
+      scopeuuid:
         type: string
 
   VerifyAPIKeyResponse:

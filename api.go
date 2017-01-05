@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"github.com/30x/apid"
 )
 
 type sucResponseDetail struct {
@@ -51,7 +52,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	f := r.Form
-	elems := []string{"action", "key", "uriPath", "organization", "environment"}
+	elems := []string{"action", "key", "uriPath", "scopeuuid"}
 	for _, elem := range elems {
 		if f.Get(elem) == "" {
 			w.WriteHeader(http.StatusBadRequest)
@@ -75,30 +76,63 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 // returns []byte to be written to client
 func verifyAPIKey(f url.Values) ([]byte, error) {
 
-	db := getDB()
 
 	key := f.Get("key")
-	org := f.Get("organization")
+	scopeuuid := f.Get("scopeuuid")
 	path := f.Get("uriPath")
-	env := f.Get("environment")
 	action := f.Get("action")
 
-	if key == "" || org == "" || path == "" || env == "" || action != "verify" {
+	if key == "" || scopeuuid == "" || path == "" || action != "verify" {
 		log.Error("Input params Invalid/Incomplete")
 		reason := "Input Params Incomplete or Invalid"
 		errorCode := "INCORRECT_USER_INPUT"
 		return errorResponse(reason, errorCode)
 	}
 
-	sSql := "SELECT ap.api_resources, ap.environments, c.issued_at, c.status, a.callback_url, d.username, d.id FROM APP_CREDENTIAL AS c INNER JOIN APP AS a ON c.app_id = a.id INNER JOIN DEVELOPER AS d ON a.developer_id = d.id INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp ON mp.appcred_id = c.id INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id WHERE (UPPER(d.status) = 'ACTIVE' AND mp.apiprdt_id = ap.id AND mp.app_id = a.id AND mp.appcred_id = c.id AND UPPER(mp.status) = 'APPROVED' AND UPPER(a.status) = 'APPROVED' AND c.id = '" + key + "' AND c._apid_scope = '" + org + "');"
+	var env, tenantId string
+	{
+		db, err := apid.Data().DB();
+		switch {
+		case err != nil:
+			reason := err.Error()
+			errorCode := "SEARCH_INTERNAL_ERROR"
+			return errorResponse(reason, errorCode)
+		}
+
+		error := db.QueryRow("SELECT env, scope FROM DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
+
+		switch {
+		case error == sql.ErrNoRows:
+			reason := "ENV Validation Failed"
+			errorCode := "ENV_VALIDATION_FAILED"
+			return errorResponse(reason, errorCode)
+		case error != nil:
+			reason := error.Error()
+			errorCode := "SEARCH_INTERNAL_ERROR"
+			return errorResponse(reason, errorCode)
+		}
+	}
+
+	db := getDB()
+
+	log.Debug("Found tenant_id='", tenantId, "' with env='", env, "' for scopeuuid='", scopeuuid,"'")
+
+	sSql := "SELECT ap.api_resources, ap.environments, c.issued_at, c.status, a.callback_url, d.username, d.id " +
+		"FROM APP_CREDENTIAL AS c INNER JOIN APP AS a ON c.app_id = a.id " +
+		"INNER JOIN DEVELOPER AS d ON a.developer_id = d.id " +
+		"INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp ON mp.appcred_id = c.id " +
+		"INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id " +
+		"WHERE (UPPER(d.status) = 'ACTIVE' AND mp.apiprdt_id = ap.id AND mp.app_id = a.id " +
+		"AND mp.appcred_id = c.id AND UPPER(mp.status) = 'APPROVED' AND UPPER(a.status) = 'APPROVED' " +
+		"AND c.id = $1 AND c.tenant_id = $2);"
 
 	var status, redirectionURIs, developerAppName, developerId, resName, resEnv string
 	var issuedAt int64
-	err := db.QueryRow(sSql).Scan(&resName, &resEnv, &issuedAt, &status,
+	err := db.QueryRow(sSql, key, tenantId).Scan(&resName, &resEnv, &issuedAt, &status,
 		&redirectionURIs, &developerAppName, &developerId)
 	switch {
 	case err == sql.ErrNoRows:
-		reason := "API Key verify failed for (" + key + ", " + org + ", " + path + ", " + env + ")"
+		reason := "API Key verify failed for (" + key + ", " + scopeuuid + ", " + path + ")"
 		errorCode := "REQ_ENTRY_NOT_FOUND"
 		return errorResponse(reason, errorCode)
 
