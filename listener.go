@@ -102,6 +102,12 @@ func insertCredentials(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("status", &status)
 		ele.Get("issued_at", &issuedAt)
 		ele.Get("tenant_id", &tenantId)
+
+		/* Mandatory params check */
+		if id == "" || scope == "" || tenantId == "" {
+			log.Error("INSERT APP_CREDENTIAL: i/p args missing")
+			return false
+		}
 		_, err = txn.Stmt(prep).Exec(
 			scope,
 			id,
@@ -152,6 +158,11 @@ func insertApplications(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("updated_by", &LastModifiedBy)
 		ele.Get("tenant_id", &tenantId)
 
+		/* Mandatory params check */
+		if EntityIdentifier == "" || scope == "" || tenantId == "" {
+			log.Error("INSERT APP: i/p args missing")
+			return false
+		}
 		_, err = txn.Stmt(prep).Exec(
 			scope,
 			EntityIdentifier,
@@ -207,6 +218,11 @@ func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("updated_at", &LastModifiedAt)
 		ele.Get("updated_by", &LastModifiedBy)
 
+		/* Mandatory params check */
+		if EntityIdentifier == "" || scope == "" || tenantId == "" {
+			log.Error("INSERT DEVELOPER: i/p args missing")
+			return false
+		}
 		_, err = txn.Stmt(prep).Exec(
 			scope,
 			Email,
@@ -253,6 +269,11 @@ func insertAPIproducts(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("environments", &env)
 		ele.Get("tenant_id", &tenantId)
 
+		/* Mandatory params check */
+		if apiProduct == "" || scope == "" || tenantId == "" {
+			log.Error("INSERT API_PRODUCT: i/p args missing")
+			return false
+		}
 		_, err = txn.Stmt(prep).Exec(
 			apiProduct,
 			res,
@@ -292,6 +313,12 @@ func insertAPIProductMappers(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("tenant_id", &tenantId)
 		ele.Get("_change_selector", &Scope)
 		ele.Get("status", &Status)
+
+		/* Mandatory params check */
+		if ApiProduct == "" || AppId == "" || EntityIdentifier == "" || tenantId == "" || Scope == "" {
+			log.Error("INSERT APP_CREDENTIAL_APIPRODUCT_MAPPER : i/p args missing")
+			return false
+		}
 
 		/*
 		 * If the credentials has been successfully inserted, insert the
@@ -437,7 +464,7 @@ func processChange(changes *common.ChangeList) {
  */
 func deleteObject(object string, ele common.Row, txn *sql.Tx) bool {
 
-	var scope, apiProduct string
+	var scope, objid string
 	ssql := "DELETE FROM " + object + " WHERE id = $1 AND _change_selector = $2"
 	prep, err := txn.Prepare(ssql)
 	if err != nil {
@@ -446,16 +473,18 @@ func deleteObject(object string, ele common.Row, txn *sql.Tx) bool {
 	}
 	defer prep.Close()
 	ele.Get("_change_selector", &scope)
-	ele.Get("id", &apiProduct)
+	ele.Get("id", &objid)
 
-	_, err = txn.Stmt(prep).Exec(apiProduct, scope)
-	if err != nil {
-		log.Error("DELETE ", object, " Failed: (", apiProduct, ", ", scope, ")", err)
-		return false
-	} else {
-		log.Debug("DELETE ", object, " Success: (", apiProduct, ", ", scope, ")")
-		return true
+	res, err := txn.Stmt(prep).Exec(objid, scope)
+	if err == nil {
+		affect, err := res.RowsAffected()
+		if err == nil && affect != 0 {
+			log.Debugf("DELETE %s (%s, %s) success.", object, objid, scope)
+			return true
+		}
 	}
+	log.Errorf("DELETE %s (%s, %s) failed.", object, objid, scope)
+	return false
 
 }
 
@@ -478,23 +507,14 @@ func deleteAPIproductMapper(ele common.Row, txn *sql.Tx) bool {
 	ele.Get("appcred_id", &EntityIdentifier)
 	ele.Get("_change_selector", &apid_scope)
 
-	_, err = txn.Stmt(prep).Exec(ApiProduct, AppId, EntityIdentifier, apid_scope)
-	if err != nil {
-		log.Error("DELETE APP_CREDENTIAL_APIPRODUCT_MAPPER Failed: (",
-			ApiProduct, ", ",
-			AppId, ", ",
-			EntityIdentifier, ", ",
-			apid_scope,
-			")",
-			err)
-		return false
-	} else {
-		log.Debug("DELETE APP_CREDENTIAL_APIPRODUCT_MAPPER Success: (",
-			ApiProduct, ", ",
-			AppId, ", ",
-			EntityIdentifier, ", ",
-			apid_scope,
-			")")
-		return true
+	res, err := txn.Stmt(prep).Exec(ApiProduct, AppId, EntityIdentifier, apid_scope)
+	if err == nil {
+		affect, err := res.RowsAffected()
+		if err == nil && affect != 0 {
+			log.Debugf("DELETE APP_CREDENTIAL_APIPRODUCT_MAPPER (%s, %s, %s, %s) success.", ApiProduct, AppId, EntityIdentifier, apid_scope)
+			return true
+		}
 	}
+	log.Errorf("DELETE APP_CREDENTIAL_APIPRODUCT_MAPPER (%s, %s, %s, %s) failed.", ApiProduct, AppId, EntityIdentifier, apid_scope, err)
+	return false
 }

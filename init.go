@@ -10,9 +10,9 @@ const (
 )
 
 var (
-	log    apid.LogService
-	data   apid.DataService
-	events apid.EventsService
+	log      apid.LogService
+	data     apid.DataService
+	events   apid.EventsService
 	unsafeDB apid.DB
 	dbMux    sync.RWMutex
 )
@@ -160,7 +160,6 @@ CREATE TABLE IF NOT EXISTS app_credential_apiproduct_mapper (
 	}
 }
 
-
 func createApidClusterTables(db apid.DB) {
 	_, err := db.Exec(`
 CREATE TABLE apid_cluster (
@@ -196,4 +195,3 @@ CREATE TABLE data_scope (
 		log.Panic("Unable to initialize DB", err)
 	}
 }
-
