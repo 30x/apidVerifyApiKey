@@ -251,10 +251,10 @@ func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
  * Performs Bulk insert of Company Developers
  */
 func insertCompanyDevelopers(rows []common.Row, txn *sql.Tx) bool {
-	var scope, EntityIdentifier, DeveloperId, tenantId, CreatedBy, LastModifiedBy string
+	var scope, CompanyId, DeveloperId, tenantId, CreatedBy, LastModifiedBy string
 	var CreatedAt, LastModifiedAt int64
 
-	prep, err := txn.Prepare("INSERT INTO COMPANY_DEVELOPER (_change_selector,id,tenant_id,developer_id,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8);")
+	prep, err := txn.Prepare("INSERT INTO COMPANY_DEVELOPER (_change_selector,company_id,tenant_id,developer_id,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8);")
 	if err != nil {
 		log.Error("INSERT COMPANY_DEVELOPER Failed: ", err)
 		return false
@@ -263,7 +263,7 @@ func insertCompanyDevelopers(rows []common.Row, txn *sql.Tx) bool {
 	for _, ele := range rows {
 
 		ele.Get("_change_selector", &scope)
-		ele.Get("id", &EntityIdentifier)
+		ele.Get("company_id", &CompanyId)
 		ele.Get("tenant_id", &tenantId)
 		ele.Get("developer_id", &DeveloperId)
 		ele.Get("created_at", &CreatedAt)
@@ -272,24 +272,25 @@ func insertCompanyDevelopers(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("updated_by", &LastModifiedBy)
 
 		/* Mandatory params check */
-		if EntityIdentifier == "" || scope == "" || tenantId == "" {
+		if scope == "" || tenantId == "" || CompanyId == "" || DeveloperId == ""{
 			log.Error("INSERT COMPANY_DEVELOPER: i/p args missing")
 			return false
 		}
 		_, err = txn.Stmt(prep).Exec(
 			scope,
-			EntityIdentifier,
+			CompanyId,
 			tenantId,
+			DeveloperId,
 			CreatedAt,
 			CreatedBy,
 			LastModifiedAt,
 			LastModifiedBy)
 
 		if err != nil {
-			log.Error("INSERT COMPANY_DEVELOPER Failed: (", EntityIdentifier, ", ", scope, ")", err)
+			log.Error("INSERT COMPANY_DEVELOPER Failed: (", DeveloperId, ", ", CompanyId, ", ", scope, ")", err)
 			return false
 		} else {
-			log.Debug("INSERT COMPANY_DEVELOPER Success: (", EntityIdentifier, ", ", scope, ")")
+			log.Debug("INSERT COMPANY_DEVELOPER Success: (", DeveloperId, ", ", CompanyId, ", ", scope, ")")
 		}
 	}
 	return true
@@ -302,7 +303,7 @@ func insertCompanies(rows []common.Row, txn *sql.Tx) bool {
 	var scope, EntityIdentifier, Name, DisplayName, Status, tenantId, CreatedBy, LastModifiedBy string
 	var CreatedAt, LastModifiedAt int64
 
-	prep, err := txn.Prepare("INSERT INTO COMAPNY (_change_selector,id,tenant_id,status,name,display_name,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);")
+	prep, err := txn.Prepare("INSERT INTO COMPANY (_change_selector,id,tenant_id,status,name,display_name,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);")
 	if err != nil {
 		log.Error("INSERT COMPANY Failed: ", err)
 		return false
@@ -509,12 +510,12 @@ func processChange(changes *common.ChangeList) {
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				ok = insertApplications(rows, txn)
+				ok = insertCompanies(rows, txn)
 
 			case common.Update:
 				ok = deleteObject("COMPANY", payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				ok = insertApplications(rows, txn)
+				ok = insertCompanies(rows, txn)
 
 			case common.Delete:
 				ok = deleteObject("COMPANY", payload.OldRow, txn)
@@ -523,12 +524,12 @@ func processChange(changes *common.ChangeList) {
 			switch payload.Operation {
 			case common.Insert:
 				rows = append(rows, payload.NewRow)
-				ok = insertApplications(rows, txn)
+				ok = insertCompanyDevelopers(rows, txn)
 
 			case common.Update:
 				ok = deleteObject("COMPANY_DEVELOPER", payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
-				ok = insertApplications(rows, txn)
+				ok = insertCompanyDevelopers(rows, txn)
 
 			case common.Delete:
 				ok = deleteObject("COMPANY_DEVELOPER", payload.OldRow, txn)

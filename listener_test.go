@@ -20,7 +20,7 @@ var _ = Describe("listener", func() {
 				"id": {
 					Value: "ch_api_product_2",
 				},
-				"apid_resources": {
+				"api_resources": {
 					Value: "{}",
 				},
 				"environments": {
@@ -231,7 +231,7 @@ var _ = Describe("listener", func() {
 			"id": {
 				Value: "ch_api_product_0",
 			},
-			"apid_resources": {
+			"api_resources": {
 				Value: "{}",
 			},
 			"environments": {
@@ -366,7 +366,7 @@ var _ = Describe("listener", func() {
 			"id": {
 				Value: "ch_api_product_1",
 			},
-			"apid_resources": {
+			"api_resources": {
 				Value: "{}",
 			},
 			"environments": {
