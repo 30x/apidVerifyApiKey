@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"github.com/30x/apid"
 )
 
 type sucResponseDetail struct {
@@ -89,31 +88,22 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 		return errorResponse(reason, errorCode)
 	}
 
-	var env, tenantId string
-	{
-		db, err := apid.Data().DB();
-		switch {
-		case err != nil:
-			reason := err.Error()
-			errorCode := "SEARCH_INTERNAL_ERROR"
-			return errorResponse(reason, errorCode)
-		}
-
-		error := db.QueryRow("SELECT env, scope FROM DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
-
-		switch {
-		case error == sql.ErrNoRows:
-			reason := "ENV Validation Failed"
-			errorCode := "ENV_VALIDATION_FAILED"
-			return errorResponse(reason, errorCode)
-		case error != nil:
-			reason := error.Error()
-			errorCode := "SEARCH_INTERNAL_ERROR"
-			return errorResponse(reason, errorCode)
-		}
-	}
-
 	db := getDB()
+
+	// DANGER: This relies on an external TABLE - DATA_SCOPE is maintained by apidApigeeSync
+	var env, tenantId string
+	error := db.QueryRow("SELECT env, scope FROM DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
+
+	switch {
+	case error == sql.ErrNoRows:
+		reason := "ENV Validation Failed"
+		errorCode := "ENV_VALIDATION_FAILED"
+		return errorResponse(reason, errorCode)
+	case error != nil:
+		reason := error.Error()
+		errorCode := "SEARCH_INTERNAL_ERROR"
+		return errorResponse(reason, errorCode)
+	}
 
 	log.Debug("Found tenant_id='", tenantId, "' with env='", env, "' for scopeuuid='", scopeuuid,"'")
 
