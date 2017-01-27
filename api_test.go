@@ -20,228 +20,52 @@ var _ = Describe("api", func() {
 			db := getDB()
 			txn, err := db.Begin()
 			Expect(err).ShouldNot(HaveOccurred())
-
+			// api products
 			for i := 0; i < 10; i++ {
-				var rows []common.Row
-				srvItems := common.Row{}
-				result := strconv.FormatInt(int64(i), 10)
-
-				scv := &common.ColumnVal{
-					Value: "api_product_" + result,
-					Type:  1,
-				}
-				srvItems["id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "{/**, /test}",
-					Type:  1,
-				}
-				srvItems["api_resources"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "{Env_0, Env_1}",
-					Type:  1,
-				}
-				srvItems["environments"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "Org_0",
-					Type:  1,
-				}
-				srvItems["_change_selector"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "tenant_id_xxxx",
-					Type:  1,
-				}
-				srvItems["tenant_id"] = scv
-				rows = append(rows, srvItems)
-				res := insertAPIproducts(rows, txn)
+				row := generateTestApiProduct(i)
+				res := insertAPIproducts([]common.Row{row}, txn)
+				Expect(res).Should(BeTrue())
+			}
+			// developers
+			for i := 0; i < 10; i++ {
+				row := generateTestDeveloper(i)
+				res := insertDevelopers([]common.Row{row}, txn)
+				Expect(res).Should(BeTrue())
+			}
+			// companies
+			for i := 0; i < 10; i++ {
+				row := generateTestCompany(i)
+				res := insertCompanies([]common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
+			// company developers
 			for i := 0; i < 10; i++ {
-				var rows []common.Row
-				srvItems := common.Row{}
-				result := strconv.FormatInt(int64(i), 10)
-
-				scv := &common.ColumnVal{
-					Value: "developer_id_" + result,
-					Type:  1,
-				}
-				srvItems["id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "test@apigee.com",
-					Type:  1,
-				}
-				srvItems["email"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "Active",
-					Type:  1,
-				}
-				srvItems["status"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "Apigee",
-					Type:  1,
-				}
-				srvItems["firstName"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "Google",
-					Type:  1,
-				}
-				srvItems["lastName"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "Org_0",
-					Type:  1,
-				}
-				srvItems["_change_selector"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "tenant_id_xxxx",
-					Type:  1,
-				}
-				srvItems["tenant_id"] = scv
-
-				rows = append(rows, srvItems)
-				res := insertDevelopers(rows, txn)
+				row := generateTestCompanyDeveloper(i);
+				res := insertCompanyDevelopers([]common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
+			// application
 			var j, k int
 			for i := 0; i < 10; i++ {
-				resulti := strconv.FormatInt(int64(i), 10)
 				for j = k; j < 10+k; j++ {
-					var rows []common.Row
-
-					srvItems := common.Row{}
-					resultj := strconv.FormatInt(int64(j), 10)
-
-					scv := &common.ColumnVal{
-						Value: "application_id_" + resultj,
-						Type:  1,
-					}
-					srvItems["id"] = scv
-
-					scv = &common.ColumnVal{
-						Value: "developer_id_" + resulti,
-						Type:  1,
-					}
-					srvItems["developer_id"] = scv
-
-					scv = &common.ColumnVal{
-						Value: "approved",
-						Type:  1,
-					}
-					srvItems["status"] = scv
-
-					scv = &common.ColumnVal{
-						Value: "http://apigee.com",
-						Type:  1,
-					}
-					srvItems["callback_url"] = scv
-
-					scv = &common.ColumnVal{
-						Value: "Org_0",
-						Type:  1,
-					}
-					srvItems["_change_selector"] = scv
-
-					scv = &common.ColumnVal{
-						Value: "tenant_id_xxxx",
-						Type:  1,
-					}
-					srvItems["tenant_id"] = scv
-					rows = append(rows, srvItems)
-					res := insertApplications(rows, txn)
+					row := generateTestApp(j, i);
+					res := insertApplications([]common.Row{row}, txn)
 					Expect(res).Should(BeTrue())
 				}
 				k = j
 			}
-
+			// app credentials
 			for i := 0; i < 10; i++ {
-				var rows []common.Row
-				srvItems := common.Row{}
-				result := strconv.FormatInt(int64(i), 10)
-
-				scv := &common.ColumnVal{
-					Value: "app_credential_" + result,
-					Type:  1,
-				}
-				srvItems["id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "application_id_" + result,
-					Type:  1,
-				}
-				srvItems["app_id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "approved",
-					Type:  1,
-				}
-				srvItems["status"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "Org_0",
-					Type:  1,
-				}
-				srvItems["_change_selector"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "tenant_id_xxxx",
-					Type:  1,
-				}
-				srvItems["tenant_id"] = scv
-				rows = append(rows, srvItems)
-				res := insertCredentials(rows, txn)
+				row := generateTestAppCreds(i)
+				res := insertCredentials([]common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
-
+			// api product mapper
 			for i := 0; i < 10; i++ {
-				var rows []common.Row
-				srvItems := common.Row{}
-				result := strconv.FormatInt(int64(i), 10)
-
-				scv := &common.ColumnVal{
-					Value: "api_product_" + result,
-					Type:  1,
-				}
-				srvItems["apiprdt_id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "application_id_" + result,
-					Type:  1,
-				}
-				srvItems["app_id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "app_credential_" + result,
-					Type:  1,
-				}
-				srvItems["appcred_id"] = scv
-				scv = &common.ColumnVal{
-					Value: "approved",
-					Type:  1,
-				}
-				srvItems["status"] = scv
-				scv = &common.ColumnVal{
-					Value: "Org_0",
-					Type:  1,
-				}
-				srvItems["_change_selector"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "tenant_id_xxxx",
-					Type:  1,
-				}
-				srvItems["tenant_id"] = scv
-				rows = append(rows, srvItems)
-				res := insertAPIProductMappers(rows, txn)
+				row := generateTestApiProductMapper(i)
+				res := insertAPIProductMappers([]common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
@@ -294,119 +118,35 @@ var _ = Describe("api", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			for i := 0; i < 10; i++ {
-				srvItems := common.Row{}
-				result := strconv.FormatInt(int64(i), 10)
-
-				scv := &common.ColumnVal{
-					Value: "api_product_" + result,
-					Type:  3,
-				}
-				srvItems["apiprdt_id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "application_id_" + result,
-					Type:  3,
-				}
-				srvItems["app_id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "app_credential_" + result,
-					Type:  3,
-				}
-				srvItems["appcred_id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "Org_0",
-					Type:  3,
-				}
-				srvItems["_change_selector"] = scv
-
-				res := deleteAPIproductMapper(srvItems, txn)
+				row := generateTestApiProductMapper(i);
+				res := deleteAPIproductMapper(row, txn)
 				Expect(res).Should(BeTrue())
 			}
 
 			for i := 0; i < 10; i++ {
-				srvItems := common.Row{}
-				result := strconv.FormatInt(int64(i), 10)
-
-				scv := &common.ColumnVal{
-					Value: "app_credential_" + result,
-					Type:  3,
-				}
-				srvItems["id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "Org_0",
-					Type:  3,
-				}
-				srvItems["_change_selector"] = scv
-
-				res := deleteObject("APP_CREDENTIAL", srvItems, txn)
+				row := generateTestAppCreds(i)
+				res := deleteObject("APP_CREDENTIAL", row, txn)
 				Expect(res).Should(BeTrue())
 			}
 			for i := 0; i < 100; i++ {
-
-				srvItems := common.Row{}
-				resultj := strconv.FormatInt(int64(i), 10)
-
-				scv := &common.ColumnVal{
-					Value: "application_id_" + resultj,
-					Type:  1,
-				}
-				srvItems["id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "Org_0",
-					Type:  1,
-				}
-				srvItems["_change_selector"] = scv
-
-				res := deleteObject("APP", srvItems, txn)
+				row := generateTestApp(i, 999) //TODO we use j in above insertions
+				res := deleteObject("APP", row, txn)
 				Expect(res).Should(BeTrue())
 			}
 
 			for i := 0; i < 10; i++ {
-				srvItems := common.Row{}
-				result := strconv.FormatInt(int64(i), 10)
-
-				scv := &common.ColumnVal{
-					Value: "developer_id_" + result,
-					Type:  1,
-				}
-				srvItems["id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "Org_0",
-					Type:  1,
-				}
-				srvItems["_change_selector"] = scv
-
-				res := deleteObject("DEVELOPER", srvItems, txn)
+				row := generateTestDeveloper(i)
+				res := deleteObject("DEVELOPER", row, txn)
 				Expect(res).Should(BeTrue())
 			}
 
 			for i := 0; i < 10; i++ {
-				srvItems := common.Row{}
-				result := strconv.FormatInt(int64(i), 10)
-
-				scv := &common.ColumnVal{
-					Value: "api_product_" + result,
-					Type:  1,
-				}
-				srvItems["id"] = scv
-
-				scv = &common.ColumnVal{
-					Value: "Org_0",
-					Type:  1,
-				}
-				srvItems["_change_selector"] = scv
-
-				res := deleteObject("API_PRODUCT", srvItems, txn)
+				row := generateTestApiProduct(i)
+				res := deleteObject("API_PRODUCT", row, txn)
 				Expect(res).Should(BeTrue())
 			}
 
 			txn.Commit()
-
 		})
 
 		It("Negative cases for DB Deletes on KMS tables", func() {
@@ -414,101 +154,57 @@ var _ = Describe("api", func() {
 			txn, err := db.Begin()
 			Expect(err).ShouldNot(HaveOccurred())
 
-			srvItems := common.Row{}
-			result := "DEADBEEF"
+			row := generateTestApiProductMapper(999)
 
-			scv := &common.ColumnVal{
-				Value: "api_product_" + result,
-				Type:  3,
-			}
-			srvItems["apiprdt_id"] = scv
-
-			scv = &common.ColumnVal{
-				Value: "application_id_" + result,
-				Type:  3,
-			}
-			srvItems["app_id"] = scv
-
-			scv = &common.ColumnVal{
-				Value: "app_credential_" + result,
-				Type:  3,
-			}
-			srvItems["appcred_id"] = scv
-
-			scv = &common.ColumnVal{
-				Value: "Org_0",
-				Type:  3,
-			}
-			srvItems["_change_selector"] = scv
-
-			res := deleteAPIproductMapper(srvItems, txn)
+			res := deleteAPIproductMapper(row, txn)
 			Expect(res).Should(BeFalse())
 
-			res = deleteObject("API_PRODUCT", srvItems, txn)
+			res = deleteObject("API_PRODUCT", row, txn)
 			Expect(res).Should(BeFalse())
 
-			res = deleteObject("APP_CREDENTIAL", srvItems, txn)
+			res = deleteObject("APP_CREDENTIAL", row, txn)
 			Expect(res).Should(BeFalse())
 
-			res = deleteObject("DEVELOPER", srvItems, txn)
+			res = deleteObject("DEVELOPER", row, txn)
 			Expect(res).Should(BeFalse())
 
-			res = deleteObject("APP", srvItems, txn)
+			res = deleteObject("APP", row, txn)
+			Expect(res).Should(BeFalse())
+
+			res = deleteObject("COMPANY", row, txn)
+			Expect(res).Should(BeFalse())
+
+			res = deleteObject("COMPANY_DEVELOPER", row, txn)
 			Expect(res).Should(BeFalse())
 
 			txn.Rollback()
 
 		})
+
 		It("Negative cases for DB Inserts/updates on KMS tables", func() {
 
 			db := getDB()
 			txn, err := db.Begin()
 			Expect(err).ShouldNot(HaveOccurred())
 
-			var rows []common.Row
-			srvItems := common.Row{}
-			result := "NOPRODID_BADCASE"
-			scv := &common.ColumnVal{
-				Value: "foobar_" + result,
-				Type:  1,
-			}
-			srvItems[result] = scv
-
-			scv = &common.ColumnVal{
-				Value: "{/**, /test}",
-				Type:  1,
-			}
-			srvItems["api_resources"] = scv
-
-			scv = &common.ColumnVal{
-				Value: "{Env_1, Env_0}",
-				Type:  1,
-			}
-			srvItems["environments"] = scv
-
-			scv = &common.ColumnVal{
-				Value: "Org_0",
-				Type:  1,
-			}
-			srvItems["_change_selector"] = scv
-
-			scv = &common.ColumnVal{
-				Value: "tenant_id_xxxx",
-				Type:  1,
-			}
-			srvItems["tenant_id"] = scv
-
-			rows = append(rows, srvItems)
-			res := insertAPIproducts(rows, txn)
+			row := generateTestApiProduct(999)
+			row["id"] = nil
+			res := insertAPIproducts([]common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = insertApplications(rows, txn)
+			res = insertApplications([]common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = insertCredentials(rows, txn)
+			res = insertCredentials([]common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = insertAPIProductMappers(rows, txn)
+			res = insertAPIProductMappers([]common.Row{row}, txn)
+			Expect(res).Should(BeFalse())
+
+			res = insertCompanies([]common.Row{row}, txn)
+			Expect(res).Should(BeFalse())
+
+			res = insertCompanyDevelopers([]common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
 		})

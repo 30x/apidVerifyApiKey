@@ -20,7 +20,7 @@ var _ = Describe("listener", func() {
 				"id": {
 					Value: "ch_api_product_2",
 				},
-				"apid_resources": {
+				"api_resources": {
 					Value: "{}",
 				},
 				"environments": {
@@ -47,6 +47,45 @@ var _ = Describe("listener", func() {
 				},
 				"_change_selector": {
 					Value: "test_org0",
+				},
+			}
+
+			companyItems := common.Row{
+				"id": {
+					Value: "ch_company_id_2",
+				},
+				"status": {
+					Value: "Active",
+				},
+				"tenant_id": {
+					Value: "tenant_id_0",
+				},
+				"_change_selector": {
+					Value: "test_org0",
+				},
+				"name": {
+					Value: "test_company_name0",
+				},
+				"display_name": {
+					Value: "test_company_display_name0",
+				},
+			}
+
+			companyDeveloperItems := common.Row{
+				"id": {
+					Value: "ch_developer_id_2",
+				},
+				"tenant_id": {
+					Value: "tenant_id_0",
+				},
+				"_change_selector": {
+					Value: "test_org0",
+				},
+				"company_id": {
+					Value: "ch_company_id_2",
+				},
+				"developer_id": {
+					Value: "ch_developer_id_2",
 				},
 			}
 
@@ -136,6 +175,16 @@ var _ = Describe("listener", func() {
 					NewRow:    mpItems,
 					Operation: 1,
 				},
+				{
+					Table:     "kms.company",
+					NewRow:    companyItems,
+					Operation: 1,
+				},
+				{
+					Table:     "kms.company_developer",
+					NewRow:    companyDeveloperItems,
+					Operation: 1,
+				},
 			}
 
 			h := &test_handler{
@@ -182,7 +231,7 @@ var _ = Describe("listener", func() {
 			"id": {
 				Value: "ch_api_product_0",
 			},
-			"apid_resources": {
+			"api_resources": {
 				Value: "{}",
 			},
 			"environments": {
@@ -228,6 +277,45 @@ var _ = Describe("listener", func() {
 			},
 			"_change_selector": {
 				Value: "test_org0",
+			},
+		}
+
+		companyItemsOld := common.Row{
+			"id": {
+				Value: "ch_company_id_0",
+			},
+			"status": {
+				Value: "Active",
+			},
+			"tenant_id": {
+				Value: "tenant_id_0",
+			},
+			"_change_selector": {
+				Value: "test_org0",
+			},
+			"name": {
+				Value: "test_company_name0",
+			},
+			"display_name": {
+				Value: "test_company_display_name0",
+			},
+		}
+
+		companyDeveloperItemsOld := common.Row{
+			"id": {
+				Value: "ch_developer_id_0",
+			},
+			"tenant_id": {
+				Value: "tenant_id_0",
+			},
+			"_change_selector": {
+				Value: "test_org0",
+			},
+			"company_id": {
+				Value: "ch_company_id_0",
+			},
+			"developer_id": {
+				Value: "ch_developer_id_0",
 			},
 		}
 
@@ -278,7 +366,7 @@ var _ = Describe("listener", func() {
 			"id": {
 				Value: "ch_api_product_1",
 			},
-			"apid_resources": {
+			"api_resources": {
 				Value: "{}",
 			},
 			"environments": {
@@ -305,6 +393,45 @@ var _ = Describe("listener", func() {
 			},
 			"_change_selector": {
 				Value: "test_org0",
+			},
+		}
+
+		companyItemsNew := common.Row{
+			"id": {
+				Value: "ch_company_id_1",
+			},
+			"status": {
+				Value: "Active",
+			},
+			"tenant_id": {
+				Value: "tenant_id_0",
+			},
+			"_change_selector": {
+				Value: "test_org0",
+			},
+			"name": {
+				Value: "test_company_name0",
+			},
+			"display_name": {
+				Value: "test_company_display_name0",
+			},
+		}
+
+		companyDeveloperItemsNew := common.Row{
+			"id": {
+				Value: "ch_developer_id_1",
+			},
+			"tenant_id": {
+				Value: "tenant_id_0",
+			},
+			"_change_selector": {
+				Value: "test_org0",
+			},
+			"company_id": {
+				Value: "ch_company_id_1",
+			},
+			"developer_id": {
+				Value: "ch_developer_id_1",
 			},
 		}
 
@@ -380,6 +507,16 @@ var _ = Describe("listener", func() {
 				Operation: 1,
 			},
 			{
+				Table:     "kms.company",
+				NewRow:    companyItemsOld,
+				Operation: 1,
+			},
+			{
+				Table:     "kms.company_developer",
+				NewRow:    companyDeveloperItemsOld,
+				Operation: 1,
+			},
+			{
 				Table:     "kms.app",
 				NewRow:    appItemsOld,
 				Operation: 1,
@@ -407,6 +544,18 @@ var _ = Describe("listener", func() {
 				Table:     "kms.developer",
 				OldRow:    devItemsOld,
 				NewRow:    devItemsNew,
+				Operation: 2,
+			},
+			{
+				Table:     "kms.company",
+				OldRow:    companyItemsOld,
+				NewRow:    companyItemsNew,
+				Operation: 2,
+			},
+			{
+				Table:     "kms.company_developer",
+				OldRow:    companyDeveloperItemsOld,
+				NewRow:    companyDeveloperItemsNew,
 				Operation: 2,
 			},
 			{
@@ -461,7 +610,6 @@ var _ = Describe("listener", func() {
 		apid.Events().Emit("ApigeeSync", &event2)
 		apid.Events().Emit("ApigeeSync", &common.ChangeList{})
 	})
-
 })
 
 type test_handler struct {

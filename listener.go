@@ -248,6 +248,108 @@ func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 }
 
 /*
+ * Performs Bulk insert of Company Developers
+ */
+func insertCompanyDevelopers(rows []common.Row, txn *sql.Tx) bool {
+	var scope, CompanyId, DeveloperId, tenantId, CreatedBy, LastModifiedBy string
+	var CreatedAt, LastModifiedAt int64
+
+	prep, err := txn.Prepare("INSERT INTO COMPANY_DEVELOPER (_change_selector,company_id,tenant_id,developer_id,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8);")
+	if err != nil {
+		log.Error("INSERT COMPANY_DEVELOPER Failed: ", err)
+		return false
+	}
+	defer prep.Close()
+	for _, ele := range rows {
+
+		ele.Get("_change_selector", &scope)
+		ele.Get("company_id", &CompanyId)
+		ele.Get("tenant_id", &tenantId)
+		ele.Get("developer_id", &DeveloperId)
+		ele.Get("created_at", &CreatedAt)
+		ele.Get("created_by", &CreatedBy)
+		ele.Get("updated_at", &LastModifiedAt)
+		ele.Get("updated_by", &LastModifiedBy)
+
+		/* Mandatory params check */
+		if scope == "" || tenantId == "" || CompanyId == "" || DeveloperId == ""{
+			log.Error("INSERT COMPANY_DEVELOPER: i/p args missing")
+			return false
+		}
+		_, err = txn.Stmt(prep).Exec(
+			scope,
+			CompanyId,
+			tenantId,
+			DeveloperId,
+			CreatedAt,
+			CreatedBy,
+			LastModifiedAt,
+			LastModifiedBy)
+
+		if err != nil {
+			log.Error("INSERT COMPANY_DEVELOPER Failed: (", DeveloperId, ", ", CompanyId, ", ", scope, ")", err)
+			return false
+		} else {
+			log.Debug("INSERT COMPANY_DEVELOPER Success: (", DeveloperId, ", ", CompanyId, ", ", scope, ")")
+		}
+	}
+	return true
+}
+
+/*
+ * Performs Bulk insert of Companies
+ */
+func insertCompanies(rows []common.Row, txn *sql.Tx) bool {
+	var scope, EntityIdentifier, Name, DisplayName, Status, tenantId, CreatedBy, LastModifiedBy string
+	var CreatedAt, LastModifiedAt int64
+
+	prep, err := txn.Prepare("INSERT INTO COMPANY (_change_selector,id,tenant_id,status,name,display_name,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);")
+	if err != nil {
+		log.Error("INSERT COMPANY Failed: ", err)
+		return false
+	}
+	defer prep.Close()
+	for _, ele := range rows {
+
+		ele.Get("_change_selector", &scope)
+		ele.Get("id", &EntityIdentifier)
+		ele.Get("tenant_id", &tenantId)
+		ele.Get("status", &Status)
+		ele.Get("name", &Name)
+		ele.Get("display_name", &DisplayName)
+		ele.Get("created_at", &CreatedAt)
+		ele.Get("created_by", &CreatedBy)
+		ele.Get("updated_at", &LastModifiedAt)
+		ele.Get("updated_by", &LastModifiedBy)
+
+		/* Mandatory params check */
+		if EntityIdentifier == "" || scope == "" || tenantId == "" {
+			log.Error("INSERT COMPANY: i/p args missing")
+			return false
+		}
+		_, err = txn.Stmt(prep).Exec(
+			scope,
+			EntityIdentifier,
+			tenantId,
+			Status,
+			Name,
+			DisplayName,
+			CreatedAt,
+			CreatedBy,
+			LastModifiedAt,
+			LastModifiedBy)
+
+		if err != nil {
+			log.Error("INSERT COMPANY Failed: (", EntityIdentifier, ", ", scope, ")", err)
+			return false
+		} else {
+			log.Debug("INSERT COMPANY Success: (", EntityIdentifier, ", ", scope, ")")
+		}
+	}
+	return true
+}
+
+/*
  * Performs Bulk insert of API products
  */
 func insertAPIproducts(rows []common.Row, txn *sql.Tx) bool {
@@ -404,7 +506,34 @@ func processChange(changes *common.ChangeList) {
 			case common.Delete:
 				ok = deleteObject("APP", payload.OldRow, txn)
 			}
+		case "kms.company":
+			switch payload.Operation {
+			case common.Insert:
+				rows = append(rows, payload.NewRow)
+				ok = insertCompanies(rows, txn)
 
+			case common.Update:
+				ok = deleteObject("COMPANY", payload.OldRow, txn)
+				rows = append(rows, payload.NewRow)
+				ok = insertCompanies(rows, txn)
+
+			case common.Delete:
+				ok = deleteObject("COMPANY", payload.OldRow, txn)
+			}
+		case "kms.company_developer":
+			switch payload.Operation {
+			case common.Insert:
+				rows = append(rows, payload.NewRow)
+				ok = insertCompanyDevelopers(rows, txn)
+
+			case common.Update:
+				ok = deleteObject("COMPANY_DEVELOPER", payload.OldRow, txn)
+				rows = append(rows, payload.NewRow)
+				ok = insertCompanyDevelopers(rows, txn)
+
+			case common.Delete:
+				ok = deleteObject("COMPANY_DEVELOPER", payload.OldRow, txn)
+			}
 		case "kms.app_credential":
 			switch payload.Operation {
 			case common.Insert:
