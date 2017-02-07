@@ -2,6 +2,7 @@ package apidVerifyApiKey
 
 import (
 	"database/sql"
+
 	"github.com/30x/apid"
 	"github.com/apigee-labs/transicator/common"
 )
@@ -272,7 +273,7 @@ func insertCompanyDevelopers(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("updated_by", &LastModifiedBy)
 
 		/* Mandatory params check */
-		if scope == "" || tenantId == "" || CompanyId == "" || DeveloperId == ""{
+		if scope == "" || tenantId == "" || CompanyId == "" || DeveloperId == "" {
 			log.Error("INSERT COMPANY_DEVELOPER: i/p args missing")
 			return false
 		}
@@ -470,6 +471,7 @@ func processChange(changes *common.ChangeList) {
 		log.Error("Unable to create transaction")
 		return
 	}
+	defer txn.Rollback()
 
 	var rows []common.Row
 	ok := true
@@ -527,12 +529,12 @@ func processChange(changes *common.ChangeList) {
 				ok = insertCompanyDevelopers(rows, txn)
 
 			case common.Update:
-				ok = deleteObject("COMPANY_DEVELOPER", payload.OldRow, txn)
+				ok = deleteCompanyDeveloper(payload.OldRow, txn)
 				rows = append(rows, payload.NewRow)
 				ok = insertCompanyDevelopers(rows, txn)
 
 			case common.Delete:
-				ok = deleteObject("COMPANY_DEVELOPER", payload.OldRow, txn)
+				ok = deleteCompanyDeveloper(payload.OldRow, txn)
 			}
 		case "kms.app_credential":
 			switch payload.Operation {
@@ -580,7 +582,6 @@ func processChange(changes *common.ChangeList) {
 		}
 		if !ok {
 			log.Error("Sql Operation error. Operation rollbacked")
-			txn.Rollback()
 			return
 		}
 	}
@@ -645,5 +646,32 @@ func deleteAPIproductMapper(ele common.Row, txn *sql.Tx) bool {
 		}
 	}
 	log.Errorf("DELETE APP_CREDENTIAL_APIPRODUCT_MAPPER (%s, %s, %s, %s) failed.", ApiProduct, AppId, EntityIdentifier, apid_scope, err)
+	return false
+}
+
+func deleteCompanyDeveloper(ele common.Row, txn *sql.Tx) bool {
+	prep, err := txn.Prepare(`
+	DELETE FROM COMPANY_DEVELOPER
+	WHERE tenant_id=$1 AND company_id=$2 AND developer_id=$3`)
+	if err != nil {
+		log.Errorf("DELETE COMPANY_DEVELOPER Failed: %v", err)
+		return false
+	}
+	defer prep.Close()
+
+	var tenantId, companyId, developerId string
+	ele.Get("tenant_id", &tenantId)
+	ele.Get("company_id", &companyId)
+	ele.Get("developer_id", &developerId)
+
+	res, err := txn.Stmt(prep).Exec(tenantId, companyId, developerId)
+	if err == nil {
+		affect, err := res.RowsAffected()
+		if err == nil && affect != 0 {
+			log.Debugf("DELETE COMPANY_DEVELOPER (%s, %s, %s) success.", tenantId, companyId, developerId)
+			return true
+		}
+	}
+	log.Errorf("DELETE COMPANY_DEVELOPER (%s, %s, %s) failed: %v", tenantId, companyId, developerId, err)
 	return false
 }
