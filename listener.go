@@ -470,6 +470,7 @@ func processChange(changes *common.ChangeList) {
 		log.Error("Unable to create transaction")
 		return
 	}
+	defer txn.Rollback()
 
 	var rows []common.Row
 	ok := true
