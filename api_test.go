@@ -146,6 +146,12 @@ var _ = Describe("api", func() {
 				Expect(res).Should(BeTrue())
 			}
 
+			for i := 0; i < 10; i++ {
+				row := generateTestCompanyDeveloper(i)
+				res := deleteCompanyDeveloper(row, txn)
+				Expect(res).Should(BeTrue())
+			}
+
 			txn.Commit()
 		})
 
@@ -174,7 +180,7 @@ var _ = Describe("api", func() {
 			res = deleteObject("COMPANY", row, txn)
 			Expect(res).Should(BeFalse())
 
-			res = deleteObject("COMPANY_DEVELOPER", row, txn)
+			res = deleteCompanyDeveloper(row, txn)
 			Expect(res).Should(BeFalse())
 
 			txn.Rollback()
