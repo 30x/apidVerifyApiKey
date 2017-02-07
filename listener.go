@@ -2,6 +2,7 @@ package apidVerifyApiKey
 
 import (
 	"database/sql"
+
 	"github.com/30x/apid"
 	"github.com/apigee-labs/transicator/common"
 )
@@ -272,7 +273,7 @@ func insertCompanyDevelopers(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("updated_by", &LastModifiedBy)
 
 		/* Mandatory params check */
-		if scope == "" || tenantId == "" || CompanyId == "" || DeveloperId == ""{
+		if scope == "" || tenantId == "" || CompanyId == "" || DeveloperId == "" {
 			log.Error("INSERT COMPANY_DEVELOPER: i/p args missing")
 			return false
 		}
@@ -581,7 +582,6 @@ func processChange(changes *common.ChangeList) {
 		}
 		if !ok {
 			log.Error("Sql Operation error. Operation rollbacked")
-			txn.Rollback()
 			return
 		}
 	}
