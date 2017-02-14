@@ -3,7 +3,7 @@ package apidVerifyApiKey
 import (
 	"database/sql"
 
-	"github.com/30x/apid"
+	"github.com/30x/apid-core"
 	"github.com/apigee-labs/transicator/common"
 )
 

@@ -1,8 +1,9 @@
 package apidVerifyApiKey
 
 import (
-	"github.com/30x/apid"
 	"sync"
+
+	"github.com/30x/apid-core"
 )
 
 const (
