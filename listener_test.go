@@ -2,7 +2,7 @@ package apidVerifyApiKey
 
 import (
 	"encoding/json"
-	"github.com/30x/apid"
+	"github.com/30x/apid-core"
 	"github.com/apigee-labs/transicator/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
