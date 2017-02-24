@@ -109,7 +109,7 @@ func insertCredentials(rows []common.Row, txn *sql.Tx) bool {
 			log.Error("INSERT APP_CREDENTIAL: i/p args missing")
 			return false
 		}
-		_, err = txn.Stmt(prep).Exec(
+		_, err = prep.Exec(
 			scope,
 			id,
 			appId,
@@ -164,7 +164,7 @@ func insertApplications(rows []common.Row, txn *sql.Tx) bool {
 			log.Error("INSERT APP: i/p args missing")
 			return false
 		}
-		_, err = txn.Stmt(prep).Exec(
+		_, err = prep.Exec(
 			scope,
 			EntityIdentifier,
 			DeveloperId,
@@ -224,7 +224,7 @@ func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 			log.Error("INSERT DEVELOPER: i/p args missing")
 			return false
 		}
-		_, err = txn.Stmt(prep).Exec(
+		_, err = prep.Exec(
 			scope,
 			Email,
 			EntityIdentifier,
@@ -277,7 +277,7 @@ func insertCompanyDevelopers(rows []common.Row, txn *sql.Tx) bool {
 			log.Error("INSERT COMPANY_DEVELOPER: i/p args missing")
 			return false
 		}
-		_, err = txn.Stmt(prep).Exec(
+		_, err = prep.Exec(
 			scope,
 			CompanyId,
 			tenantId,
@@ -328,7 +328,7 @@ func insertCompanies(rows []common.Row, txn *sql.Tx) bool {
 			log.Error("INSERT COMPANY: i/p args missing")
 			return false
 		}
-		_, err = txn.Stmt(prep).Exec(
+		_, err = prep.Exec(
 			scope,
 			EntityIdentifier,
 			tenantId,
@@ -377,7 +377,7 @@ func insertAPIproducts(rows []common.Row, txn *sql.Tx) bool {
 			log.Error("INSERT API_PRODUCT: i/p args missing")
 			return false
 		}
-		_, err = txn.Stmt(prep).Exec(
+		_, err = prep.Exec(
 			apiProduct,
 			res,
 			env,
@@ -428,7 +428,7 @@ func insertAPIProductMappers(rows []common.Row, txn *sql.Tx) bool {
 		 * mapping entries associated with the credential
 		 */
 
-		_, err = txn.Stmt(prep).Exec(
+		_, err = prep.Exec(
 			ApiProduct,
 			AppId,
 			EntityIdentifier,
@@ -605,7 +605,7 @@ func deleteObject(object string, ele common.Row, txn *sql.Tx) bool {
 	ele.Get("_change_selector", &scope)
 	ele.Get("id", &objid)
 
-	res, err := txn.Stmt(prep).Exec(objid, scope)
+	res, err := prep.Exec(objid, scope)
 	if err == nil {
 		affect, err := res.RowsAffected()
 		if err == nil && affect != 0 {
@@ -637,7 +637,7 @@ func deleteAPIproductMapper(ele common.Row, txn *sql.Tx) bool {
 	ele.Get("appcred_id", &EntityIdentifier)
 	ele.Get("_change_selector", &apid_scope)
 
-	res, err := txn.Stmt(prep).Exec(ApiProduct, AppId, EntityIdentifier, apid_scope)
+	res, err := prep.Exec(ApiProduct, AppId, EntityIdentifier, apid_scope)
 	if err == nil {
 		affect, err := res.RowsAffected()
 		if err == nil && affect != 0 {
@@ -664,7 +664,7 @@ func deleteCompanyDeveloper(ele common.Row, txn *sql.Tx) bool {
 	ele.Get("company_id", &companyId)
 	ele.Get("developer_id", &developerId)
 
-	res, err := txn.Stmt(prep).Exec(tenantId, companyId, developerId)
+	res, err := prep.Exec(tenantId, companyId, developerId)
 	if err == nil {
 		affect, err := res.RowsAffected()
 		if err == nil && affect != 0 {
