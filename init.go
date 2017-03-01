@@ -155,9 +155,9 @@ CREATE TABLE IF NOT EXISTS app_credential_apiproduct_mapper (
     status text,
     PRIMARY KEY (appcred_id, app_id, apiprdt_id,tenant_id)
 );
-CREATE INDEX developer_id ON developer (id);
-CREATE INDEX api_product_id ON api_product (id);
-CREATE INDEX app_id ON app (id);
+CREATE INDEX IF NOT EXISTS developer_id ON developer (id);
+CREATE INDEX IF NOT EXISTS api_product_id ON api_product (id);
+CREATE INDEX IF NOT EXISTS app_id ON app (id);
 `)
 	if err != nil {
 		log.Panic("Unable to initialize DB", err)
