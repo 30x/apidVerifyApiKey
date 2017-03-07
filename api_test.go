@@ -32,6 +32,7 @@ var _ = Describe("api", func() {
 				res := insertDevelopers([]common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
+
 			// companies
 			for i := 0; i < 10; i++ {
 				row := generateTestCompany(i)
@@ -41,7 +42,7 @@ var _ = Describe("api", func() {
 
 			// company developers
 			for i := 0; i < 10; i++ {
-				row := generateTestCompanyDeveloper(i);
+				row := generateTestCompanyDeveloper(i)
 				res := insertCompanyDevelopers([]common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
@@ -50,7 +51,7 @@ var _ = Describe("api", func() {
 			var j, k int
 			for i := 0; i < 10; i++ {
 				for j = k; j < 10+k; j++ {
-					row := generateTestApp(j, i);
+					row := generateTestApp(j, i)
 					res := insertApplications([]common.Row{row}, txn)
 					Expect(res).Should(BeTrue())
 				}
@@ -118,7 +119,7 @@ var _ = Describe("api", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			for i := 0; i < 10; i++ {
-				row := generateTestApiProductMapper(i);
+				row := generateTestApiProductMapper(i)
 				res := deleteAPIproductMapper(row, txn)
 				Expect(res).Should(BeTrue())
 			}
