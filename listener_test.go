@@ -163,6 +163,7 @@ var _ = Describe("listener", func() {
 					json.Unmarshal(rsp, &respj)
 					Expect(respj.Type).Should(Equal("APIKeyContext"))
 					Expect(respj.RspInfo.Key).Should(Equal("ch_app_credential_2"))
+					Expect(respj.RspInfo.Type).Should(Equal("developer"))
 					closed = 1
 					close(done)
 				},
@@ -181,7 +182,7 @@ var _ = Describe("listener", func() {
 			/* API Product */
 			srvItems := common.Row{
 				"id": {
-					Value: "ch_api_product_2",
+					Value: "ch_api_product_5",
 				},
 				"api_resources": {
 					Value: "{}",
@@ -197,25 +198,10 @@ var _ = Describe("listener", func() {
 				},
 			}
 
-			/* DEVELOPER */
-			devItems := common.Row{
-				"id": {
-					Value: "ch_developer_id_2",
-				},
-				"status": {
-					Value: "Active",
-				},
-				"tenant_id": {
-					Value: "tenant_id_0",
-				},
-				"_change_selector": {
-					Value: "test_org0",
-				},
-			}
 			/* COMPANY */
 			companyItems := common.Row{
 				"id": {
-					Value: "ch_company_id_2",
+					Value: "ch_company_id_5",
 				},
 				"status": {
 					Value: "Active",
@@ -236,7 +222,7 @@ var _ = Describe("listener", func() {
 			/* COMPANY_DEVELOPER */
 			companyDeveloperItems := common.Row{
 				"id": {
-					Value: "ch_developer_id_2",
+					Value: "ch_developer_id_5",
 				},
 				"tenant_id": {
 					Value: "tenant_id_0",
@@ -245,20 +231,20 @@ var _ = Describe("listener", func() {
 					Value: "test_org0",
 				},
 				"company_id": {
-					Value: "ch_company_id_2",
+					Value: "ch_company_id_5",
 				},
 				"developer_id": {
-					Value: "ch_developer_id_2",
+					Value: "ch_developer_id_5",
 				},
 			}
 
 			/* APP */
 			appItems := common.Row{
 				"id": {
-					Value: "ch_application_id_2",
+					Value: "ch_application_id_5",
 				},
 				"company_id": {
-					Value: "ch_company_id_2",
+					Value: "ch_company_id_5",
 				},
 				"status": {
 					Value: "Approved",
@@ -270,17 +256,17 @@ var _ = Describe("listener", func() {
 					Value: "test_org0",
 				},
 				"parent_id": {
-					Value: "ch_company_id_2",
+					Value: "ch_company_id_5",
 				},
 			}
 
 			/* CRED */
 			credItems := common.Row{
 				"id": {
-					Value: "ch_app_credential_2",
+					Value: "ch_app_credential_5",
 				},
 				"app_id": {
-					Value: "ch_application_id_2",
+					Value: "ch_application_id_5",
 				},
 				"tenant_id": {
 					Value: "tenant_id_0",
@@ -296,13 +282,13 @@ var _ = Describe("listener", func() {
 			/* APP_CRED_APIPRD_MAPPER */
 			mpItems := common.Row{
 				"apiprdt_id": {
-					Value: "ch_api_product_2",
+					Value: "ch_api_product_5",
 				},
 				"app_id": {
-					Value: "ch_application_id_2",
+					Value: "ch_application_id_5",
 				},
 				"appcred_id": {
-					Value: "ch_app_credential_2",
+					Value: "ch_app_credential_5",
 				},
 				"status": {
 					Value: "Approved",
@@ -321,11 +307,7 @@ var _ = Describe("listener", func() {
 					NewRow:    srvItems,
 					Operation: 1,
 				},
-				{
-					Table:     "kms.developer",
-					NewRow:    devItems,
-					Operation: 1,
-				},
+
 				{
 					Table:     "kms.app",
 					NewRow:    appItems,
@@ -364,7 +346,7 @@ var _ = Describe("listener", func() {
 						return
 					}
 					v := url.Values{
-						"key":       []string{"ch_app_credential_2"},
+						"key":       []string{"ch_app_credential_5"},
 						"uriPath":   []string{"/test"},
 						"scopeuuid": []string{"XYZ"},
 						"action":    []string{"verify"},
@@ -373,8 +355,9 @@ var _ = Describe("listener", func() {
 					Expect(err).ShouldNot(HaveOccurred())
 					var respj kmsResponseSuccess
 					json.Unmarshal(rsp, &respj)
+					Expect(respj.RspInfo.Type).Should(Equal("company"))
 					Expect(respj.Type).Should(Equal("APIKeyContext"))
-					Expect(respj.RspInfo.Key).Should(Equal("ch_app_credential_2"))
+					Expect(respj.RspInfo.Key).Should(Equal("ch_app_credential_5"))
 					closed = 1
 					close(done)
 				},
@@ -673,6 +656,7 @@ var _ = Describe("listener", func() {
 				json.Unmarshal(rsp, &respj)
 				Expect(respj.Type).Should(Equal("APIKeyContext"))
 				Expect(respj.RspInfo.Key).Should(Equal("ch_app_credential_1"))
+				Expect(respj.RspInfo.Type).Should(Equal("developer"))
 				closed = 1
 				close(done)
 			},
@@ -1074,6 +1058,7 @@ var _ = Describe("listener", func() {
 				json.Unmarshal(rsp, &respj)
 				Expect(respj.Type).Should(Equal("APIKeyContext"))
 				Expect(respj.RspInfo.Key).Should(Equal("ch_app_credential_1"))
+
 				closed = 1
 				close(done)
 			},

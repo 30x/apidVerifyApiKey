@@ -13,9 +13,10 @@ type sucResponseDetail struct {
 	ExpiresAt       int64  `json:"expiresAt"`
 	IssuedAt        int64  `json:"issuedAt"`
 	Status          string `json:"status"`
+	Type            string `json:"cType"`
 	RedirectionURIs string `json:"redirectionURIs"`
-	DeveloperAppId  string `json:"developerId"`
-	DeveloperAppNam string `json:"developerAppName"`
+	AppId           string `json:"cmpydevId"`
+	AppName         string `json:"cmpydevAppName"`
 }
 
 type errResultDetail struct {
@@ -114,7 +115,8 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			c.status,
 			a.callback_url,
 			ad.name,
-			ad.id
+			ad.id,
+			"developer" as ctype
 		FROM
 			APP_CREDENTIAL AS c 
 			INNER JOIN APP AS a ON c.app_id = a.id
@@ -131,7 +133,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			AND UPPER(a.status) = 'APPROVED'
 			AND c.id = $1 
 			AND c.tenant_id = $2)
-		UNION ALL
+		UNION
 		SELECT
 			ap.api_resources,
 			ap.environments,
@@ -139,7 +141,8 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			c.status,
 			a.callback_url,
 			ad.name,
-			ad.id
+			ad.id,
+			"company" as ctype
 		FROM
 			APP_CREDENTIAL AS c
 			INNER JOIN APP AS a ON c.app_id = a.id
@@ -158,10 +161,10 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			AND c.tenant_id = $2)
 	;`
 
-	var status, redirectionURIs, developerAppName, developerId, resName, resEnv string
+	var status, redirectionURIs, cmpydevAppName, cmpydevId, resName, resEnv, cType string
 	var issuedAt int64
 	err := db.QueryRow(sSql, key, tenantId).Scan(&resName, &resEnv, &issuedAt, &status,
-		&redirectionURIs, &developerAppName, &developerId)
+		&redirectionURIs, &cmpydevAppName, &cmpydevId, &cType)
 	switch {
 	case err == sql.ErrNoRows:
 		reason := "API Key verify failed for (" + key + ", " + scopeuuid + ", " + path + ")"
@@ -203,8 +206,9 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			IssuedAt:        issuedAt,
 			Status:          status,
 			RedirectionURIs: redirectionURIs,
-			DeveloperAppId:  developerId,
-			DeveloperAppNam: developerAppName},
+			Type:            cType,
+			AppId:           cmpydevId,
+			AppName:         cmpydevAppName},
 	}
 	return json.Marshal(resp)
 }

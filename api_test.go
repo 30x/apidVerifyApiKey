@@ -140,6 +140,7 @@ var _ = Describe("api", func() {
 				var respj kmsResponseSuccess
 				json.Unmarshal(rsp, &respj)
 				Expect(respj.Type).Should(Equal("APIKeyContext"))
+				Expect(respj.RspInfo.Type).Should(Equal("developer"))
 				Expect(respj.RspInfo.Key).Should(Equal("app_credential_" + resulti))
 			}
 		})
@@ -159,6 +160,7 @@ var _ = Describe("api", func() {
 				var respj kmsResponseSuccess
 				json.Unmarshal(rsp, &respj)
 				Expect(respj.Type).Should(Equal("APIKeyContext"))
+				Expect(respj.RspInfo.Type).Should(Equal("company"))
 				Expect(respj.RspInfo.Key).Should(Equal("app_credential_" + resulti))
 			}
 		})
