@@ -257,7 +257,7 @@ var _ = Describe("listener", func() {
 				"id": {
 					Value: "ch_application_id_2",
 				},
-				"developer_id": {
+				"company_id": {
 					Value: "ch_company_id_2",
 				},
 				"status": {
@@ -730,7 +730,7 @@ var _ = Describe("listener", func() {
 			"id": {
 				Value: "ch_application_id_0",
 			},
-			"developer_id": {
+			"company_id": {
 				Value: "ch_company_id_0",
 			},
 			"status": {
@@ -865,6 +865,7 @@ var _ = Describe("listener", func() {
 			},
 		}
 
+		/* COMPANY */
 		companyItemsNew := common.Row{
 			"id": {
 				Value: "ch_company_id_1",
@@ -886,6 +887,7 @@ var _ = Describe("listener", func() {
 			},
 		}
 
+		/* COMPANY_DEVELOPER */
 		companyDeveloperItemsNew := common.Row{
 			"id": {
 				Value: "ch_developer_id_1",
@@ -909,7 +911,7 @@ var _ = Describe("listener", func() {
 			"id": {
 				Value: "ch_application_id_1",
 			},
-			"developer_id": {
+			"company_id": {
 				Value: "ch_company_id_1",
 			},
 			"status": {
