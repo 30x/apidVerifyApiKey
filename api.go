@@ -124,7 +124,8 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			a.callback_url,
 			ad.name,
 			ad.id
-		FROM APP_CREDENTIAL AS c 
+		FROM
+			APP_CREDENTIAL AS c 
 			INNER JOIN APP AS a ON c.app_id = a.id
 			INNER JOIN ALL_DEVELOPERS AS ad 
 				ON (ad.id = a.company_id OR ad.id = a.developer_id)

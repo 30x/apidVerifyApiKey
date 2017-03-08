@@ -33,20 +33,6 @@ var _ = Describe("api", func() {
 				Expect(res).Should(BeTrue())
 			}
 
-			// companies
-			for i := 0; i < 10; i++ {
-				row := generateTestCompany(i)
-				res := insertCompanies([]common.Row{row}, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			// company developers
-			for i := 0; i < 10; i++ {
-				row := generateTestCompanyDeveloper(i)
-				res := insertCompanyDevelopers([]common.Row{row}, txn)
-				Expect(res).Should(BeTrue())
-			}
-
 			// application
 			var j, k int
 			for i := 0; i < 10; i++ {
@@ -65,6 +51,51 @@ var _ = Describe("api", func() {
 			}
 			// api product mapper
 			for i := 0; i < 10; i++ {
+				row := generateTestApiProductMapper(i)
+				res := insertAPIProductMappers([]common.Row{row}, txn)
+				Expect(res).Should(BeTrue())
+			}
+
+			// Following are data for company
+			// api products
+			for i := 100; i < 110; i++ {
+				row := generateTestApiProduct(i)
+				res := insertAPIproducts([]common.Row{row}, txn)
+				Expect(res).Should(BeTrue())
+			}
+
+			// companies
+			for i := 100; i < 110; i++ {
+				row := generateTestCompany(i)
+				res := insertCompanies([]common.Row{row}, txn)
+				Expect(res).Should(BeTrue())
+			}
+
+			// company developers
+			for i := 100; i < 110; i++ {
+				row := generateTestCompanyDeveloper(i)
+				res := insertCompanyDevelopers([]common.Row{row}, txn)
+				Expect(res).Should(BeTrue())
+			}
+
+			// application
+			k = 100
+			for i := 100; i < 110; i++ {
+				for j = k; j < 100+k; j++ {
+					row := generateTestAppCompany(j, i)
+					res := insertApplications([]common.Row{row}, txn)
+					Expect(res).Should(BeTrue())
+				}
+				k = j
+			}
+			// app credentials
+			for i := 100; i < 110; i++ {
+				row := generateTestAppCreds(i)
+				res := insertCredentials([]common.Row{row}, txn)
+				Expect(res).Should(BeTrue())
+			}
+			// api product mapper
+			for i := 100; i < 110; i++ {
 				row := generateTestApiProductMapper(i)
 				res := insertAPIProductMappers([]common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
@@ -94,8 +125,27 @@ var _ = Describe("api", func() {
 
 		})
 
-		It("should successfully verify good keys", func() {
+		It("should successfully verify good Developer keys", func() {
 			for i := 1; i < 10; i++ {
+				resulti := strconv.FormatInt(int64(i), 10)
+				v := url.Values{
+					"key":       []string{"app_credential_" + resulti},
+					"uriPath":   []string{"/test"},
+					"scopeuuid": []string{"ABCDE"},
+					"action":    []string{"verify"},
+				}
+				rsp, err := verifyAPIKey(v)
+				Expect(err).ShouldNot(HaveOccurred())
+
+				var respj kmsResponseSuccess
+				json.Unmarshal(rsp, &respj)
+				Expect(respj.Type).Should(Equal("APIKeyContext"))
+				Expect(respj.RspInfo.Key).Should(Equal("app_credential_" + resulti))
+			}
+		})
+
+		It("should successfully verify good Company keys", func() {
+			for i := 100; i < 110; i++ {
 				resulti := strconv.FormatInt(int64(i), 10)
 				v := url.Values{
 					"key":       []string{"app_credential_" + resulti},
@@ -147,7 +197,7 @@ var _ = Describe("api", func() {
 				Expect(res).Should(BeTrue())
 			}
 
-			for i := 0; i < 10; i++ {
+			for i := 100; i < 110; i++ {
 				row := generateTestCompanyDeveloper(i)
 				res := deleteCompanyDeveloper(row, txn)
 				Expect(res).Should(BeTrue())

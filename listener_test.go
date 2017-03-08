@@ -106,6 +106,9 @@ var _ = Describe("listener", func() {
 				"_change_selector": {
 					Value: "test_org0",
 				},
+				"parent_id": {
+					Value: "ch_developer_id_2",
+				},
 			}
 
 			/* CRED */
@@ -451,6 +454,9 @@ var _ = Describe("listener", func() {
 			},
 			"_change_selector": {
 				Value: "test_org0",
+			},
+			"parent_id": {
+				Value: "ch_developer_id_1",
 			},
 		}
 

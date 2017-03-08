@@ -5,11 +5,11 @@ import (
 	"strconv"
 )
 
-func convertSuffix(i int) string{
+func convertSuffix(i int) string {
 	return strconv.FormatInt(int64(i), 10)
 }
 
-func generateTestApiProduct(suffix int) common.Row{
+func generateTestApiProduct(suffix int) common.Row {
 	return common.Row{
 		"id": {
 			Value: "api_product_" + convertSuffix(suffix),
@@ -30,7 +30,7 @@ func generateTestApiProduct(suffix int) common.Row{
 }
 
 func generateTestDeveloper(suffix int) common.Row {
-	 return common.Row{
+	return common.Row{
 		"id": {
 			Value: "developer_id_" + convertSuffix(suffix),
 		},
@@ -115,6 +115,35 @@ func generateTestApp(suffix1, suffix2 int) common.Row {
 		"_change_selector": {
 			Value: "Org_0",
 		},
+		"parent_id": {
+			Value: "developer_id_" + convertSuffix(suffix2),
+		},
+	}
+}
+
+func generateTestAppCompany(suffix1, suffix2 int) common.Row {
+	return common.Row{
+		"id": {
+			Value: "application_id_" + convertSuffix(suffix1),
+		},
+		"company_id": {
+			Value: "company_id_" + convertSuffix(suffix2),
+		},
+		"status": {
+			Value: "Approved",
+		},
+		"tenant_id": {
+			Value: "tenant_id_xxxx",
+		},
+		"callback_url": {
+			Value: "http://apigee.com",
+		},
+		"_change_selector": {
+			Value: "Org_0",
+		},
+		"parent_id": {
+			Value: "company_id_" + convertSuffix(suffix2),
+		},
 	}
 }
 
@@ -163,5 +192,3 @@ func generateTestApiProductMapper(suffix int) common.Row {
 		},
 	}
 }
-
-
