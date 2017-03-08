@@ -107,16 +107,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 	log.Debug("Found tenant_id='", tenantId, "' with env='", env, "' for scopeuuid='", scopeuuid, "'")
 
 	sSql := `
-		WITH ALL_DEVELOPERS AS (
-			SELECT d.id, d.name, d.status
-			FROM DEVELOPER as d
-				INNER JOIN APP as a ON a.parent_id = d.id
-			UNION ALL
-			SELECT c.id, c.name, c.status
-			FROM COMPANY as c
-				INNER JOIN APP as a ON a.parent_id = c.id
-		)
-		SELECT 
+		SELECT
 			ap.api_resources, 
 			ap.environments, 
 			c.issued_at,
@@ -139,7 +130,33 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			AND UPPER(mp.status) = 'APPROVED' 
 			AND UPPER(a.status) = 'APPROVED'
 			AND c.id = $1 
-			AND c.tenant_id = $2);`
+			AND c.tenant_id = $2)
+		UNION
+		SELECT
+			ap.api_resources,
+			ap.environments,
+			c.issued_at,
+			c.status,
+			a.callback_url,
+			ad.name,
+			ad.id
+		FROM
+			APP_CREDENTIAL AS c
+			INNER JOIN APP AS a ON c.app_id = a.id
+			INNER JOIN ALL_DEVELOPERS AS ad
+				ON (ad.id = a.company_id OR ad.id = a.developer_id)
+			INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
+				ON mp.appcred_id = c.id
+			INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id
+		WHERE (UPPER(ad.status) = 'ACTIVE'
+			AND mp.apiprdt_id = ap.id
+			AND mp.app_id = a.id
+			AND mp.appcred_id = c.id
+			AND UPPER(mp.status) = 'APPROVED'
+			AND UPPER(a.status) = 'APPROVED'
+			AND c.id = $1
+			AND c.tenant_id = $2)
+	;`
 
 	var status, redirectionURIs, developerAppName, developerId, resName, resEnv string
 	var issuedAt int64
