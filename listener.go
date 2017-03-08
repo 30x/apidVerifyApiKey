@@ -65,6 +65,10 @@ func processSnapshot(snapshot *common.Snapshot) {
 				ok = insertAPIproducts(payload.Rows, txn)
 			case "kms.app_credential_apiproduct_mapper":
 				ok = insertAPIProductMappers(payload.Rows, txn)
+			case "kms.company":
+				ok = insertCompanies(payload.Rows, txn)
+			case "kms.company_developer":
+				ok = insertCompanyDevelopers(payload.Rows, txn)
 			}
 			if !ok {
 				log.Error("Error encountered in Downloading Snapshot for VerifyApiKey")

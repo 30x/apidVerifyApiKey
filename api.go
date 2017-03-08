@@ -118,8 +118,8 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 		FROM
 			APP_CREDENTIAL AS c 
 			INNER JOIN APP AS a ON c.app_id = a.id
-			INNER JOIN ALL_DEVELOPERS AS ad 
-				ON (ad.id = a.company_id OR ad.id = a.developer_id)
+			INNER JOIN DEVELOPER AS ad 
+				ON ad.id = a.developer_id
 			INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp 
 				ON mp.appcred_id = c.id 
 			INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id
@@ -143,8 +143,8 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 		FROM
 			APP_CREDENTIAL AS c
 			INNER JOIN APP AS a ON c.app_id = a.id
-			INNER JOIN ALL_DEVELOPERS AS ad
-				ON (ad.id = a.company_id OR ad.id = a.developer_id)
+			INNER JOIN COMPANY AS ad
+				ON ad.id = a.company_id
 			INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
 				ON mp.appcred_id = c.id
 			INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id
