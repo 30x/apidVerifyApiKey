@@ -133,7 +133,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			AND UPPER(a.status) = 'APPROVED'
 			AND c.id = $1 
 			AND c.tenant_id = $2)
-		UNION
+		UNION ALL
 		SELECT
 			ap.api_resources,
 			ap.environments,
