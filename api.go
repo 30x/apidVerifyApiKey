@@ -15,8 +15,8 @@ type sucResponseDetail struct {
 	Status          string `json:"status"`
 	Type            string `json:"cType"`
 	RedirectionURIs string `json:"redirectionURIs"`
-	AppId           string `json:"cmpydevId"`
-	AppName         string `json:"cmpydevAppName"`
+	AppId           string `json:"appId"`
+	AppName         string `json:"appName"`
 }
 
 type errResultDetail struct {
@@ -114,7 +114,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			c.issued_at,
 			c.status,
 			a.callback_url,
-			ad.name,
+			ad.email,
 			ad.id,
 			"developer" as ctype
 		FROM
@@ -161,10 +161,10 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			AND c.tenant_id = $2)
 	;`
 
-	var status, redirectionURIs, cmpydevAppName, cmpydevId, resName, resEnv, cType string
+	var status, redirectionURIs, appName, appId, resName, resEnv, cType string
 	var issuedAt int64
 	err := db.QueryRow(sSql, key, tenantId).Scan(&resName, &resEnv, &issuedAt, &status,
-		&redirectionURIs, &cmpydevAppName, &cmpydevId, &cType)
+		&redirectionURIs, &appName, &appId, &cType)
 	switch {
 	case err == sql.ErrNoRows:
 		reason := "API Key verify failed for (" + key + ", " + scopeuuid + ", " + path + ")"
@@ -207,8 +207,8 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			Status:          status,
 			RedirectionURIs: redirectionURIs,
 			Type:            cType,
-			AppId:           cmpydevId,
-			AppName:         cmpydevAppName},
+			AppId:           appId,
+			AppName:         appName},
 	}
 	return json.Marshal(resp)
 }

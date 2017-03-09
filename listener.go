@@ -202,10 +202,10 @@ func insertApplications(rows []common.Row, txn *sql.Tx) bool {
  */
 func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 
-	var scope, EntityIdentifier, Email, Status, UserName, FirstName, LastName, tenantId, CreatedBy, LastModifiedBy, Username, Name string
+	var scope, EntityIdentifier, Email, Status, UserName, FirstName, LastName, tenantId, CreatedBy, LastModifiedBy, Username string
 	var CreatedAt, LastModifiedAt int64
 
-	prep, err := txn.Prepare("INSERT INTO DEVELOPER (_change_selector,email,id,tenant_id,status,username,first_name,last_name,name,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13);")
+	prep, err := txn.Prepare("INSERT INTO DEVELOPER (_change_selector,email,id,tenant_id,status,username,first_name,last_name,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
 	if err != nil {
 		log.Error("INSERT DEVELOPER Failed: ", err)
 		return false
@@ -222,7 +222,6 @@ func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("username", &Username)
 		ele.Get("first_name", &FirstName)
 		ele.Get("last_name", &LastName)
-		ele.Get("email", &Name)
 		ele.Get("created_at", &CreatedAt)
 		ele.Get("created_by", &CreatedBy)
 		ele.Get("updated_at", &LastModifiedAt)
@@ -242,7 +241,6 @@ func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 			UserName,
 			FirstName,
 			LastName,
-			Name,
 			CreatedAt,
 			CreatedBy,
 			LastModifiedAt,

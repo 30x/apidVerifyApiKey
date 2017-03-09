@@ -62,9 +62,9 @@ paths:
                 issuedAt: 1234567890
                 status: abc123
                 redirectionURIs: abc123
-                AppName: abc123
-                AppId: abc123
-                Type: "developer"
+                appName: abc123
+                appId: abc123
+                cType: "developer"
         default:
           description: 4xx or 5xx errors
           schema:
@@ -133,11 +133,11 @@ definitions:
                 type: string
               redirectionURIs:
                 type: string
-              AppName:
+              appName:
                 type: string
-              AppId:
+              appId:
                 type: string
-              Type:
+              cType:
                 type: string
     example:
       type: "APIKeyContext"
@@ -147,9 +147,9 @@ definitions:
         issuedAt: 1234567890
         status: "abc123"
         redirectionURIs: "abc123"
-        AppName: "abc123"
-        AppId: "abc123"
-        Type: "company OR developer"
+        appName: "abc123"
+        appId: "abc123"
+        cType: "company OR developer"
 
   VerifyAPIKeyResponseFailed:
     allOf:

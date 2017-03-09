@@ -73,7 +73,6 @@ CREATE TABLE IF NOT EXISTS api_product (
     PRIMARY KEY (tenant_id, id));
 CREATE TABLE IF NOT EXISTS developer (
     id text,
-    name text,
     tenant_id text,
     username text,
     first_name text,
