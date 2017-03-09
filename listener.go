@@ -65,6 +65,10 @@ func processSnapshot(snapshot *common.Snapshot) {
 				ok = insertAPIproducts(payload.Rows, txn)
 			case "kms.app_credential_apiproduct_mapper":
 				ok = insertAPIProductMappers(payload.Rows, txn)
+			case "kms.company":
+				ok = insertCompanies(payload.Rows, txn)
+			case "kms.company_developer":
+				ok = insertCompanyDevelopers(payload.Rows, txn)
 			}
 			if !ok {
 				log.Error("Error encountered in Downloading Snapshot for VerifyApiKey")
@@ -134,10 +138,10 @@ func insertCredentials(rows []common.Row, txn *sql.Tx) bool {
  */
 func insertApplications(rows []common.Row, txn *sql.Tx) bool {
 
-	var scope, EntityIdentifier, DeveloperId, CallbackUrl, Status, AppName, AppFamily, tenantId, CreatedBy, LastModifiedBy string
+	var scope, EntityIdentifier, DeveloperId, CompanyId, ParentId, CallbackUrl, Status, AppName, AppFamily, tenantId, CreatedBy, LastModifiedBy string
 	var CreatedAt, LastModifiedAt int64
 
-	prep, err := txn.Prepare("INSERT INTO APP (_change_selector, id, developer_id,callback_url,status, name, app_family, created_at, created_by,updated_at, updated_by,tenant_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
+	prep, err := txn.Prepare("INSERT INTO APP (_change_selector, id, developer_id, company_id, parent_id, callback_url,status, name, app_family, created_at, created_by,updated_at, updated_by,tenant_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14);")
 	if err != nil {
 		log.Error("INSERT APP Failed: ", err)
 		return false
@@ -149,6 +153,8 @@ func insertApplications(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("_change_selector", &scope)
 		ele.Get("id", &EntityIdentifier)
 		ele.Get("developer_id", &DeveloperId)
+		ele.Get("company_id", &CompanyId)
+		ele.Get("parent_id", &ParentId)
 		ele.Get("callback_url", &CallbackUrl)
 		ele.Get("status", &Status)
 		ele.Get("name", &AppName)
@@ -168,6 +174,8 @@ func insertApplications(rows []common.Row, txn *sql.Tx) bool {
 			scope,
 			EntityIdentifier,
 			DeveloperId,
+			CompanyId,
+			ParentId,
 			CallbackUrl,
 			Status,
 			AppName,
@@ -194,10 +202,10 @@ func insertApplications(rows []common.Row, txn *sql.Tx) bool {
  */
 func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 
-	var scope, EntityIdentifier, Email, Status, UserName, FirstName, LastName, tenantId, CreatedBy, LastModifiedBy, Username string
+	var scope, EntityIdentifier, Email, Status, UserName, FirstName, LastName, tenantId, CreatedBy, LastModifiedBy, Username, Name string
 	var CreatedAt, LastModifiedAt int64
 
-	prep, err := txn.Prepare("INSERT INTO DEVELOPER (_change_selector,email,id,tenant_id,status,username,first_name,last_name,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
+	prep, err := txn.Prepare("INSERT INTO DEVELOPER (_change_selector,email,id,tenant_id,status,username,first_name,last_name,name,created_at,created_by,updated_at,updated_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13);")
 	if err != nil {
 		log.Error("INSERT DEVELOPER Failed: ", err)
 		return false
@@ -214,6 +222,7 @@ func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("username", &Username)
 		ele.Get("first_name", &FirstName)
 		ele.Get("last_name", &LastName)
+		ele.Get("email", &Name)
 		ele.Get("created_at", &CreatedAt)
 		ele.Get("created_by", &CreatedBy)
 		ele.Get("updated_at", &LastModifiedAt)
@@ -233,6 +242,7 @@ func insertDevelopers(rows []common.Row, txn *sql.Tx) bool {
 			UserName,
 			FirstName,
 			LastName,
+			Name,
 			CreatedAt,
 			CreatedBy,
 			LastModifiedAt,

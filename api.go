@@ -13,9 +13,10 @@ type sucResponseDetail struct {
 	ExpiresAt       int64  `json:"expiresAt"`
 	IssuedAt        int64  `json:"issuedAt"`
 	Status          string `json:"status"`
+	Type            string `json:"cType"`
 	RedirectionURIs string `json:"redirectionURIs"`
-	DeveloperAppId  string `json:"developerId"`
-	DeveloperAppNam string `json:"developerAppName"`
+	AppId           string `json:"cmpydevId"`
+	AppName         string `json:"cmpydevAppName"`
 }
 
 type errResultDetail struct {
@@ -75,7 +76,6 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 // returns []byte to be written to client
 func verifyAPIKey(f url.Values) ([]byte, error) {
 
-
 	key := f.Get("key")
 	scopeuuid := f.Get("scopeuuid")
 	path := f.Get("uriPath")
@@ -105,21 +105,66 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 		return errorResponse(reason, errorCode)
 	}
 
-	log.Debug("Found tenant_id='", tenantId, "' with env='", env, "' for scopeuuid='", scopeuuid,"'")
+	log.Debug("Found tenant_id='", tenantId, "' with env='", env, "' for scopeuuid='", scopeuuid, "'")
 
-	sSql := "SELECT ap.api_resources, ap.environments, c.issued_at, c.status, a.callback_url, d.username, d.id " +
-		"FROM APP_CREDENTIAL AS c INNER JOIN APP AS a ON c.app_id = a.id " +
-		"INNER JOIN DEVELOPER AS d ON a.developer_id = d.id " +
-		"INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp ON mp.appcred_id = c.id " +
-		"INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id " +
-		"WHERE (UPPER(d.status) = 'ACTIVE' AND mp.apiprdt_id = ap.id AND mp.app_id = a.id " +
-		"AND mp.appcred_id = c.id AND UPPER(mp.status) = 'APPROVED' AND UPPER(a.status) = 'APPROVED' " +
-		"AND c.id = $1 AND c.tenant_id = $2);"
+	sSql := `
+		SELECT
+			ap.api_resources, 
+			ap.environments, 
+			c.issued_at,
+			c.status,
+			a.callback_url,
+			ad.name,
+			ad.id,
+			"developer" as ctype
+		FROM
+			APP_CREDENTIAL AS c 
+			INNER JOIN APP AS a ON c.app_id = a.id
+			INNER JOIN DEVELOPER AS ad 
+				ON ad.id = a.developer_id
+			INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp 
+				ON mp.appcred_id = c.id 
+			INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id
+		WHERE (UPPER(ad.status) = 'ACTIVE' 
+			AND mp.apiprdt_id = ap.id 
+			AND mp.app_id = a.id
+			AND mp.appcred_id = c.id 
+			AND UPPER(mp.status) = 'APPROVED' 
+			AND UPPER(a.status) = 'APPROVED'
+			AND c.id = $1 
+			AND c.tenant_id = $2)
+		UNION
+		SELECT
+			ap.api_resources,
+			ap.environments,
+			c.issued_at,
+			c.status,
+			a.callback_url,
+			ad.name,
+			ad.id,
+			"company" as ctype
+		FROM
+			APP_CREDENTIAL AS c
+			INNER JOIN APP AS a ON c.app_id = a.id
+			INNER JOIN COMPANY AS ad
+				ON ad.id = a.company_id
+			INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
+				ON mp.appcred_id = c.id
+			INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id
+		WHERE (UPPER(ad.status) = 'ACTIVE'
+			AND mp.apiprdt_id = ap.id
+			AND mp.app_id = a.id
+			AND mp.appcred_id = c.id
+			AND UPPER(mp.status) = 'APPROVED'
+			AND UPPER(a.status) = 'APPROVED'
+			AND c.id = $1
+			AND c.tenant_id = $2)
+	;`
 
-	var status, redirectionURIs, developerAppName, developerId, resName, resEnv string
+	var status, redirectionURIs, cmpydevAppName, cmpydevId, resName, resEnv, cType string
 	var issuedAt int64
 	err := db.QueryRow(sSql, key, tenantId).Scan(&resName, &resEnv, &issuedAt, &status,
-		&redirectionURIs, &developerAppName, &developerId)
+		&redirectionURIs, &cmpydevAppName, &cmpydevId, &cType)
 	switch {
 	case err == sql.ErrNoRows:
 		reason := "API Key verify failed for (" + key + ", " + scopeuuid + ", " + path + ")"
@@ -161,8 +206,9 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			IssuedAt:        issuedAt,
 			Status:          status,
 			RedirectionURIs: redirectionURIs,
-			DeveloperAppId:  developerId,
-			DeveloperAppNam: developerAppName},
+			Type:            cType,
+			AppId:           cmpydevId,
+			AppName:         cmpydevAppName},
 	}
 	return json.Marshal(resp)
 }
