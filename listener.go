@@ -65,6 +65,10 @@ func processSnapshot(snapshot *common.Snapshot) {
 				ok = insertAPIproducts(payload.Rows, txn)
 			case "kms.app_credential_apiproduct_mapper":
 				ok = insertAPIProductMappers(payload.Rows, txn)
+			case "kms.company":
+				ok = insertCompanies(payload.Rows, txn)
+			case "kms.company_developer":
+				ok = insertCompanyDevelopers(payload.Rows, txn)
 			}
 			if !ok {
 				log.Error("Error encountered in Downloading Snapshot for VerifyApiKey")
@@ -134,10 +138,10 @@ func insertCredentials(rows []common.Row, txn *sql.Tx) bool {
  */
 func insertApplications(rows []common.Row, txn *sql.Tx) bool {
 
-	var scope, EntityIdentifier, DeveloperId, CallbackUrl, Status, AppName, AppFamily, tenantId, CreatedBy, LastModifiedBy string
+	var scope, EntityIdentifier, DeveloperId, CompanyId, ParentId, CallbackUrl, Status, AppName, AppFamily, tenantId, CreatedBy, LastModifiedBy string
 	var CreatedAt, LastModifiedAt int64
 
-	prep, err := txn.Prepare("INSERT INTO APP (_change_selector, id, developer_id,callback_url,status, name, app_family, created_at, created_by,updated_at, updated_by,tenant_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);")
+	prep, err := txn.Prepare("INSERT INTO APP (_change_selector, id, developer_id, company_id, parent_id, callback_url,status, name, app_family, created_at, created_by,updated_at, updated_by,tenant_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14);")
 	if err != nil {
 		log.Error("INSERT APP Failed: ", err)
 		return false
@@ -149,6 +153,8 @@ func insertApplications(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("_change_selector", &scope)
 		ele.Get("id", &EntityIdentifier)
 		ele.Get("developer_id", &DeveloperId)
+		ele.Get("company_id", &CompanyId)
+		ele.Get("parent_id", &ParentId)
 		ele.Get("callback_url", &CallbackUrl)
 		ele.Get("status", &Status)
 		ele.Get("name", &AppName)
@@ -168,6 +174,8 @@ func insertApplications(rows []common.Row, txn *sql.Tx) bool {
 			scope,
 			EntityIdentifier,
 			DeveloperId,
+			CompanyId,
+			ParentId,
 			CallbackUrl,
 			Status,
 			AppName,

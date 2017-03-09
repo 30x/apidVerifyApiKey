@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS app (
     status text,
     app_family text,
     company_id text,
+    parent_id text,
     developer_id text,
     type int,
     created_at int64,
@@ -155,6 +156,7 @@ CREATE TABLE IF NOT EXISTS app_credential_apiproduct_mapper (
     status text,
     PRIMARY KEY (appcred_id, app_id, apiprdt_id,tenant_id)
 );
+CREATE INDEX IF NOT EXISTS company_id ON company (id);
 CREATE INDEX IF NOT EXISTS developer_id ON developer (id);
 CREATE INDEX IF NOT EXISTS api_product_id ON api_product (id);
 CREATE INDEX IF NOT EXISTS app_id ON app (id);
