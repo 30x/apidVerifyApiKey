@@ -61,6 +61,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	b, err := verifyAPIKey(f)
 	if err != nil {
 		log.Errorf("error: %s", err)

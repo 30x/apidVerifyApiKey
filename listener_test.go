@@ -2,10 +2,14 @@ package apidVerifyApiKey
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/30x/apid-core"
 	"github.com/apigee-labs/transicator/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 )
 
@@ -13,6 +17,7 @@ var _ = Describe("listener", func() {
 
 	Context("KMS create/updates verification via changes for Developer", func() {
 		It("Create KMS tables via changes, and Verify via verifyApiKey", func(done Done) {
+			server := mockKMSserver()
 			var event = common.ChangeList{}
 			closed := 0
 			/* API Product */
@@ -151,19 +156,48 @@ var _ = Describe("listener", func() {
 					if len(changeSet.Changes) > 0 || closed == 1 {
 						return
 					}
-					v := url.Values{
-						"key":       []string{"ch_app_credential_2"},
-						"uriPath":   []string{"/test"},
-						"scopeuuid": []string{"XYZ"},
-						"action":    []string{"verify"},
-					}
-					rsp, err := verifyAPIKey(v)
-					Expect(err).ShouldNot(HaveOccurred())
+
+					rsp, err := http.PostForm(
+						fmt.Sprintf("%s/verifiers/apikey",
+							server.URL),
+						url.Values{"key": {"ch_app_credential_2"},
+							"uriPath":   {"/test"},
+							"scopeuuid": {"XYZ"},
+							"action":    {"verify"}})
+
+					Expect(err).Should(Succeed())
+					defer rsp.Body.Close()
+					body, readErr := ioutil.ReadAll(rsp.Body)
+					Expect(readErr).Should(Succeed())
 					var respj kmsResponseSuccess
-					json.Unmarshal(rsp, &respj)
+					json.Unmarshal(body, &respj)
 					Expect(respj.Type).Should(Equal("APIKeyContext"))
+					Expect(rsp.StatusCode).To(Equal(http.StatusOK))
 					Expect(respj.RspInfo.Key).Should(Equal("ch_app_credential_2"))
 					Expect(respj.RspInfo.Type).Should(Equal("developer"))
+					dataValue := rsp.Header.Get("Content-Type")
+					Expect(dataValue).To(Equal("application/json"))
+
+					rsp, err = http.PostForm(
+						fmt.Sprintf("%s/verifiers/apikey",
+							server.URL),
+						url.Values{"key": {"ch_app_credential_2"},
+							"uriPath":   {"/test"},
+							"scopeuuid": {"badscope"},
+							"action":    {"verify"}})
+
+					Expect(err).Should(Succeed())
+					defer rsp.Body.Close()
+					body, readErr = ioutil.ReadAll(rsp.Body)
+					Expect(readErr).Should(Succeed())
+					var respe kmsResponseFail
+					json.Unmarshal(body, &respe)
+					Expect(rsp.StatusCode).To(Equal(http.StatusOK))
+					dataValue = rsp.Header.Get("Content-Type")
+					Expect(dataValue).To(Equal("application/json"))
+					Expect(respe.Type).Should(Equal("ErrorResult"))
+					Expect(respe.ErrInfo.ErrorCode).Should(Equal("ENV_VALIDATION_FAILED"))
+
 					closed = 1
 					close(done)
 				},
@@ -177,6 +211,7 @@ var _ = Describe("listener", func() {
 
 	Context("KMS create/updates verification via changes for Company", func() {
 		It("Create KMS tables via changes, and Verify via verifyApiKey", func(done Done) {
+			server := mockKMSserver()
 			var event = common.ChangeList{}
 			closed := 0
 			/* API Product */
@@ -345,19 +380,48 @@ var _ = Describe("listener", func() {
 					if len(changeSet.Changes) > 0 || closed == 1 {
 						return
 					}
-					v := url.Values{
-						"key":       []string{"ch_app_credential_5"},
-						"uriPath":   []string{"/test"},
-						"scopeuuid": []string{"XYZ"},
-						"action":    []string{"verify"},
-					}
-					rsp, err := verifyAPIKey(v)
-					Expect(err).ShouldNot(HaveOccurred())
+
+					rsp, err := http.PostForm(
+						fmt.Sprintf("%s/verifiers/apikey",
+							server.URL),
+						url.Values{"key": {"ch_app_credential_5"},
+							"uriPath":   {"/test"},
+							"scopeuuid": {"XYZ"},
+							"action":    {"verify"}})
+
+					Expect(err).Should(Succeed())
+					defer rsp.Body.Close()
+					body, readErr := ioutil.ReadAll(rsp.Body)
+					Expect(readErr).Should(Succeed())
 					var respj kmsResponseSuccess
-					json.Unmarshal(rsp, &respj)
+					json.Unmarshal(body, &respj)
+					Expect(rsp.StatusCode).To(Equal(http.StatusOK))
 					Expect(respj.RspInfo.Type).Should(Equal("company"))
 					Expect(respj.Type).Should(Equal("APIKeyContext"))
 					Expect(respj.RspInfo.Key).Should(Equal("ch_app_credential_5"))
+					dataValue := rsp.Header.Get("Content-Type")
+					Expect(dataValue).To(Equal("application/json"))
+
+					rsp, err = http.PostForm(
+						fmt.Sprintf("%s/verifiers/apikey",
+							server.URL),
+						url.Values{"key": {"ch_app_credential_5"},
+							"uriPath":   {"/test"},
+							"scopeuuid": {"badscope"},
+							"action":    {"verify"}})
+
+					Expect(err).Should(Succeed())
+					defer rsp.Body.Close()
+					body, readErr = ioutil.ReadAll(rsp.Body)
+					Expect(readErr).Should(Succeed())
+					var respe kmsResponseFail
+					json.Unmarshal(body, &respe)
+					Expect(rsp.StatusCode).To(Equal(http.StatusOK))
+					dataValue = rsp.Header.Get("Content-Type")
+					Expect(dataValue).To(Equal("application/json"))
+					Expect(respe.Type).Should(Equal("ErrorResult"))
+					Expect(respe.ErrInfo.ErrorCode).Should(Equal("ENV_VALIDATION_FAILED"))
+
 					closed = 1
 					close(done)
 				},
@@ -1109,4 +1173,10 @@ func addScopes(db apid.DB) {
 	)
 	log.Info("Inserted DATA_SCOPE for test")
 	txn.Commit()
+}
+
+func mockKMSserver() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handleRequest(w, r)
+	}))
 }
