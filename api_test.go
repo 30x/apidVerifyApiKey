@@ -103,7 +103,7 @@ var _ = Describe("api", func() {
 
 			txn.Commit()
 			var count int64
-			db.QueryRow("select count(*) from data_scope").Scan(&count)
+			db.QueryRow("select count(*) from edgex_data_scope").Scan(&count)
 			log.Info("Found ", count)
 
 		})
@@ -178,24 +178,24 @@ var _ = Describe("api", func() {
 
 			for i := 0; i < 10; i++ {
 				row := generateTestAppCreds(i)
-				res := deleteObject("APP_CREDENTIAL", row, txn)
+				res := delete("APP_CREDENTIAL", row, txn)
 				Expect(res).Should(BeTrue())
 			}
 			for i := 0; i < 100; i++ {
 				row := generateTestApp(i, 999) //TODO we use j in above insertions
-				res := deleteObject("APP", row, txn)
+				res := delete("APP", row, txn)
 				Expect(res).Should(BeTrue())
 			}
 
 			for i := 0; i < 10; i++ {
 				row := generateTestDeveloper(i)
-				res := deleteObject("DEVELOPER", row, txn)
+				res := delete("DEVELOPER", row, txn)
 				Expect(res).Should(BeTrue())
 			}
 
 			for i := 0; i < 10; i++ {
 				row := generateTestApiProduct(i)
-				res := deleteObject("API_PRODUCT", row, txn)
+				res := delete("API_PRODUCT", row, txn)
 				Expect(res).Should(BeTrue())
 			}
 
@@ -218,19 +218,19 @@ var _ = Describe("api", func() {
 			res := deleteAPIproductMapper(row, txn)
 			Expect(res).Should(BeFalse())
 
-			res = deleteObject("API_PRODUCT", row, txn)
+			res = delete("API_PRODUCT", row, txn)
 			Expect(res).Should(BeFalse())
 
-			res = deleteObject("APP_CREDENTIAL", row, txn)
+			res = delete("APP_CREDENTIAL", row, txn)
 			Expect(res).Should(BeFalse())
 
-			res = deleteObject("DEVELOPER", row, txn)
+			res = delete("DEVELOPER", row, txn)
 			Expect(res).Should(BeFalse())
 
-			res = deleteObject("APP", row, txn)
+			res = delete("APP", row, txn)
 			Expect(res).Should(BeFalse())
 
-			res = deleteObject("COMPANY", row, txn)
+			res = delete("COMPANY", row, txn)
 			Expect(res).Should(BeFalse())
 
 			res = deleteCompanyDeveloper(row, txn)
