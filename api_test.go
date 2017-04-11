@@ -36,7 +36,7 @@ var _ = Describe("api", func() {
 			// application
 			var j, k int
 			for i := 0; i < 10; i++ {
-				for j = k; j < 10+k; j++ {
+				for j = k; j < 10 + k; j++ {
 					row := generateTestApp(j, i)
 					res := insertApplications([]common.Row{row}, txn)
 					Expect(res).Should(BeTrue())
@@ -46,13 +46,13 @@ var _ = Describe("api", func() {
 			// app credentials
 			for i := 0; i < 10; i++ {
 				row := generateTestAppCreds(i)
-				res := insertCredentials([]common.Row{row}, txn)
+				res := insert("APP_CREDENTIAL", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 			// api product mapper
 			for i := 0; i < 10; i++ {
 				row := generateTestApiProductMapper(i)
-				res := insertAPIProductMappers([]common.Row{row}, txn)
+				res := insert("APP_CREDENTIAL_APIPRODUCT_MAPPER", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
@@ -81,7 +81,7 @@ var _ = Describe("api", func() {
 			// application
 			k = 100
 			for i := 100; i < 110; i++ {
-				for j = k; j < 100+k; j++ {
+				for j = k; j < 100 + k; j++ {
 					row := generateTestAppCompany(j, i)
 					res := insertApplications([]common.Row{row}, txn)
 					Expect(res).Should(BeTrue())
@@ -178,30 +178,30 @@ var _ = Describe("api", func() {
 
 			for i := 0; i < 10; i++ {
 				row := generateTestAppCreds(i)
-				res := delete("APP_CREDENTIAL", row, txn)
+				res := delete("APP_CREDENTIAL", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 			for i := 0; i < 100; i++ {
 				row := generateTestApp(i, 999) //TODO we use j in above insertions
-				res := delete("APP", row, txn)
+				res := delete("APP", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
 			for i := 0; i < 10; i++ {
 				row := generateTestDeveloper(i)
-				res := delete("DEVELOPER", row, txn)
+				res := delete("DEVELOPER", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
 			for i := 0; i < 10; i++ {
 				row := generateTestApiProduct(i)
-				res := delete("API_PRODUCT", row, txn)
+				res := delete("API_PRODUCT", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
 			for i := 100; i < 110; i++ {
 				row := generateTestCompanyDeveloper(i)
-				res := deleteCompanyDeveloper(row, txn)
+				res := delete("COMPANY_DEVELOPER", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
@@ -215,25 +215,25 @@ var _ = Describe("api", func() {
 
 			row := generateTestApiProductMapper(999)
 
-			res := deleteAPIproductMapper(row, txn)
+			res := delete("APP_CREDENTIAL_APIPRODUCT_MAPPER", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = delete("API_PRODUCT", row, txn)
+			res = delete("API_PRODUCT", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = delete("APP_CREDENTIAL", row, txn)
+			res = delete("APP_CREDENTIAL", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = delete("DEVELOPER", row, txn)
+			res = delete("DEVELOPER", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = delete("APP", row, txn)
+			res = delete("APP", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = delete("COMPANY", row, txn)
+			res = delete("COMPANY", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = deleteCompanyDeveloper(row, txn)
+			res = delete("COMPANY_DEVELOPER", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
 			txn.Rollback()
@@ -248,22 +248,22 @@ var _ = Describe("api", func() {
 
 			row := generateTestApiProduct(999)
 			row["id"] = nil
-			res := insertAPIproducts([]common.Row{row}, txn)
+			res := insert("API_PRODUCT", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = insertApplications([]common.Row{row}, txn)
+			res = insert( "APP", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = insertCredentials([]common.Row{row}, txn)
+			res = insert( "APP_CREDENTIAL", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = insertAPIProductMappers([]common.Row{row}, txn)
+			res = insert("APP_CREDENTIAL_APIPRODUCT_MAPPER", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = insertCompanies([]common.Row{row}, txn)
+			res = insert("COMPANY", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = insertCompanyDevelopers([]common.Row{row}, txn)
+			res = insert("COMPANY_DEVELOPER",[]common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
 		})

@@ -185,8 +185,8 @@ func processChange(changes *common.ChangeList) {
 }
 
 func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {
-	var pkeys []string = getPkeysForTable(tableName)
-	if (len(pkeys) == 0) {
+	pkeys, err := getPkeysForTable(tableName)
+	if (len(pkeys) == 0 || err != nil) {
 		log.Errorf("DELETE No primary keys found for table.", tableName)
 		return false
 	} else {
@@ -202,7 +202,7 @@ func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {
 			for _, pkey := range pkeys {
 				var value interface{}
 				row.Get(pkey, &value)
-				append(values, value)
+				values = append(values, value)
 			}
 			_, err = prep.Exec(values)
 
@@ -222,21 +222,21 @@ func buildDeleteSql(tableName string, pkeys []string) string {
 
 	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
 	var clauses []string
-	for i,columnName := range pkeys {
-		append(clauses, fmt.Sprintf("%s = $%v", columnName ,(i+1)))
+	for i, columnName := range pkeys {
+		clauses = append(clauses, fmt.Sprintf("%s = $%v", columnName, (i + 1)))
 	}
 
 	sql := []string{"DELETE FROM ", normalizedTableName, "WHERE", strings.Join(clauses, "AND"), ";"}
-	return strings.Join(sql, " "), pkeys
+	return strings.Join(sql, " ")
 }
-func getPkeysForTable(tableName string) []string {
+func getPkeysForTable(tableName string) ([]string, error) {
 	db := getDB()
 	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
 	sql := "SELECT columnName FROM _transicator_tables WHERE tableName = $1 AND primaryKey"
 	rows, err := db.Query(sql, normalizedTableName)
 	if err != nil {
 		log.Error("Failed [%s] values=[s%] Error: %v", sql, normalizedTableName, err)
-		return false
+		return nil, err
 	}
 	var columnNames []string
 	defer rows.Close()
@@ -246,26 +246,26 @@ func getPkeysForTable(tableName string) []string {
 		if err != nil {
 			log.Fatal(err)
 		}
-		append(columnNames, fmt.Sprint("%s", value))
+		columnNames = append(columnNames, fmt.Sprint("%s", value))
 	}
 	err = rows.Err()
 	if err != nil {
 		log.Fatal(err)
 	}
-	return columnNames;
+	return columnNames, nil;
 }
 
 func buildInsertSql(tableName string, rows []common.Row) string {
 	if len(rows) == 0 {
-		return nil
+		return ""
 	}
 	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
 	row := rows[0]
 	var columns, placeholders []string
 	i := 1
 	for columnName := range row {
-		append(columns, columnName)
-		append(placeholders, "$" + i)
+		columns = append(columns, columnName)
+		placeholders = append(placeholders, fmt.Sprint("$%v", i))
 		i++
 	}
 
@@ -287,7 +287,7 @@ func insert(tableName string, rows []common.Row, txn *sql.Tx) bool {
 	for _, ele := range rows {
 		var values []interface{};
 		for _, value := range ele {
-			append(values, value)
+			values = append(values, value)
 		}
 
 		_, err = prep.Exec(values)
