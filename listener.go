@@ -86,14 +86,14 @@ func processSnapshot(snapshot *common.Snapshot) {
 	return
 }
 
-func processChange(changes *common.ChangeList) {
+func processChange(changes *common.ChangeList) bool {
 
 	db := getDB()
 
 	txn, err := db.Begin()
 	if err != nil {
 		log.Error("Unable to create transaction")
-		return
+		return false
 	}
 	defer txn.Rollback()
 
@@ -177,11 +177,11 @@ func processChange(changes *common.ChangeList) {
 		}
 		if !ok {
 			log.Error("Sql Operation error. Operation rollbacked")
-			return
+			return ok
 		}
 	}
 	txn.Commit()
-	return
+	return ok
 }
 
 func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {

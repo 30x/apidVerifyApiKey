@@ -147,6 +147,163 @@ var _ = Describe("listener", func() {
 
 		})
 
+		FIt("update should succeed if newrow modifies the primary key", func() {
+			event := &common.ChangeList{}
+
+			//this needs to match what is actually in the DB
+			oldRow := common.Row{
+				"id": {
+					Value: "87a4bfaa-b3c4-47cd-b6c5-378cdb68610c",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "A product for testing Greg",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			newRow := common.Row{
+				"id": {
+					Value: "new_id",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			event.Changes = []common.Change{
+				{
+					Table:     "kms.api_product",
+					OldRow:    oldRow,
+					NewRow:    newRow,
+					Operation: 2,
+				},
+			}
+
+			ok := processChange(event)
+			Expect(true).To(Equal(ok))
+			var desc string
+			rows, _ := getDB().Query("select description from api_product where id=\"87a4bfaa-b3c4-47cd-b6c5-378cdb68610c\"")
+			Expect(rows.Next()).To(BeFalse())
+			rows, _ = getDB().Query("select description from api_product where id=\"new_id\"")
+			Expect(rows.Next()).To(BeTrue())
+			rows.Scan(&desc)
+			//expect update to not have happened
+			Expect("new description").To(Equal(desc))
+			Expect(rows.Next()).To(BeFalse())
+		})
+
+		FIt("update should fail if oldrow and new row do not contain same fields", func() {
+			log.Info("Starting test update with composite primary key")
+			event := &common.ChangeList{}
+
+			//this needs to match what is actually in the DB
+			oldRow := common.Row{
+				"id": {
+					Value: "87a4bfaa-b3c4-47cd-b6c5-378cdb68610c",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "A product for testing Greg",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			newRow := common.Row{
+				"id": {
+					Value: "87a4bfaa-b3c4-47cd-b6c5-378cdb68610c",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			event.Changes = []common.Change{
+				{
+					Table:     "kms.api_product",
+					OldRow:    oldRow,
+					NewRow:    newRow,
+					Operation: 2,
+				},
+			}
+
+			ok := processChange(event)
+			Expect(false).To(Equal(ok))
+			var desc string
+			rows, _ := getDB().Query("select description from api_product where id=\"87a4bfaa-b3c4-47cd-b6c5-378cdb68610c\"")
+			for rows.Next() {
+				rows.Scan(&desc)
+				//expect update to not have happened
+				Expect("A product for testing Greg").To(Equal(desc))
+			}
+
+		})
+
 	})
 
 	Context("KMS create/updates verification via changes for Developer", func() {
