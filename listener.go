@@ -7,6 +7,7 @@ import (
 	"strings"
 	"fmt"
 	"sort"
+	"bufio"
 )
 
 type handler struct {
@@ -109,38 +110,35 @@ func processChange(changes *common.ChangeList) bool {
 			case common.Insert:
 				ok = insert("developer", newrows, txn)
 			case common.Update:
-				ok = delete("DEVELOPER", oldrows, txn)
+				ok = delete("developer", oldrows, txn)
 				ok = ok && insert("developer", newrows, txn)
 			case common.Delete:
-				ok = delete("DEVELOPER", oldrows, txn)
+				ok = delete("developer", oldrows, txn)
 			}
 		case "kms.app":
 			switch payload.Operation {
 			case common.Insert:
 				ok = insert("app", newrows, txn)
 			case common.Update:
-				ok = delete("APP", oldrows, txn)
-				ok = ok && insert("app", newrows, txn)
+				ok = update("app", oldrows, newrows, txn)
 			case common.Delete:
-				ok = delete("APP", oldrows, txn)
+				ok = delete("app", oldrows, txn)
 			}
 		case "kms.company":
 			switch payload.Operation {
 			case common.Insert:
 				ok = insert("company", newrows, txn)
 			case common.Update:
-				ok = delete("COMPANY", oldrows, txn)
-				ok = ok && insert("company", newrows, txn)
+				ok = update("company", oldrows, newrows, txn)
 			case common.Delete:
-				ok = delete("COMPANY", oldrows, txn)
+				ok = delete("company", oldrows, txn)
 			}
 		case "kms.company_developer":
 			switch payload.Operation {
 			case common.Insert:
 				ok = insert("company_developer", newrows, txn)
 			case common.Update:
-				ok = delete("company_developer", oldrows, txn)
-				ok = ok && insert("company_developer", newrows, txn)
+				ok = update("company_developer", oldrows, newrows, txn)
 			case common.Delete:
 				ok = delete("company_developer", oldrows, txn)
 			}
@@ -149,10 +147,9 @@ func processChange(changes *common.ChangeList) bool {
 			case common.Insert:
 				ok = insert("app_credential", newrows, txn)
 			case common.Update:
-				ok = delete("APP_CREDENTIAL", oldrows, txn)
-				ok = ok && insert("app_credential", newrows, txn)
+				ok = update("app_credential", oldrows, newrows, txn)
 			case common.Delete:
-				ok = delete("APP_CREDENTIAL", oldrows, txn)
+				ok = delete("app_credential", oldrows, txn)
 			}
 		case "kms.api_product":
 			switch payload.Operation {
@@ -161,7 +158,7 @@ func processChange(changes *common.ChangeList) bool {
 			case common.Update:
 				ok = update("api_product", oldrows, newrows, txn)
 			case common.Delete:
-				ok = delete("API_PRODUCT", oldrows, txn)
+				ok = delete("api_product", oldrows, txn)
 			}
 
 		case "kms.app_credential_apiproduct_mapper":
@@ -169,8 +166,7 @@ func processChange(changes *common.ChangeList) bool {
 			case common.Insert:
 				ok = insert("app_credential_apiproduct_mapper", newrows, txn)
 			case common.Update:
-				ok = delete("app_credential_apiproduct_mapper", oldrows, txn)
-				ok = ok && insert("app_credential_apiproduct_mapper", newrows, txn)
+				ok = update("app_credential_apiproduct_mapper", oldrows, newrows, txn)
 			case common.Delete:
 				ok = delete("app_credential_apiproduct_mapper", oldrows, txn)
 			}
@@ -229,7 +225,7 @@ func update(tableName string, oldRows, newRows []common.Row, txn *sql.Tx) bool {
 
 		var columnNames []string
 
-		//extract columnNames
+		//extract sorted columnNames
 		for columnName := range oldRows[0] {
 			columnNames = append(columnNames, columnName)
 		}
@@ -238,7 +234,6 @@ func update(tableName string, oldRows, newRows []common.Row, txn *sql.Tx) bool {
 
 		//build update statement, use arbitrary row as template
 		sql := buildUpdateSql(tableName, newRows[0], pkeys)
-		log.Info("Sql update statement is " + sql)
 		prep, err := txn.Prepare(sql)
 
 		for i, row := range newRows {
@@ -247,12 +242,12 @@ func update(tableName string, oldRows, newRows []common.Row, txn *sql.Tx) bool {
 				return false
 			}
 			defer prep.Close()
-			//TODO need to figure out how to get this to work
 			var values []interface{}
 
-			//sort to ensure order parity with sql creation, add values for set clause
 			for _, columnName := range columnNames {
 				//use Value so that stmt exec does not complain about common.ColumnVal being a struct
+				//TODO will need to convert the Value (which is a string) to the appropriate field, using type for mapping
+				//TODO right now this will only work when the column type is a string
 				if row[columnName] != nil {
 					values = append(values, row[columnName].Value)
 				} else {
@@ -334,7 +329,6 @@ func buildUpdateSql(tableName string, row common.Row, pkeys []string) string {
 
 	for columnName := range row {
 		columns = append(columns, columnName)
-
 	}
 
 	sort.Strings(columns)
