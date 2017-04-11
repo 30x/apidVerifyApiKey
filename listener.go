@@ -6,6 +6,7 @@ import (
 	"github.com/apigee-labs/transicator/common"
 	"strings"
 	"fmt"
+	"sort"
 )
 
 type handler struct {
@@ -215,7 +216,63 @@ func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {
 		}
 		return true
 	}
+}
 
+func update(tableName string, oldRows, newRows []common.Row, txn *sql.Tx) bool {
+	pkeys, err := getPkeysForTable(tableName)
+	if (len(pkeys) == 0 || err != nil) {
+		log.Errorf("UPDATE No primary keys found for table.", tableName)
+		return false
+	} else {
+		if len(oldRows) == 0 || len(newRows) == 0 {
+			return false
+		}
+
+		var columnNames []string
+
+		//extract columnNames
+		for columnName := range oldRows[0] {
+			columnNames = append(columnNames, columnName)
+		}
+		sort.Strings(columnNames)
+
+
+		//build update statement, use arbitrary row as template
+		sql := buildUpdateSql(tableName, newRows[0], pkeys);
+		prep, err := txn.Prepare(sql)
+
+		for i, row := range newRows {
+			if err != nil {
+				log.Errorf("UPDATE Fail to prep statement [%s] error=[%v]", sql, err)
+				return false
+			}
+			defer prep.Close()
+			var values []interface{};
+
+			//sort to ensure order parity with sql creation, add values for set clause
+			for _, columnName := range columnNames {
+				values = append(values, row[columnName])
+			}
+
+			//add values for where clause, use PKs of old row
+			for _, pk := range pkeys {
+				values = append(values, oldRows[i][pk])
+
+			}
+
+			//create prepared statement from existing template statement
+			_, err = txn.Stmt(prep).Exec(values)
+
+			if err != nil {
+				log.Errorf("UPDATE Fail [%s] value=[%v] error=[%v]", sql, values, err)
+				return false
+			} else {
+				log.Debugf("UPDATE Success [%s] value=[%v]", sql, values)
+			}
+		}
+
+		return true
+	}
 }
 
 func buildDeleteSql(tableName string, pkeys []string) string {
@@ -229,10 +286,11 @@ func buildDeleteSql(tableName string, pkeys []string) string {
 	sql := []string{"DELETE FROM ", normalizedTableName, "WHERE", strings.Join(clauses, "AND"), ";"}
 	return strings.Join(sql, " ")
 }
+
 func getPkeysForTable(tableName string) ([]string, error) {
 	db := getDB()
 	normalizedTableName := normalizeTableName(tableName)
-	sql := "SELECT columnName FROM _transicator_tables WHERE tableName = $1 AND primaryKey;"
+	sql := "SELECT columnName FROM _transicator_tables WHERE tableName = $1 ORDER BY columnName"
 	rows, err := db.Query(sql, normalizedTableName)
 	if err != nil {
 		log.Errorf("Failed [%s] values=[s%] Error: %v", sql, normalizedTableName, err)
@@ -253,6 +311,39 @@ func getPkeysForTable(tableName string) ([]string, error) {
 		log.Fatal(err)
 	}
 	return columnNames, nil;
+}
+
+func buildUpdateSql(tableName string, row common.Row, pkeys []string) string {
+	if row == nil{
+		return ""
+	}
+	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
+
+	var columns, setPlaceholders, wherePlaceholders []string
+	i := 1
+
+	for columnName := range row {
+		columns = append(columns, columnName)
+
+	}
+
+	sort.Strings(columns)
+	for _, columnName := range columns {
+		setPlaceholders = append(setPlaceholders, fmt.Sprintf("%s=$%v", columnName, i))
+		i++
+	}
+
+	for _, pk := range pkeys {
+		wherePlaceholders = append(wherePlaceholders, fmt.Sprintf("%s=$%v", pk, i))
+		i++
+	}
+
+	sql := "UPDATE " + normalizedTableName + " SET "
+	sql = sql + strings.Join(setPlaceholders, ", ")
+	sql = sql + " WHERE "
+	sql = sql + strings.Join(wherePlaceholders, " AND ")
+
+	return sql
 }
 
 func buildInsertSql(tableName string, rows []common.Row) string {

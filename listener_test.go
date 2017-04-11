@@ -15,6 +15,64 @@ import (
 
 var _ = Describe("listener", func() {
 
+	Context("Update processing", func() {
+		FIt("test buildUpdateSql with single primary key", func() {
+			testRow := common.Row{
+				"id": {
+					Value: "ch_api_product_2",
+				},
+				"api_resources": {
+					Value: "{}",
+				},
+				"environments": {
+					Value: "{Env_0, Env_1}",
+				},
+				"tenant_id": {
+					Value: "tenant_id_0",
+				},
+				"_change_selector": {
+					Value: "test_org0",
+				},
+			}
+
+			result := buildUpdateSql("TEST_TABLE", testRow, []string{"id"})
+			log.Info(result)
+			Expect("UPDATE TEST_TABLE SET _change_selector=$1, api_resources=$2, environments=$3, id=$4, tenant_id=$5" +
+				" WHERE id=$6").To(Equal(result))
+		})
+
+		FIt("test buildUpdateSql with composite primary key", func() {
+			testRow := common.Row{
+				"id1": {
+					Value: "composite-key-1",
+				},
+				"id2": {
+					Value: "composite-key-2",
+				},
+				"api_resources": {
+					Value: "{}",
+				},
+				"environments": {
+					Value: "{Env_0, Env_1}",
+				},
+				"tenant_id": {
+					Value: "tenant_id_0",
+				},
+				"_change_selector": {
+					Value: "test_org0",
+				},
+			}
+
+			result := buildUpdateSql("TEST_TABLE", testRow, []string{"id1", "id2"})
+			log.Info(result)
+			Expect("UPDATE TEST_TABLE SET _change_selector=$1, api_resources=$2, environments=$3, id1=$4, id2=$5, tenant_id=$6" +
+				" WHERE id1=$7 AND id2=$8").To(Equal(result))
+		})
+
+
+
+	})
+
 	Context("KMS create/updates verification via changes for Developer", func() {
 		It("Create KMS tables via changes, and Verify via verifyApiKey", func(done Done) {
 			server := mockKMSserver()
