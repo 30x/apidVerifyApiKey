@@ -24,7 +24,7 @@ func (h *handler) Handle(e apid.Event) {
 		if ok {
 			processChange(changeSet)
 		} else {
-			log.Errorf("Received Invalid event. Ignoring. %v", e)
+			log.Debugf("Received Invalid event. Ignoring. %v", e)
 		}
 	}
 	return
