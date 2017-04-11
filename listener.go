@@ -7,7 +7,6 @@ import (
 	"strings"
 	"fmt"
 	"sort"
-	"bufio"
 )
 
 type handler struct {

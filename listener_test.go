@@ -227,7 +227,7 @@ var _ = Describe("listener", func() {
 			Expect(rows.Next()).To(BeFalse())
 		})
 
-		FIt("update should fail if oldrow and new row do not contain same fields", func() {
+		FIt("update should fail if newrow contains fewer fields than oldrow", func() {
 			log.Info("Starting test update with composite primary key")
 			event := &common.ChangeList{}
 
@@ -265,6 +265,83 @@ var _ = Describe("listener", func() {
 				},
 				"api_resources": {
 					Value: "{/**}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			event.Changes = []common.Change{
+				{
+					Table:     "kms.api_product",
+					OldRow:    oldRow,
+					NewRow:    newRow,
+					Operation: 2,
+				},
+			}
+
+			ok := processChange(event)
+			Expect(false).To(Equal(ok))
+			var desc string
+			rows, _ := getDB().Query("select description from api_product where id=\"87a4bfaa-b3c4-47cd-b6c5-378cdb68610c\"")
+			for rows.Next() {
+				rows.Scan(&desc)
+				//expect update to not have happened
+				Expect("A product for testing Greg").To(Equal(desc))
+			}
+
+		})
+
+		FIt("update should fail if oldrow contains fewer fields than newrow", func() {
+			log.Info("Starting test update with composite primary key")
+			event := &common.ChangeList{}
+
+			//this needs to match what is actually in the DB
+			oldRow := common.Row{
+				"id": {
+					Value: "87a4bfaa-b3c4-47cd-b6c5-378cdb68610c",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "A product for testing Greg",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			newRow := common.Row{
+				"id": {
+					Value: "87a4bfaa-b3c4-47cd-b6c5-378cdb68610c",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
 				},
 				"tenant_id": {
 					Value: "43aef41d",
