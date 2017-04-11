@@ -220,7 +220,7 @@ func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {
 
 func buildDeleteSql(tableName string, pkeys []string) string {
 
-	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
+	normalizedTableName := normalizeTableName(tableName)
 	var clauses []string
 	for i, columnName := range pkeys {
 		clauses = append(clauses, fmt.Sprint(columnName, "= $", (i + 1)))
@@ -231,7 +231,7 @@ func buildDeleteSql(tableName string, pkeys []string) string {
 }
 func getPkeysForTable(tableName string) ([]string, error) {
 	db := getDB()
-	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
+	normalizedTableName := normalizeTableName(tableName)
 	sql := "SELECT columnName FROM _transicator_tables WHERE tableName = $1 AND primaryKey;"
 	rows, err := db.Query(sql, normalizedTableName)
 	if err != nil {
@@ -259,7 +259,7 @@ func buildInsertSql(tableName string, rows []common.Row) string {
 	if len(rows) == 0 {
 		return ""
 	}
-	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
+	normalizedTableName := normalizeTableName(tableName)
 	row := rows[0]
 	var columns, placeholders []string
 	i := 1
@@ -272,6 +272,14 @@ func buildInsertSql(tableName string, rows []common.Row) string {
 	sql := []string{"INSERT INTO", normalizedTableName, "(", strings.Join(columns, ","), ")",
 		"VALUES", "(", strings.Join(placeholders, ","), ");"}
 	return strings.Join(sql, " ")
+}
+
+func normalizeTableName(tableName string) string {
+	if (strings.Contains(tableName, ".")) {
+		split := strings.Split(tableName, ".")
+		return split[len(split) - 1];
+	}
+	return tableName;
 }
 
 func insert(tableName string, rows []common.Row, txn *sql.Tx) bool {
