@@ -223,7 +223,7 @@ func buildDeleteSql(tableName string, pkeys []string) string {
 	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
 	var clauses []string
 	for i, columnName := range pkeys {
-		clauses = append(clauses, fmt.Sprintf("%s = $%v", columnName, (i + 1)))
+		clauses = append(clauses, fmt.Sprint(columnName, "= $", (i + 1)))
 	}
 
 	sql := []string{"DELETE FROM ", normalizedTableName, "WHERE", strings.Join(clauses, "AND"), ";"}
@@ -232,10 +232,10 @@ func buildDeleteSql(tableName string, pkeys []string) string {
 func getPkeysForTable(tableName string) ([]string, error) {
 	db := getDB()
 	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
-	sql := "SELECT columnName FROM _transicator_tables WHERE tableName = $1 AND primaryKey"
+	sql := "SELECT columnName FROM _transicator_tables WHERE tableName = $1 AND primaryKey;"
 	rows, err := db.Query(sql, normalizedTableName)
 	if err != nil {
-		log.Error("Failed [%s] values=[s%] Error: %v", sql, normalizedTableName, err)
+		log.Errorf("Failed [%s] values=[s%] Error: %v", sql, normalizedTableName, err)
 		return nil, err
 	}
 	var columnNames []string
@@ -246,7 +246,7 @@ func getPkeysForTable(tableName string) ([]string, error) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		columnNames = append(columnNames, fmt.Sprint("%s", value))
+		columnNames = append(columnNames, fmt.Sprint(value))
 	}
 	err = rows.Err()
 	if err != nil {
@@ -265,7 +265,7 @@ func buildInsertSql(tableName string, rows []common.Row) string {
 	i := 1
 	for columnName := range row {
 		columns = append(columns, columnName)
-		placeholders = append(placeholders, fmt.Sprint("$%v", i))
+		placeholders = append(placeholders, fmt.Sprint("$", i))
 		i++
 	}
 

@@ -23,13 +23,13 @@ var _ = Describe("api", func() {
 			// api products
 			for i := 0; i < 10; i++ {
 				row := generateTestApiProduct(i)
-				res := insertAPIproducts([]common.Row{row}, txn)
+				res := insert("API_PRODUCT", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 			// developers
 			for i := 0; i < 10; i++ {
 				row := generateTestDeveloper(i)
-				res := insertDevelopers([]common.Row{row}, txn)
+				res := insert("DEVELOPER", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
@@ -38,7 +38,7 @@ var _ = Describe("api", func() {
 			for i := 0; i < 10; i++ {
 				for j = k; j < 10 + k; j++ {
 					row := generateTestApp(j, i)
-					res := insertApplications([]common.Row{row}, txn)
+					res := insert("APP", []common.Row{row}, txn)
 					Expect(res).Should(BeTrue())
 				}
 				k = j
@@ -60,21 +60,21 @@ var _ = Describe("api", func() {
 			// api products
 			for i := 100; i < 110; i++ {
 				row := generateTestApiProduct(i)
-				res := insertAPIproducts([]common.Row{row}, txn)
+				res := insert("API_PRODUCT", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
 			// companies
 			for i := 100; i < 110; i++ {
 				row := generateTestCompany(i)
-				res := insertCompanies([]common.Row{row}, txn)
+				res := insert("COMPANY", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
 			// company developers
 			for i := 100; i < 110; i++ {
 				row := generateTestCompanyDeveloper(i)
-				res := insertCompanyDevelopers([]common.Row{row}, txn)
+				res := insert("COMPANY_DEVELOPER", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
@@ -83,7 +83,7 @@ var _ = Describe("api", func() {
 			for i := 100; i < 110; i++ {
 				for j = k; j < 100 + k; j++ {
 					row := generateTestAppCompany(j, i)
-					res := insertApplications([]common.Row{row}, txn)
+					res := insert("APP", []common.Row{row}, txn)
 					Expect(res).Should(BeTrue())
 				}
 				k = j
@@ -91,13 +91,13 @@ var _ = Describe("api", func() {
 			// app credentials
 			for i := 100; i < 110; i++ {
 				row := generateTestAppCreds(i)
-				res := insertCredentials([]common.Row{row}, txn)
+				res := insert("APP_CREDENTIAL", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 			// api product mapper
 			for i := 100; i < 110; i++ {
 				row := generateTestApiProductMapper(i)
-				res := insertAPIProductMappers([]common.Row{row}, txn)
+				res := insert("APP_CREDENTIAL_APIPRODUCT_MAPPER", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
@@ -172,7 +172,7 @@ var _ = Describe("api", func() {
 
 			for i := 0; i < 10; i++ {
 				row := generateTestApiProductMapper(i)
-				res := deleteAPIproductMapper(row, txn)
+				res := delete("APP_CREDENTIAL_APIPRODUCT_MAPPER", []common.Row{row}, txn)
 				Expect(res).Should(BeTrue())
 			}
 
@@ -251,10 +251,10 @@ var _ = Describe("api", func() {
 			res := insert("API_PRODUCT", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = insert( "APP", []common.Row{row}, txn)
+			res = insert("APP", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = insert( "APP_CREDENTIAL", []common.Row{row}, txn)
+			res = insert("APP_CREDENTIAL", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
 			res = insert("APP_CREDENTIAL_APIPRODUCT_MAPPER", []common.Row{row}, txn)
@@ -263,7 +263,7 @@ var _ = Describe("api", func() {
 			res = insert("COMPANY", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
-			res = insert("COMPANY_DEVELOPER",[]common.Row{row}, txn)
+			res = insert("COMPANY_DEVELOPER", []common.Row{row}, txn)
 			Expect(res).Should(BeFalse())
 
 		})
