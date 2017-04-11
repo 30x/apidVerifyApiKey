@@ -36,7 +36,7 @@ func processSnapshot(snapshot *common.Snapshot) {
 
 	log.Debugf("Snapshot received. Switching to DB version: %s", snapshot.SnapshotInfo)
 
-	db, err := data.DBVersion(snapshot.SnapshotInfo)
+	db, err := dataService.DBVersion(snapshot.SnapshotInfo)
 	if err != nil {
 		log.Panicf("Unable to access database: %v", err)
 	}
@@ -159,8 +159,7 @@ func processChange(changes *common.ChangeList) {
 			case common.Insert:
 				ok = insert("api_product", newrows, txn)
 			case common.Update:
-				ok = delete("API_PRODUCT", oldrows, txn)
-				ok = ok && insert("api_product", newrows, txn)
+				ok = update("api_product", oldrows, newrows, txn)
 			case common.Delete:
 				ok = delete("API_PRODUCT", oldrows, txn)
 			}
@@ -238,7 +237,8 @@ func update(tableName string, oldRows, newRows []common.Row, txn *sql.Tx) bool {
 
 
 		//build update statement, use arbitrary row as template
-		sql := buildUpdateSql(tableName, newRows[0], pkeys);
+		sql := buildUpdateSql(tableName, newRows[0], pkeys)
+		log.Info("Sql update statement is " + sql)
 		prep, err := txn.Prepare(sql)
 
 		for i, row := range newRows {
@@ -247,21 +247,31 @@ func update(tableName string, oldRows, newRows []common.Row, txn *sql.Tx) bool {
 				return false
 			}
 			defer prep.Close()
-			var values []interface{};
+			//TODO need to figure out how to get this to work
+			var values []interface{}
 
 			//sort to ensure order parity with sql creation, add values for set clause
 			for _, columnName := range columnNames {
-				values = append(values, row[columnName])
+				//use Value so that stmt exec does not complain about common.ColumnVal being a struct
+				if row[columnName] != nil {
+					values = append(values, row[columnName].Value)
+				} else {
+					values = append(values, nil)
+				}
 			}
 
 			//add values for where clause, use PKs of old row
 			for _, pk := range pkeys {
-				values = append(values, oldRows[i][pk])
+				if oldRows[i][pk] != nil {
+					values = append(values, oldRows[i][pk].Value)
+				} else {
+					values = append(values, nil)
+				}
 
 			}
 
 			//create prepared statement from existing template statement
-			_, err = txn.Stmt(prep).Exec(values)
+			_, err = txn.Stmt(prep).Exec(values...)
 
 			if err != nil {
 				log.Errorf("UPDATE Fail [%s] value=[%v] error=[%v]", sql, values, err)
@@ -290,7 +300,7 @@ func buildDeleteSql(tableName string, pkeys []string) string {
 func getPkeysForTable(tableName string) ([]string, error) {
 	db := getDB()
 	normalizedTableName := normalizeTableName(tableName)
-	sql := "SELECT columnName FROM _transicator_tables WHERE tableName = $1 ORDER BY columnName"
+	sql := "SELECT columnName FROM _transicator_tables WHERE tableName=$1 AND primaryKey ORDER BY columnName;"
 	rows, err := db.Query(sql, normalizedTableName)
 	if err != nil {
 		log.Errorf("Failed [%s] values=[s%] Error: %v", sql, normalizedTableName, err)
@@ -299,18 +309,18 @@ func getPkeysForTable(tableName string) ([]string, error) {
 	var columnNames []string
 	defer rows.Close()
 	for rows.Next() {
-		var value interface{}
+		var value string
 		err := rows.Scan(&value)
 		if err != nil {
 			log.Fatal(err)
 		}
-		columnNames = append(columnNames, fmt.Sprint(value))
+		columnNames = append(columnNames, value)
 	}
 	err = rows.Err()
 	if err != nil {
 		log.Fatal(err)
 	}
-	return columnNames, nil;
+	return columnNames, nil
 }
 
 func buildUpdateSql(tableName string, row common.Row, pkeys []string) string {
@@ -334,6 +344,7 @@ func buildUpdateSql(tableName string, row common.Row, pkeys []string) string {
 	}
 
 	for _, pk := range pkeys {
+		log.Info("Pkey is " + pk)
 		wherePlaceholders = append(wherePlaceholders, fmt.Sprintf("%s=$%v", pk, i))
 		i++
 	}

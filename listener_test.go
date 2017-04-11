@@ -16,7 +16,7 @@ import (
 var _ = Describe("listener", func() {
 
 	Context("Update processing", func() {
-		FIt("test buildUpdateSql with single primary key", func() {
+		FIt("unit test buildUpdateSql with single primary key", func() {
 			testRow := common.Row{
 				"id": {
 					Value: "ch_api_product_2",
@@ -41,7 +41,7 @@ var _ = Describe("listener", func() {
 				" WHERE id=$6").To(Equal(result))
 		})
 
-		FIt("test buildUpdateSql with composite primary key", func() {
+		FIt("unit test buildUpdateSql with composite primary key", func() {
 			testRow := common.Row{
 				"id1": {
 					Value: "composite-key-1",
@@ -69,7 +69,83 @@ var _ = Describe("listener", func() {
 				" WHERE id1=$7 AND id2=$8").To(Equal(result))
 		})
 
+		FIt("test update with composite primary key", func() {
+			log.Info("Starting test update with composite primary key")
+			event := &common.ChangeList{}
 
+			//this needs to match what is actually in the DB
+			oldRow := common.Row{
+				"id": {
+					Value: "87a4bfaa-b3c4-47cd-b6c5-378cdb68610c",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "A product for testing Greg",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			newRow := common.Row{
+				"id": {
+					Value: "87a4bfaa-b3c4-47cd-b6c5-378cdb68610c",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			event.Changes = []common.Change{
+				{
+					Table:     "kms.api_product",
+					OldRow:    oldRow,
+					NewRow:    newRow,
+					Operation: 2,
+				},
+			}
+
+			var desc string
+			processChange(event)
+			rows, _ := getDB().Query("select description from api_product where id=\"87a4bfaa-b3c4-47cd-b6c5-378cdb68610c\"")
+			for rows.Next() {
+				rows.Scan(&desc)
+				Expect("new description").To(Equal(desc))
+			}
+
+		})
 
 	})
 
@@ -496,7 +572,7 @@ var _ = Describe("listener", func() {
 		var event = common.ChangeList{}
 		var event2 = common.ChangeList{}
 
-		/* Orig data */
+		/* Orig dataService */
 		/* API Product */
 		srvItemsOld := common.Row{
 			"id": {
@@ -595,7 +671,7 @@ var _ = Describe("listener", func() {
 			},
 		}
 
-		/* New to be replaced data */
+		/* New to be replaced dataService */
 		/* API PRODUCT */
 		srvItemsNew := common.Row{
 			"id": {
@@ -795,7 +871,7 @@ var _ = Describe("listener", func() {
 		var event = common.ChangeList{}
 		var event2 = common.ChangeList{}
 
-		/* Orig data */
+		/* Orig dataService */
 		/* API Product */
 		srvItemsOld := common.Row{
 			"id": {
@@ -935,7 +1011,7 @@ var _ = Describe("listener", func() {
 			},
 		}
 
-		/* New to be replaced data */
+		/* New to be replaced dataService */
 		/* API PRODUCT */
 		srvItemsNew := common.Row{
 			"id": {

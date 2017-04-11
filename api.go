@@ -179,7 +179,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 	}
 
 	/*
-	 * Perform all validations related to the Query made with the data
+	 * Perform all validations related to the Query made with the dataService
 	 * we just retrieved
 	 */
 	result := validatePath(resName, path)

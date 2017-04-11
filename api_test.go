@@ -56,7 +56,7 @@ var _ = Describe("api", func() {
 				Expect(res).Should(BeTrue())
 			}
 
-			// Following are data for company
+			// Following are dataService for company
 			// api products
 			for i := 100; i < 110; i++ {
 				row := generateTestApiProduct(i)
