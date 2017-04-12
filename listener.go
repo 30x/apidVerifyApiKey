@@ -2,11 +2,11 @@ package apidVerifyApiKey
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/30x/apid-core"
 	"github.com/apigee-labs/transicator/common"
-	"strings"
-	"fmt"
 	"sort"
+	"strings"
 )
 
 type handler struct {
@@ -201,7 +201,6 @@ func insert(tableName string, rows []common.Row, txn *sql.Tx) bool {
 	}
 	defer prep.Close()
 
-
 	var values []interface{}
 
 	for _, row := range rows {
@@ -226,13 +225,13 @@ func insert(tableName string, rows []common.Row, txn *sql.Tx) bool {
 	return true
 }
 
-func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {
+func delete(tableName string, rows []common.Row, txn *sql.Tx) bool {
 	pkeys, err := getPkeysForTable(tableName)
-	if (len(pkeys) == 0 || err != nil) {
+	if len(pkeys) == 0 || err != nil {
 		log.Errorf("DELETE No primary keys found for table.", tableName)
 		return false
 	} else {
-		sql := buildDeleteSql(tableName, pkeys);
+		sql := buildDeleteSql(tableName, pkeys)
 		prep, err := txn.Prepare(sql)
 		if err != nil {
 			log.Errorf("DELETE Fail to prep statement [%s] error=[%v]", sql, err)
@@ -240,7 +239,7 @@ func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {
 		}
 		defer prep.Close()
 		for _, row := range rows {
-			var values []interface{};
+			var values []interface{}
 			for _, pkey := range pkeys {
 				var value interface{}
 				row.Get(pkey, &value)
@@ -261,7 +260,7 @@ func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {
 
 func update(tableName string, oldRows, newRows []common.Row, txn *sql.Tx) bool {
 	pkeys, err := getPkeysForTable(tableName)
-	if (len(pkeys) == 0 || err != nil) {
+	if len(pkeys) == 0 || err != nil {
 		log.Errorf("UPDATE No primary keys found for table.", tableName)
 		return false
 	} else {
@@ -276,7 +275,6 @@ func update(tableName string, oldRows, newRows []common.Row, txn *sql.Tx) bool {
 			orderedColumns = append(orderedColumns, columnName)
 		}
 		sort.Strings(orderedColumns)
-
 
 		//build update statement, use arbitrary row as template
 		sql := buildUpdateSql(tableName, orderedColumns, newRows[0], pkeys)
@@ -331,7 +329,7 @@ func buildDeleteSql(tableName string, pkeys []string) string {
 	normalizedTableName := normalizeTableName(tableName)
 	var clauses []string
 	for i, columnName := range pkeys {
-		clauses = append(clauses, fmt.Sprint(columnName, "= $", (i + 1)))
+		clauses = append(clauses, fmt.Sprint(columnName, "= $", (i+1)))
 	}
 
 	sql := []string{"DELETE FROM ", normalizedTableName, "WHERE", strings.Join(clauses, "AND"), ";"}
@@ -365,7 +363,7 @@ func getPkeysForTable(tableName string) ([]string, error) {
 }
 
 func buildUpdateSql(tableName string, orderedColumns []string, row common.Row, pkeys []string) string {
-	if row == nil{
+	if row == nil {
 		return ""
 	}
 	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
@@ -401,9 +399,9 @@ func buildInsertSql(tableName string, orderedColumns []string, rows []common.Row
 
 	var i, j int
 	k := 1
-	for i = 0; i < len(rows) - 1; i++ {
+	for i = 0; i < len(rows)-1; i++ {
 		values += "("
-		for j = 0; j < len(orderedColumns) - 1; j++ {
+		for j = 0; j < len(orderedColumns)-1; j++ {
 			values += fmt.Sprintf("$%d,", k)
 			k++
 		}
@@ -411,7 +409,7 @@ func buildInsertSql(tableName string, orderedColumns []string, rows []common.Row
 		k++
 	}
 	values += "("
-	for j = 0; j < len(orderedColumns) - 1; j++ {
+	for j = 0; j < len(orderedColumns)-1; j++ {
 		values += fmt.Sprintf("$%d,", k)
 		k++
 	}
@@ -425,11 +423,11 @@ func buildInsertSql(tableName string, orderedColumns []string, rows []common.Row
 }
 
 func normalizeTableName(tableName string) string {
-	if (strings.Contains(tableName, ".")) {
+	if strings.Contains(tableName, ".") {
 		split := strings.Split(tableName, ".")
-		return split[len(split) - 1];
+		return split[len(split)-1]
 	}
-	return tableName;
+	return tableName
 }
 
 /*
@@ -817,8 +815,6 @@ func insertAPIProductMappers(rows []common.Row, txn *sql.Tx) bool {
 	}
 	return true
 }
-
-
 
 /*
  * DELETE  APIPRDT MAPPER

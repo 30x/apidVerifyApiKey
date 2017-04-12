@@ -5,14 +5,14 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/30x/apid-core"
+	"github.com/30x/apid-core/data"
 	"github.com/30x/apid-core/factory"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
-	"io"
-	"github.com/30x/apid-core/data"
 )
 
 var (
