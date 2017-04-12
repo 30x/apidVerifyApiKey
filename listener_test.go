@@ -11,12 +11,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sort"
 )
 
 var _ = Describe("listener", func() {
 
 	Context("Update processing", func() {
-		FIt("unit test buildUpdateSql with single primary key", func() {
+		It("unit test buildUpdateSql with single primary key", func() {
 			testRow := common.Row{
 				"id": {
 					Value: "ch_api_product_2",
@@ -35,7 +36,13 @@ var _ = Describe("listener", func() {
 				},
 			}
 
-			result := buildUpdateSql("TEST_TABLE", testRow, []string{"id"})
+			var orderedColumns []string
+			for column := range testRow {
+				orderedColumns = append(orderedColumns, column)
+			}
+			sort.Strings(orderedColumns)
+
+			result := buildUpdateSql("TEST_TABLE", orderedColumns, testRow, []string{"id"})
 			log.Info(result)
 			Expect("UPDATE TEST_TABLE SET _change_selector=$1, api_resources=$2, environments=$3, id=$4, tenant_id=$5" +
 				" WHERE id=$6").To(Equal(result))
@@ -63,13 +70,19 @@ var _ = Describe("listener", func() {
 				},
 			}
 
-			result := buildUpdateSql("TEST_TABLE", testRow, []string{"id1", "id2"})
+			var orderedColumns []string
+			for column := range testRow {
+				orderedColumns = append(orderedColumns, column)
+			}
+			sort.Strings(orderedColumns)
+
+			result := buildUpdateSql("TEST_TABLE", orderedColumns, testRow, []string{"id1", "id2"})
 			log.Info(result)
 			Expect("UPDATE TEST_TABLE SET _change_selector=$1, api_resources=$2, environments=$3, id1=$4, id2=$5, tenant_id=$6" +
 				" WHERE id1=$7 AND id2=$8").To(Equal(result))
 		})
 
-		FIt("test update with composite primary key", func() {
+		It("test update with composite primary key", func() {
 			log.Info("Starting test update with composite primary key")
 			event := &common.ChangeList{}
 
@@ -147,7 +160,7 @@ var _ = Describe("listener", func() {
 
 		})
 
-		FIt("update should succeed if newrow modifies the primary key", func() {
+		It("update should succeed if newrow modifies the primary key", func() {
 			event := &common.ChangeList{}
 
 			//this needs to match what is actually in the DB
@@ -222,16 +235,14 @@ var _ = Describe("listener", func() {
 			rows, _ = getDB().Query("select description from api_product where id=\"new_id\"")
 			Expect(rows.Next()).To(BeTrue())
 			rows.Scan(&desc)
-			//expect update to not have happened
 			Expect("new description").To(Equal(desc))
 			Expect(rows.Next()).To(BeFalse())
 		})
 
-		FIt("update should fail if newrow contains fewer fields than oldrow", func() {
+		It("update should fail if newrow contains fewer fields than oldrow", func() {
 			log.Info("Starting test update with composite primary key")
 			event := &common.ChangeList{}
 
-			//this needs to match what is actually in the DB
 			oldRow := common.Row{
 				"id": {
 					Value: "87a4bfaa-b3c4-47cd-b6c5-378cdb68610c",
@@ -304,11 +315,10 @@ var _ = Describe("listener", func() {
 
 		})
 
-		FIt("update should fail if oldrow contains fewer fields than newrow", func() {
+		It("update should fail if oldrow contains fewer fields than newrow", func() {
 			log.Info("Starting test update with composite primary key")
 			event := &common.ChangeList{}
 
-			//this needs to match what is actually in the DB
 			oldRow := common.Row{
 				"id": {
 					Value: "87a4bfaa-b3c4-47cd-b6c5-378cdb68610c",
@@ -381,6 +391,384 @@ var _ = Describe("listener", func() {
 
 		})
 
+	})
+
+	FContext("Insert processing", func() {
+		It("Properly constructs insert sql for one row", func() {
+			newRow := common.Row{
+				"id": {
+					Value: "new_id",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			var orderedColumns []string
+			for column := range newRow {
+				orderedColumns = append(orderedColumns, column)
+			}
+			sort.Strings(orderedColumns)
+
+			expectedSql := "INSERT INTO api_product(_change_selector,api_resources,created_at,description,environments,id,tenant_id,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)"
+			Expect(expectedSql).To(Equal(buildInsertSql("api_product", orderedColumns, []common.Row{newRow})))
+		})
+
+		It("Properly constructs insert sql for multiple rows", func() {
+			newRow1 := common.Row{
+				"id": {
+					Value: "1",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+			newRow2 := common.Row{
+				"id": {
+					Value: "2",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			var orderedColumns []string
+			for column := range newRow1 {
+				orderedColumns = append(orderedColumns, column)
+			}
+			sort.Strings(orderedColumns)
+
+			expectedSql := "INSERT INTO api_product(_change_selector,api_resources,created_at,description,environments,id,tenant_id,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8),($9,$10,$11,$12,$13,$14,$15,$16)"
+			Expect(expectedSql).To(Equal(buildInsertSql("api_product", orderedColumns, []common.Row{newRow1, newRow2})))
+		})
+
+		It("Properly executed insert for a single rows", func() {
+			event := &common.ChangeList{}
+
+			newRow1 := common.Row{
+				"id": {
+					Value: "a",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			event.Changes = []common.Change{
+				{
+					Table:     "kms.api_product",
+					NewRow:    newRow1,
+					Operation: 1,
+				},
+			}
+
+			//delete any existing entries
+			getDB().Exec("delete from api_product")
+			ok := processChange(event)
+			Expect(true).To(Equal(ok))
+			var numApiProducts int
+			var id string
+
+			//verify count is correct
+			rows, _ := getDB().Query("select count(*) from api_product")
+			Expect(rows.Next()).To(BeTrue())
+			rows.Scan(&numApiProducts)
+			Expect(1).To(Equal(numApiProducts))
+			Expect(rows.Next()).To(BeFalse())
+
+			//verify ids
+			rows, _ = getDB().Query("select id from api_product order by id")
+			Expect(rows.Next()).To(BeTrue())
+			rows.Scan(&id)
+			Expect("a").To(Equal(id))
+			Expect(rows.Next()).To(BeFalse())
+		})
+
+		It("Properly executed insert for multiple rows", func() {
+			event := &common.ChangeList{}
+
+			newRow1 := common.Row{
+				"id": {
+					Value: "a",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+			newRow2 := common.Row{
+				"id": {
+					Value: "b",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			event.Changes = []common.Change{
+				{
+					Table:     "kms.api_product",
+					NewRow:    newRow1,
+					Operation: 1,
+				},
+				{
+					Table:     "kms.api_product",
+					NewRow:    newRow2,
+					Operation: 1,
+				},
+			}
+
+			getDB().Exec("delete from api_product")
+			ok := processChange(event)
+			Expect(true).To(Equal(ok))
+
+			var numApiProducts int
+			var id string
+
+			//verify count is correct
+			rows, _ := getDB().Query("select count(*) from api_product")
+			Expect(rows.Next()).To(BeTrue())
+			rows.Scan(&numApiProducts)
+			//expect insert to have happened
+			Expect(2).To(Equal(numApiProducts))
+			Expect(rows.Next()).To(BeFalse())
+
+			//verify ids
+			rows, _ = getDB().Query("select id from api_product order by id")
+			Expect(rows.Next()).To(BeTrue())
+			rows.Scan(&id)
+			Expect("a").To(Equal(id))
+			Expect(rows.Next()).To(BeTrue())
+			rows.Scan(&id)
+			Expect("b").To(Equal(id))
+			Expect(rows.Next()).To(BeFalse())
+		})
+
+		It("Fails to execute if row does not match existing table schema", func() {
+			event := &common.ChangeList{}
+
+			newRow1 := common.Row{
+				"not_and_id": {
+					Value: "a",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			event.Changes = []common.Change{
+				{
+					Table:     "kms.api_product",
+					NewRow:    newRow1,
+					Operation: 1,
+				},
+			}
+
+			//delete any existing entries
+			getDB().Exec("delete from api_product")
+			ok := processChange(event)
+			Expect(false).To(Equal(ok))
+		})
+
+		It("Fails to execute at least one row does not match the table schema, even if other rows are valid", func() {
+			event := &common.ChangeList{}
+			newRow1 := common.Row{
+				"id": {
+					Value: "a",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			newRow2 := common.Row{
+				"not_and_id": {
+					Value: "a",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			event.Changes = []common.Change{
+				{
+					Table:     "kms.api_product",
+					NewRow:    newRow1,
+					Operation: 1,
+				},
+				{
+					Table:     "kms.api_product",
+					NewRow:    newRow2,
+					Operation: 1,
+				},
+			}
+
+			//delete any existing entries
+			getDB().Exec("delete from api_product")
+			ok := processChange(event)
+			Expect(false).To(Equal(ok))
+		})
 	})
 
 	Context("KMS create/updates verification via changes for Developer", func() {

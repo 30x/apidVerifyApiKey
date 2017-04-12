@@ -179,6 +179,53 @@ func processChange(changes *common.ChangeList) bool {
 	return ok
 }
 
+//TODO if len(rows) > 1000, chunk it up and exec multiple inserts in the txn
+func insert(tableName string, rows []common.Row, txn *sql.Tx) bool {
+
+	if len(rows) == 0 {
+		return false
+	}
+
+	var orderedColumns []string
+	for column := range rows[0] {
+		orderedColumns = append(orderedColumns, column)
+	}
+	sort.Strings(orderedColumns)
+
+	sql := buildInsertSql(tableName, orderedColumns, rows)
+
+	prep, err := txn.Prepare(sql)
+	if err != nil {
+		log.Errorf("INSERT Fail to prepare statement [%s] error=[%v]", sql, err)
+		return false
+	}
+	defer prep.Close()
+
+
+	var values []interface{}
+
+	for _, row := range rows {
+		for _, columnName := range orderedColumns {
+			//use Value so that stmt exec does not complain about common.ColumnVal being a struct
+			//TODO will need to convert the Value (which is a string) to the appropriate field, using type for mapping
+			//TODO right now this will only work when the column type is a string
+			values = append(values, row[columnName].Value)
+		}
+	}
+
+	//create prepared statement from existing template statement
+	_, err = prep.Exec(values...)
+
+	if err != nil {
+		log.Errorf("INSERT Fail [%s] value=[%v] error=[%v]", sql, values, err)
+		return false
+	} else {
+		log.Debugf("INSERT Success [%s] value=[%v]", sql, values)
+	}
+
+	return true
+}
+
 func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {
 	pkeys, err := getPkeysForTable(tableName)
 	if (len(pkeys) == 0 || err != nil) {
@@ -222,28 +269,28 @@ func update(tableName string, oldRows, newRows []common.Row, txn *sql.Tx) bool {
 			return false
 		}
 
-		var columnNames []string
+		var orderedColumns []string
 
-		//extract sorted columnNames
+		//extract sorted orderedColumns
 		for columnName := range oldRows[0] {
-			columnNames = append(columnNames, columnName)
+			orderedColumns = append(orderedColumns, columnName)
 		}
-		sort.Strings(columnNames)
+		sort.Strings(orderedColumns)
 
 
 		//build update statement, use arbitrary row as template
-		sql := buildUpdateSql(tableName, newRows[0], pkeys)
+		sql := buildUpdateSql(tableName, orderedColumns, newRows[0], pkeys)
 		prep, err := txn.Prepare(sql)
+		if err != nil {
+			log.Errorf("UPDATE Fail to prep statement [%s] error=[%v]", sql, err)
+			return false
+		}
+		defer prep.Close()
 
 		for i, row := range newRows {
-			if err != nil {
-				log.Errorf("UPDATE Fail to prep statement [%s] error=[%v]", sql, err)
-				return false
-			}
-			defer prep.Close()
 			var values []interface{}
 
-			for _, columnName := range columnNames {
+			for _, columnName := range orderedColumns {
 				//use Value so that stmt exec does not complain about common.ColumnVal being a struct
 				//TODO will need to convert the Value (which is a string) to the appropriate field, using type for mapping
 				//TODO right now this will only work when the column type is a string
@@ -317,56 +364,64 @@ func getPkeysForTable(tableName string) ([]string, error) {
 	return columnNames, nil
 }
 
-func buildUpdateSql(tableName string, row common.Row, pkeys []string) string {
+func buildUpdateSql(tableName string, orderedColumns []string, row common.Row, pkeys []string) string {
 	if row == nil{
 		return ""
 	}
 	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
 
-	var columns, setPlaceholders, wherePlaceholders []string
+	var setPlaceholders, wherePlaceholders []string
 	i := 1
 
-	for columnName := range row {
-		columns = append(columns, columnName)
-	}
-
-	sort.Strings(columns)
-	for _, columnName := range columns {
+	for _, columnName := range orderedColumns {
 		setPlaceholders = append(setPlaceholders, fmt.Sprintf("%s=$%v", columnName, i))
 		i++
 	}
 
 	for _, pk := range pkeys {
-		log.Info("Pkey is " + pk)
 		wherePlaceholders = append(wherePlaceholders, fmt.Sprintf("%s=$%v", pk, i))
 		i++
 	}
 
 	sql := "UPDATE " + normalizedTableName + " SET "
-	sql = sql + strings.Join(setPlaceholders, ", ")
-	sql = sql + " WHERE "
-	sql = sql + strings.Join(wherePlaceholders, " AND ")
+	sql += strings.Join(setPlaceholders, ", ")
+	sql += " WHERE "
+	sql += strings.Join(wherePlaceholders, " AND ")
 
 	return sql
 }
 
-func buildInsertSql(tableName string, rows []common.Row) string {
+//precondition: rows.length > 1000, max number of entities for sqlite
+func buildInsertSql(tableName string, orderedColumns []string, rows []common.Row) string {
 	if len(rows) == 0 {
 		return ""
 	}
 	normalizedTableName := normalizeTableName(tableName)
-	row := rows[0]
-	var columns, placeholders []string
-	i := 1
-	for columnName := range row {
-		columns = append(columns, columnName)
-		placeholders = append(placeholders, fmt.Sprint("$", i))
-		i++
-	}
+	var values string = ""
 
-	sql := []string{"INSERT INTO", normalizedTableName, "(", strings.Join(columns, ","), ")",
-		"VALUES", "(", strings.Join(placeholders, ","), ");"}
-	return strings.Join(sql, " ")
+	var i, j int
+	k := 1
+	for i = 0; i < len(rows) - 1; i++ {
+		values += "("
+		for j = 0; j < len(orderedColumns) - 1; j++ {
+			values += fmt.Sprintf("$%d,", k)
+			k++
+		}
+		values += fmt.Sprintf("$%d),", k)
+		k++
+	}
+	values += "("
+	for j = 0; j < len(orderedColumns) - 1; j++ {
+		values += fmt.Sprintf("$%d,", k)
+		k++
+	}
+	values += fmt.Sprintf("$%d)", k)
+
+	sql := "INSERT INTO " + normalizedTableName
+	sql += "(" + strings.Join(orderedColumns, ",") + ") "
+	sql += "VALUES " + values
+
+	return sql
 }
 
 func normalizeTableName(tableName string) string {
@@ -375,34 +430,6 @@ func normalizeTableName(tableName string) string {
 		return split[len(split) - 1];
 	}
 	return tableName;
-}
-
-func insert(tableName string, rows []common.Row, txn *sql.Tx) bool {
-
-	sql := buildInsertSql(tableName, rows)
-
-	prep, err := txn.Prepare(sql)
-	if err != nil {
-		log.Errorf("INSERT Fail to prepare statement [%s] error=[%v]", sql, err)
-		return false
-	}
-	defer prep.Close()
-	for _, ele := range rows {
-		var values []interface{};
-		for _, value := range ele {
-			values = append(values, value)
-		}
-
-		_, err = prep.Exec(values)
-
-		if err != nil {
-			log.Errorf("INSERT Fail [%s] value=[%v] error=[%v]", sql, values, err)
-			return false
-		} else {
-			log.Debugf("INSERT Success [%s] value=[%v]", sql, values)
-		}
-	}
-	return true
 }
 
 /*
