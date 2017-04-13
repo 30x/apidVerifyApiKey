@@ -29,7 +29,7 @@ var _ = BeforeSuite(func() {
 
 	config.Set("data_path", testTempDir)
 
-	apid.InitializePlugins()
+	apid.InitializePlugins("")
 
 	db, err := apid.Data().DB()
 	Expect(err).NotTo(HaveOccurred())
