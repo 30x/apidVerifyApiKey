@@ -31,7 +31,7 @@ var _ = BeforeSuite(func() {
 
 	config.Set("data_path", testTempDir)
 
-	apid.InitializePlugins()
+	apid.InitializePlugins("")
 
 	testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == apiPath {
