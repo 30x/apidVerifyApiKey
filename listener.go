@@ -267,7 +267,7 @@ func delete(tableName string, rows []common.Row, txn *sql.Tx) bool {
 				affected, err := res.RowsAffected()
 				if err == nil && affected != 0 {
 					log.Debugf("DELETE Success [%s] value=[%v]", sql, values)
-				} else if affected != 0 {
+				} else if affected == 0 {
 					log.Errorf("Entry not found [%s] value=[%v]. Nothing to delete.", sql, values)
 					return false
 				} else {
