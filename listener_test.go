@@ -393,6 +393,120 @@ var _ = Describe("listener", func() {
 
 	})
 
+	FContext("Delete processing", func() {
+		It("Properly constructs sql prepare for Delete", func() {
+			row := common.Row{
+				"id": {
+					Value: "new_id",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			pkeys, err := getPkeysForTable("api_product")
+			Expect(err).Should(Succeed())
+			sql := buildDeleteSql("api_product", row, pkeys)
+
+			Expect(sql).To(Equal("DELETE FROM api_product WHERE created_at=$1 AND id=$2 AND tenant_id=$3 AND updated_at=$4"))
+
+		})
+
+		It("Verify execute insert & delete works", func() {
+			event1 := &common.ChangeList{}
+			event2 := &common.ChangeList{}
+
+			Row1 := common.Row{
+				"id": {
+					Value: "xxx",
+				},
+				"api_resources": {
+					Value: "{/**}",
+				},
+				"environments": {
+					Value: "{test}",
+				},
+				"tenant_id": {
+					Value: "43aef41d",
+				},
+				"description": {
+					Value: "new description",
+				},
+				"created_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"updated_at": {
+					Value: "2017-03-01 22:50:41.75+00:00",
+				},
+				"_change_selector": {
+					Value: "43aef41d",
+				},
+			}
+
+			event1.Changes = []common.Change{
+				{
+					Table:     "kms.api_product",
+					NewRow:    Row1,
+					Operation: 1,
+				},
+			}
+			event2.Changes = []common.Change{
+				{
+					Table:     "kms.api_product",
+					OldRow:    Row1,
+					Operation: 3,
+				},
+			}
+
+			getDB().Exec("delete from api_product")
+			// insert
+			ok := processChange(event1)
+			Expect(true).To(Equal(ok))
+			var numApiProducts int
+
+			// validate insertion
+			rows, _ := getDB().Query("select count(*) from api_product")
+			Expect(rows.Next()).To(BeTrue())
+			rows.Scan(&numApiProducts)
+			Expect(1).To(Equal(numApiProducts))
+			Expect(rows.Next()).To(BeFalse())
+
+			// delete
+			ok = processChange(event2)
+			Expect(true).To(Equal(ok))
+
+			// validate delete
+			rows, _ = getDB().Query("select count(*) from api_product")
+			Expect(rows.Next()).To(BeTrue())
+			rows.Scan(&numApiProducts)
+			Expect(0).To(Equal(numApiProducts))
+			Expect(rows.Next()).To(BeFalse())
+
+			// delete again should fail - coz entry will not exist
+			ok = processChange(event2)
+			Expect(false).To(Equal(ok))
+		})
+
+	})
+
 	FContext("Insert processing", func() {
 		It("Properly constructs insert sql for one row", func() {
 			newRow := common.Row{

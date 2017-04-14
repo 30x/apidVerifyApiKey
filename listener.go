@@ -26,7 +26,7 @@ func (h *handler) Handle(e apid.Event) {
 		if ok {
 			processChange(changeSet)
 		} else {
-			log.Errorf("Received Invalid event. Ignoring. %v", e)
+			log.Debugf("Received Invalid event. Ignoring. %v", e)
 		}
 	}
 	return
@@ -225,13 +225,31 @@ func insert(tableName string, rows []common.Row, txn *sql.Tx) bool {
 	return true
 }
 
+func getValueListFromKeys(row common.Row, pkeys []string) []interface{} {
+	var values []interface{}
+	// TODO Handle multiple data types
+	for _, pkey := range pkeys {
+		if row[pkey] == nil {
+			values = append(values, nil)
+		} else {
+			values = append(values, row[pkey].Value)
+		}
+	}
+	return values
+}
+
 func delete(tableName string, rows []common.Row, txn *sql.Tx) bool {
 	pkeys, err := getPkeysForTable(tableName)
+	sort.Strings(pkeys)
 	if len(pkeys) == 0 || err != nil {
-		log.Errorf("DELETE No primary keys found for table.", tableName)
+		log.Errorf("DELETE No primary keys found for table. %s", tableName)
+		return false
+	} else if len(rows) == 0 {
+		log.Errorf("No rows found for table.", tableName)
 		return false
 	} else {
-		sql := buildDeleteSql(tableName, pkeys)
+
+		sql := buildDeleteSql(tableName, rows[0], pkeys)
 		prep, err := txn.Prepare(sql)
 		if err != nil {
 			log.Errorf("DELETE Fail to prep statement [%s] error=[%v]", sql, err)
@@ -239,19 +257,23 @@ func delete(tableName string, rows []common.Row, txn *sql.Tx) bool {
 		}
 		defer prep.Close()
 		for _, row := range rows {
-			var values []interface{}
-			for _, pkey := range pkeys {
-				var value interface{}
-				row.Get(pkey, &value)
-				values = append(values, value)
-			}
-			_, err = prep.Exec(values)
-
+			values := getValueListFromKeys(row, pkeys)
+			// delete prepared statement from existing template statement
+			res, err := txn.Stmt(prep).Exec(values...)
 			if err != nil {
 				log.Errorf("DELETE Fail [%s] value=[%v] error=[%v]", sql, values, err)
 				return false
 			} else {
-				log.Debugf("DELETE Success [%s] value=[%v]", sql, values)
+				affected, err := res.RowsAffected()
+				if err == nil && affected != 0 {
+					log.Debugf("DELETE Success [%s] value=[%v]", sql, values)
+				} else if err == nil && affected == 0 {
+					log.Errorf("Entry not found [%s] value=[%v]. Nothing to delete.", sql, values)
+					return false
+				} else {
+					log.Errorf("DELETE Failed [%s] value=[%v] error=[%v]", sql, values, err)
+					return false
+				}
 			}
 		}
 		return true
@@ -324,18 +346,6 @@ func update(tableName string, oldRows, newRows []common.Row, txn *sql.Tx) bool {
 	}
 }
 
-func buildDeleteSql(tableName string, pkeys []string) string {
-
-	normalizedTableName := normalizeTableName(tableName)
-	var clauses []string
-	for i, columnName := range pkeys {
-		clauses = append(clauses, fmt.Sprint(columnName, "= $", (i+1)))
-	}
-
-	sql := []string{"DELETE FROM ", normalizedTableName, "WHERE", strings.Join(clauses, "AND"), ";"}
-	return strings.Join(sql, " ")
-}
-
 func getPkeysForTable(tableName string) ([]string, error) {
 	db := getDB()
 	normalizedTableName := normalizeTableName(tableName)
@@ -362,13 +372,36 @@ func getPkeysForTable(tableName string) ([]string, error) {
 	return columnNames, nil
 }
 
-func buildUpdateSql(tableName string, orderedColumns []string, row common.Row, pkeys []string) string {
+// Syntax "DELETE FROM Obj WHERE key1=$1 AND key2=$2 ... ;"
+func buildDeleteSql(tableName string, row common.Row, pkeys []string) string {
+
+	var wherePlaceholders []string
+	i := 1
 	if row == nil {
 		return ""
 	}
 	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
 
+	for _, pk := range pkeys {
+		wherePlaceholders = append(wherePlaceholders, fmt.Sprintf("%s=$%v", pk, i))
+		i++
+	}
+
+	sql := "DELETE FROM " + normalizedTableName
+	sql += " WHERE "
+	sql += strings.Join(wherePlaceholders, " AND ")
+
+	return sql
+
+}
+
+func buildUpdateSql(tableName string, orderedColumns []string, row common.Row, pkeys []string) string {
 	var setPlaceholders, wherePlaceholders []string
+	if row == nil {
+		return ""
+	}
+	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
+
 	i := 1
 
 	for _, columnName := range orderedColumns {
