@@ -264,11 +264,14 @@ func delete(tableName string, rows []common.Row, txn *sql.Tx) bool {
 				log.Errorf("DELETE Fail [%s] value=[%v] error=[%v]", sql, values, err)
 				return false
 			} else {
-				affect, err := res.RowsAffected()
-				if err == nil && affect != 0 {
+				affected, err := res.RowsAffected()
+				if err == nil && affected != 0 {
 					log.Debugf("DELETE Success [%s] value=[%v]", sql, values)
+				} else if affected != 0 {
+					log.Errorf("Entry not found [%s] value=[%v]. Nothing to delete.", sql, values)
+					return false
 				} else {
-					log.Errorf("DELETE Fail [%s] value=[%v] error=[%v]", sql, values, err)
+					log.Errorf("DELETE Failed [%s] value=[%v] error=[%v]", sql, values, err)
 					return false
 				}
 			}
