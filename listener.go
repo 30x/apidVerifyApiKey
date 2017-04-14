@@ -2,10 +2,11 @@ package apidVerifyApiKey
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/30x/apid-core"
 	"github.com/apigee-labs/transicator/common"
+	"sort"
 	"strings"
-	"fmt"
 )
 
 type handler struct {
@@ -25,7 +26,7 @@ func (h *handler) Handle(e apid.Event) {
 		if ok {
 			processChange(changeSet)
 		} else {
-			log.Errorf("Received Invalid event. Ignoring. %v", e)
+			log.Debugf("Received Invalid event. Ignoring. %v", e)
 		}
 	}
 	return
@@ -35,7 +36,7 @@ func processSnapshot(snapshot *common.Snapshot) {
 
 	log.Debugf("Snapshot received. Switching to DB version: %s", snapshot.SnapshotInfo)
 
-	db, err := data.DBVersion(snapshot.SnapshotInfo)
+	db, err := dataService.DBVersion(snapshot.SnapshotInfo)
 	if err != nil {
 		log.Panicf("Unable to access database: %v", err)
 	}
@@ -85,14 +86,14 @@ func processSnapshot(snapshot *common.Snapshot) {
 	return
 }
 
-func processChange(changes *common.ChangeList) {
+func processChange(changes *common.ChangeList) bool {
 
 	db := getDB()
 
 	txn, err := db.Begin()
 	if err != nil {
 		log.Error("Unable to create transaction")
-		return
+		return false
 	}
 	defer txn.Rollback()
 
@@ -108,38 +109,35 @@ func processChange(changes *common.ChangeList) {
 			case common.Insert:
 				ok = insert("developer", newrows, txn)
 			case common.Update:
-				ok = delete("DEVELOPER", oldrows, txn)
+				ok = delete("developer", oldrows, txn)
 				ok = ok && insert("developer", newrows, txn)
 			case common.Delete:
-				ok = delete("DEVELOPER", oldrows, txn)
+				ok = delete("developer", oldrows, txn)
 			}
 		case "kms.app":
 			switch payload.Operation {
 			case common.Insert:
 				ok = insert("app", newrows, txn)
 			case common.Update:
-				ok = delete("APP", oldrows, txn)
-				ok = ok && insert("app", newrows, txn)
+				ok = update("app", oldrows, newrows, txn)
 			case common.Delete:
-				ok = delete("APP", oldrows, txn)
+				ok = delete("app", oldrows, txn)
 			}
 		case "kms.company":
 			switch payload.Operation {
 			case common.Insert:
 				ok = insert("company", newrows, txn)
 			case common.Update:
-				ok = delete("COMPANY", oldrows, txn)
-				ok = ok && insert("company", newrows, txn)
+				ok = update("company", oldrows, newrows, txn)
 			case common.Delete:
-				ok = delete("COMPANY", oldrows, txn)
+				ok = delete("company", oldrows, txn)
 			}
 		case "kms.company_developer":
 			switch payload.Operation {
 			case common.Insert:
 				ok = insert("company_developer", newrows, txn)
 			case common.Update:
-				ok = delete("company_developer", oldrows, txn)
-				ok = ok && insert("company_developer", newrows, txn)
+				ok = update("company_developer", oldrows, newrows, txn)
 			case common.Delete:
 				ok = delete("company_developer", oldrows, txn)
 			}
@@ -148,20 +146,18 @@ func processChange(changes *common.ChangeList) {
 			case common.Insert:
 				ok = insert("app_credential", newrows, txn)
 			case common.Update:
-				ok = delete("APP_CREDENTIAL", oldrows, txn)
-				ok = ok && insert("app_credential", newrows, txn)
+				ok = update("app_credential", oldrows, newrows, txn)
 			case common.Delete:
-				ok = delete("APP_CREDENTIAL", oldrows, txn)
+				ok = delete("app_credential", oldrows, txn)
 			}
 		case "kms.api_product":
 			switch payload.Operation {
 			case common.Insert:
 				ok = insert("api_product", newrows, txn)
 			case common.Update:
-				ok = delete("API_PRODUCT", oldrows, txn)
-				ok = ok && insert("api_product", newrows, txn)
+				ok = update("api_product", oldrows, newrows, txn)
 			case common.Delete:
-				ok = delete("API_PRODUCT", oldrows, txn)
+				ok = delete("api_product", oldrows, txn)
 			}
 
 		case "kms.app_credential_apiproduct_mapper":
@@ -169,28 +165,91 @@ func processChange(changes *common.ChangeList) {
 			case common.Insert:
 				ok = insert("app_credential_apiproduct_mapper", newrows, txn)
 			case common.Update:
-				ok = delete("app_credential_apiproduct_mapper", oldrows, txn)
-				ok = ok && insert("app_credential_apiproduct_mapper", newrows, txn)
+				ok = update("app_credential_apiproduct_mapper", oldrows, newrows, txn)
 			case common.Delete:
 				ok = delete("app_credential_apiproduct_mapper", oldrows, txn)
 			}
 		}
 		if !ok {
 			log.Error("Sql Operation error. Operation rollbacked")
-			return
+			return ok
 		}
 	}
 	txn.Commit()
-	return
+	return ok
 }
 
-func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {
-	pkeys, err := getPkeysForTable(tableName)
-	if (len(pkeys) == 0 || err != nil) {
-		log.Errorf("DELETE No primary keys found for table.", tableName)
+//TODO if len(rows) > 1000, chunk it up and exec multiple inserts in the txn
+func insert(tableName string, rows []common.Row, txn *sql.Tx) bool {
+
+	if len(rows) == 0 {
+		return false
+	}
+
+	var orderedColumns []string
+	for column := range rows[0] {
+		orderedColumns = append(orderedColumns, column)
+	}
+	sort.Strings(orderedColumns)
+
+	sql := buildInsertSql(tableName, orderedColumns, rows)
+
+	prep, err := txn.Prepare(sql)
+	if err != nil {
+		log.Errorf("INSERT Fail to prepare statement [%s] error=[%v]", sql, err)
+		return false
+	}
+	defer prep.Close()
+
+	var values []interface{}
+
+	for _, row := range rows {
+		for _, columnName := range orderedColumns {
+			//use Value so that stmt exec does not complain about common.ColumnVal being a struct
+			//TODO will need to convert the Value (which is a string) to the appropriate field, using type for mapping
+			//TODO right now this will only work when the column type is a string
+			values = append(values, row[columnName].Value)
+		}
+	}
+
+	//create prepared statement from existing template statement
+	_, err = prep.Exec(values...)
+
+	if err != nil {
+		log.Errorf("INSERT Fail [%s] value=[%v] error=[%v]", sql, values, err)
 		return false
 	} else {
-		sql := buildDeleteSql(tableName, pkeys);
+		log.Debugf("INSERT Success [%s] value=[%v]", sql, values)
+	}
+
+	return true
+}
+
+func getValueListFromKeys(row common.Row, pkeys []string) []interface{} {
+	var values []interface{}
+	// TODO Handle multiple data types
+	for _, pkey := range pkeys {
+		if row[pkey] == nil {
+			values = append(values, nil)
+		} else {
+			values = append(values, row[pkey].Value)
+		}
+	}
+	return values
+}
+
+func delete(tableName string, rows []common.Row, txn *sql.Tx) bool {
+	pkeys, err := getPkeysForTable(tableName)
+	sort.Strings(pkeys)
+	if len(pkeys) == 0 || err != nil {
+		log.Errorf("DELETE No primary keys found for table. %s", tableName)
+		return false
+	} else if len(rows) == 0 {
+		log.Errorf("No rows found for table.", tableName)
+		return false
+	} else {
+
+		sql := buildDeleteSql(tableName, rows[0], pkeys)
 		prep, err := txn.Prepare(sql)
 		if err != nil {
 			log.Errorf("DELETE Fail to prep statement [%s] error=[%v]", sql, err)
@@ -198,41 +257,99 @@ func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {
 		}
 		defer prep.Close()
 		for _, row := range rows {
-			var values []interface{};
-			for _, pkey := range pkeys {
-				var value interface{}
-				row.Get(pkey, &value)
-				values = append(values, value)
-			}
-			_, err = prep.Exec(values)
-
+			values := getValueListFromKeys(row, pkeys)
+			// delete prepared statement from existing template statement
+			res, err := txn.Stmt(prep).Exec(values...)
 			if err != nil {
 				log.Errorf("DELETE Fail [%s] value=[%v] error=[%v]", sql, values, err)
 				return false
 			} else {
-				log.Debugf("DELETE Success [%s] value=[%v]", sql, values)
+				affected, err := res.RowsAffected()
+				if err == nil && affected != 0 {
+					log.Debugf("DELETE Success [%s] value=[%v]", sql, values)
+				} else if err == nil && affected == 0 {
+					log.Errorf("Entry not found [%s] value=[%v]. Nothing to delete.", sql, values)
+					return false
+				} else {
+					log.Errorf("DELETE Failed [%s] value=[%v] error=[%v]", sql, values, err)
+					return false
+				}
 			}
 		}
 		return true
 	}
-
 }
 
-func buildDeleteSql(tableName string, pkeys []string) string {
+func update(tableName string, oldRows, newRows []common.Row, txn *sql.Tx) bool {
+	pkeys, err := getPkeysForTable(tableName)
+	if len(pkeys) == 0 || err != nil {
+		log.Errorf("UPDATE No primary keys found for table.", tableName)
+		return false
+	} else {
+		if len(oldRows) == 0 || len(newRows) == 0 {
+			return false
+		}
 
-	normalizedTableName := normalizeTableName(tableName)
-	var clauses []string
-	for i, columnName := range pkeys {
-		clauses = append(clauses, fmt.Sprint(columnName, "= $", (i + 1)))
+		var orderedColumns []string
+
+		//extract sorted orderedColumns
+		for columnName := range oldRows[0] {
+			orderedColumns = append(orderedColumns, columnName)
+		}
+		sort.Strings(orderedColumns)
+
+		//build update statement, use arbitrary row as template
+		sql := buildUpdateSql(tableName, orderedColumns, newRows[0], pkeys)
+		prep, err := txn.Prepare(sql)
+		if err != nil {
+			log.Errorf("UPDATE Fail to prep statement [%s] error=[%v]", sql, err)
+			return false
+		}
+		defer prep.Close()
+
+		for i, row := range newRows {
+			var values []interface{}
+
+			for _, columnName := range orderedColumns {
+				//use Value so that stmt exec does not complain about common.ColumnVal being a struct
+				//TODO will need to convert the Value (which is a string) to the appropriate field, using type for mapping
+				//TODO right now this will only work when the column type is a string
+				if row[columnName] != nil {
+					values = append(values, row[columnName].Value)
+				} else {
+					values = append(values, nil)
+				}
+			}
+
+			//add values for where clause, use PKs of old row
+			for _, pk := range pkeys {
+				if oldRows[i][pk] != nil {
+					values = append(values, oldRows[i][pk].Value)
+				} else {
+					values = append(values, nil)
+				}
+
+			}
+
+			//create prepared statement from existing template statement
+			_, err = txn.Stmt(prep).Exec(values...)
+
+			if err != nil {
+				log.Errorf("UPDATE Fail [%s] value=[%v] error=[%v]", sql, values, err)
+				return false
+			} else {
+				log.Debugf("UPDATE Success [%s] value=[%v]", sql, values)
+			}
+		}
+
+		return true
 	}
-
-	sql := []string{"DELETE FROM ", normalizedTableName, "WHERE", strings.Join(clauses, "AND"), ";"}
-	return strings.Join(sql, " ")
 }
+
 func getPkeysForTable(tableName string) ([]string, error) {
 	db := getDB()
 	normalizedTableName := normalizeTableName(tableName)
-	sql := "SELECT columnName FROM _transicator_tables WHERE tableName = $1 AND primaryKey;"
+	sql := "SELECT columnName FROM _transicator_tables WHERE tableName=$1 AND primaryKey ORDER BY columnName;"
 	rows, err := db.Query(sql, normalizedTableName)
 	if err != nil {
 		log.Errorf("Failed [%s] values=[s%] Error: %v", sql, normalizedTableName, err)
@@ -241,73 +358,109 @@ func getPkeysForTable(tableName string) ([]string, error) {
 	var columnNames []string
 	defer rows.Close()
 	for rows.Next() {
-		var value interface{}
+		var value string
 		err := rows.Scan(&value)
 		if err != nil {
 			log.Fatal(err)
 		}
-		columnNames = append(columnNames, fmt.Sprint(value))
+		columnNames = append(columnNames, value)
 	}
 	err = rows.Err()
 	if err != nil {
 		log.Fatal(err)
 	}
-	return columnNames, nil;
+	return columnNames, nil
 }
 
-func buildInsertSql(tableName string, rows []common.Row) string {
+// Syntax "DELETE FROM Obj WHERE key1=$1 AND key2=$2 ... ;"
+func buildDeleteSql(tableName string, row common.Row, pkeys []string) string {
+
+	var wherePlaceholders []string
+	i := 1
+	if row == nil {
+		return ""
+	}
+	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
+
+	for _, pk := range pkeys {
+		wherePlaceholders = append(wherePlaceholders, fmt.Sprintf("%s=$%v", pk, i))
+		i++
+	}
+
+	sql := "DELETE FROM " + normalizedTableName
+	sql += " WHERE "
+	sql += strings.Join(wherePlaceholders, " AND ")
+
+	return sql
+
+}
+
+func buildUpdateSql(tableName string, orderedColumns []string, row common.Row, pkeys []string) string {
+	var setPlaceholders, wherePlaceholders []string
+	if row == nil {
+		return ""
+	}
+	normalizedTableName := strings.Replace(tableName, ".", "_", 0)
+
+	i := 1
+
+	for _, columnName := range orderedColumns {
+		setPlaceholders = append(setPlaceholders, fmt.Sprintf("%s=$%v", columnName, i))
+		i++
+	}
+
+	for _, pk := range pkeys {
+		wherePlaceholders = append(wherePlaceholders, fmt.Sprintf("%s=$%v", pk, i))
+		i++
+	}
+
+	sql := "UPDATE " + normalizedTableName + " SET "
+	sql += strings.Join(setPlaceholders, ", ")
+	sql += " WHERE "
+	sql += strings.Join(wherePlaceholders, " AND ")
+
+	return sql
+}
+
+//precondition: rows.length > 1000, max number of entities for sqlite
+func buildInsertSql(tableName string, orderedColumns []string, rows []common.Row) string {
 	if len(rows) == 0 {
 		return ""
 	}
 	normalizedTableName := normalizeTableName(tableName)
-	row := rows[0]
-	var columns, placeholders []string
-	i := 1
-	for columnName := range row {
-		columns = append(columns, columnName)
-		placeholders = append(placeholders, fmt.Sprint("$", i))
-		i++
-	}
+	var values string = ""
 
-	sql := []string{"INSERT INTO", normalizedTableName, "(", strings.Join(columns, ","), ")",
-		"VALUES", "(", strings.Join(placeholders, ","), ");"}
-	return strings.Join(sql, " ")
+	var i, j int
+	k := 1
+	for i = 0; i < len(rows)-1; i++ {
+		values += "("
+		for j = 0; j < len(orderedColumns)-1; j++ {
+			values += fmt.Sprintf("$%d,", k)
+			k++
+		}
+		values += fmt.Sprintf("$%d),", k)
+		k++
+	}
+	values += "("
+	for j = 0; j < len(orderedColumns)-1; j++ {
+		values += fmt.Sprintf("$%d,", k)
+		k++
+	}
+	values += fmt.Sprintf("$%d)", k)
+
+	sql := "INSERT INTO " + normalizedTableName
+	sql += "(" + strings.Join(orderedColumns, ",") + ") "
+	sql += "VALUES " + values
+
+	return sql
 }
 
 func normalizeTableName(tableName string) string {
-	if (strings.Contains(tableName, ".")) {
+	if strings.Contains(tableName, ".") {
 		split := strings.Split(tableName, ".")
-		return split[len(split) - 1];
+		return split[len(split)-1]
 	}
-	return tableName;
-}
-
-func insert(tableName string, rows []common.Row, txn *sql.Tx) bool {
-
-	sql := buildInsertSql(tableName, rows)
-
-	prep, err := txn.Prepare(sql)
-	if err != nil {
-		log.Errorf("INSERT Fail to prepare statement [%s] error=[%v]", sql, err)
-		return false
-	}
-	defer prep.Close()
-	for _, ele := range rows {
-		var values []interface{};
-		for _, value := range ele {
-			values = append(values, value)
-		}
-
-		_, err = prep.Exec(values)
-
-		if err != nil {
-			log.Errorf("INSERT Fail [%s] value=[%v] error=[%v]", sql, values, err)
-			return false
-		} else {
-			log.Debugf("INSERT Success [%s] value=[%v]", sql, values)
-		}
-	}
-	return true
+	return tableName
 }
 
 /*
@@ -695,8 +848,6 @@ func insertAPIProductMappers(rows []common.Row, txn *sql.Tx) bool {
 	}
 	return true
 }
-
-
 
 /*
  * DELETE  APIPRDT MAPPER

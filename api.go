@@ -83,7 +83,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 	action := f.Get("action")
 
 	if key == "" || scopeuuid == "" || path == "" || action != "verify" {
-		log.Error("Input params Invalid/Incomplete")
+		log.Debug("Input params Invalid/Incomplete")
 		reason := "Input Params Incomplete or Invalid"
 		errorCode := "INCORRECT_USER_INPUT"
 		return errorResponse(reason, errorCode)
@@ -179,7 +179,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 	}
 
 	/*
-	 * Perform all validations related to the Query made with the data
+	 * Perform all validations related to the Query made with the dataService
 	 * we just retrieved
 	 */
 	result := validatePath(resName, path)
@@ -215,8 +215,11 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 }
 
 func errorResponse(reason, errorCode string) ([]byte, error) {
-
-	log.Error(reason)
+	if errorCode == "SEARCH_INTERNAL_ERROR" {
+		log.Error(reason)
+	} else {
+		log.Debug(reason)
+	}
 	resp := kmsResponseFail{
 		Type: "ErrorResult",
 		ErrInfo: errResultDetail{

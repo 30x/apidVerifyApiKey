@@ -11,11 +11,11 @@ const (
 )
 
 var (
-	log      apid.LogService
-	data     apid.DataService
-	events   apid.EventsService
-	unsafeDB apid.DB
-	dbMux    sync.RWMutex
+	log         apid.LogService
+	dataService apid.DataService
+	events      apid.EventsService
+	unsafeDB    apid.DB
+	dbMux       sync.RWMutex
 )
 
 func getDB() apid.DB {
@@ -39,7 +39,7 @@ func initPlugin(services apid.Services) (apid.PluginData, error) {
 	log = services.Log().ForModule("apidVerifyAPIKey")
 	log.Debug("start init")
 
-	data = services.Data()
+	dataService = services.Data()
 	events = services.Events()
 
 	services.API().HandleFunc(apiPath, handleRequest).Methods("POST")
@@ -168,7 +168,7 @@ CREATE INDEX IF NOT EXISTS app_id ON app (id);
 
 func createApidClusterTables(db apid.DB) {
 	_, err := db.Exec(`
-CREATE TABLE apid_cluster (
+CREATE TABLE IF NOT EXISTS apid_cluster (
     id text,
     instance_id text,
     name text,
@@ -183,7 +183,7 @@ CREATE TABLE apid_cluster (
     lastSequence text,
     PRIMARY KEY (id)
 );
-CREATE TABLE data_scope (
+CREATE TABLE IF NOT EXISTS data_scope (
     id text,
     apid_cluster_id text,
     scope text,

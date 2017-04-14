@@ -36,7 +36,7 @@ var _ = Describe("api", func() {
 			// application
 			var j, k int
 			for i := 0; i < 10; i++ {
-				for j = k; j < 10 + k; j++ {
+				for j = k; j < 10+k; j++ {
 					row := generateTestApp(j, i)
 					res := insert("APP", []common.Row{row}, txn)
 					Expect(res).Should(BeTrue())
@@ -56,7 +56,7 @@ var _ = Describe("api", func() {
 				Expect(res).Should(BeTrue())
 			}
 
-			// Following are data for company
+			// Following are dataService for company
 			// api products
 			for i := 100; i < 110; i++ {
 				row := generateTestApiProduct(i)
@@ -81,7 +81,7 @@ var _ = Describe("api", func() {
 			// application
 			k = 100
 			for i := 100; i < 110; i++ {
-				for j = k; j < 100 + k; j++ {
+				for j = k; j < 100+k; j++ {
 					row := generateTestAppCompany(j, i)
 					res := insert("APP", []common.Row{row}, txn)
 					Expect(res).Should(BeTrue())
