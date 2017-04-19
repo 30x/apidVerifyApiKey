@@ -52,7 +52,7 @@ func initPlugin(services apid.Services) (apid.PluginData, error) {
 
 func createTables(db apid.DB) {
 	_, err := db.Exec(`
-CREATE TABLE IF NOT EXISTS api_product (
+CREATE TABLE IF NOT EXISTS kms_api_product (
     id text,
     tenant_id text,
     name text,
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS api_product (
     updated_at int64,
     updated_by text,
     PRIMARY KEY (tenant_id, id));
-CREATE TABLE IF NOT EXISTS developer (
+CREATE TABLE IF NOT EXISTS kms_developer (
     id text,
     tenant_id text,
     username text,
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS developer (
     updated_by text,
     PRIMARY KEY (tenant_id, id)
 );
-CREATE TABLE IF NOT EXISTS company (
+CREATE TABLE IF NOT EXISTS kms_company (
     id text,
     tenant_id text,
     name text,
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS company (
     _change_selector text,
     PRIMARY KEY (tenant_id, id)
 );
-CREATE TABLE IF NOT EXISTS company_developer (
+CREATE TABLE IF NOT EXISTS kms_company_developer (
      tenant_id text,
      company_id text,
      developer_id text,
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS company_developer (
     _change_selector text,
     PRIMARY KEY (tenant_id, company_id,developer_id)
 );
-CREATE TABLE IF NOT EXISTS app (
+CREATE TABLE IF NOT EXISTS kms_app (
     id text,
     tenant_id text,
     name text,
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS app (
     _change_selector text,
     PRIMARY KEY (tenant_id, id)
 );
-CREATE TABLE IF NOT EXISTS app_credential (
+CREATE TABLE IF NOT EXISTS kms_app_credential (
     id text,
     tenant_id text,
     consumer_secret text,
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS app_credential (
     _change_selector text,
     PRIMARY KEY (tenant_id, id)
 );
-CREATE TABLE IF NOT EXISTS app_credential_apiproduct_mapper (
+CREATE TABLE IF NOT EXISTS kms_app_credential_apiproduct_mapper (
     tenant_id text,
     appcred_id text,
     app_id text,
@@ -156,10 +156,10 @@ CREATE TABLE IF NOT EXISTS app_credential_apiproduct_mapper (
     status text,
     PRIMARY KEY (appcred_id, app_id, apiprdt_id,tenant_id)
 );
-CREATE INDEX IF NOT EXISTS company_id ON company (id);
-CREATE INDEX IF NOT EXISTS developer_id ON developer (id);
-CREATE INDEX IF NOT EXISTS api_product_id ON api_product (id);
-CREATE INDEX IF NOT EXISTS app_id ON app (id);
+CREATE INDEX IF NOT EXISTS company_id ON kms_company (id);
+CREATE INDEX IF NOT EXISTS developer_id ON kms_developer (id);
+CREATE INDEX IF NOT EXISTS api_product_id ON kms_api_product (id);
+CREATE INDEX IF NOT EXISTS app_id ON kms_app (id);
 `)
 	if err != nil {
 		log.Panic("Unable to initialize DB", err)

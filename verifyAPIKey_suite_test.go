@@ -42,6 +42,8 @@ var _ = BeforeSuite(func() {
 			handleRequest(w, req)
 		}
 	}))
+
+	createTestData(db)
 })
 
 var _ = AfterSuite(func() {
@@ -55,4 +57,72 @@ var _ = AfterSuite(func() {
 func TestVerifyAPIKey(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "VerifyAPIKey Suite")
+}
+
+func createTestData(db apid.DB) {
+	txn, err := db.Begin()
+	Expect(err).ShouldNot(HaveOccurred())
+	// api products
+	for i := 0; i < 10; i++ {
+		generateTestApiProduct(i, txn)
+	}
+	// developers
+	for i := 0; i < 10; i++ {
+		generateTestDeveloper(i, txn)
+	}
+
+	// application
+	var j, k int
+	for i := 0; i < 10; i++ {
+		for j = k; j < 10 + k; j++ {
+			generateTestApp(j, i, txn)
+		}
+		k = j
+	}
+	// app credentials
+	for i := 0; i < 10; i++ {
+		generateTestAppCreds(i, txn)
+	}
+	// api product mapper
+	for i := 0; i < 10; i++ {
+		generateTestApiProductMapper(i, txn)
+	}
+
+	// Following are data for company
+	// api products
+	for i := 100; i < 110; i++ {
+		generateTestApiProduct(i, txn)
+	}
+
+	// companies
+	for i := 100; i < 110; i++ {
+		generateTestCompany(i, txn)
+	}
+
+	// company developers
+	for i := 100; i < 110; i++ {
+		generateTestCompanyDeveloper(i, txn)
+	}
+
+	// application
+	k = 100
+	for i := 100; i < 110; i++ {
+		for j = k; j < 100 + k; j++ {
+			generateTestAppCompany(j, i, txn)
+		}
+		k = j
+	}
+	// app credentials
+	for i := 100; i < 110; i++ {
+		generateTestAppCreds(i, txn)
+	}
+	// api product mapper
+	for i := 100; i < 110; i++ {
+		generateTestApiProductMapper(i, txn)
+	}
+
+	txn.Commit()
+	var count int64
+	db.QueryRow("select count(*) from data_scope").Scan(&count)
+	log.Info("Found ", count)
 }

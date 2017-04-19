@@ -119,13 +119,13 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			ad.id,
 			"developer" as ctype
 		FROM
-			APP_CREDENTIAL AS c 
-			INNER JOIN APP AS a ON c.app_id = a.id
-			INNER JOIN DEVELOPER AS ad 
+			KMS_APP_CREDENTIAL AS c
+			INNER JOIN KMS_APP AS a ON c.app_id = a.id
+			INNER JOIN KMS_DEVELOPER AS ad
 				ON ad.id = a.developer_id
-			INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp 
+			INNER JOIN KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
 				ON mp.appcred_id = c.id 
-			INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id
+			INNER JOIN KMS_API_PRODUCT as ap ON ap.id = mp.apiprdt_id
 		WHERE (UPPER(ad.status) = 'ACTIVE' 
 			AND mp.apiprdt_id = ap.id 
 			AND mp.app_id = a.id
@@ -145,13 +145,13 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			ad.id,
 			"company" as ctype
 		FROM
-			APP_CREDENTIAL AS c
-			INNER JOIN APP AS a ON c.app_id = a.id
-			INNER JOIN COMPANY AS ad
+			KMS_APP_CREDENTIAL AS c
+			INNER JOIN KMS_APP AS a ON c.app_id = a.id
+			INNER JOIN KMS_COMPANY AS ad
 				ON ad.id = a.company_id
-			INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
+			INNER JOIN KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
 				ON mp.appcred_id = c.id
-			INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id
+			INNER JOIN KMS_API_PRODUCT as ap ON ap.id = mp.apiprdt_id
 		WHERE (UPPER(ad.status) = 'ACTIVE'
 			AND mp.apiprdt_id = ap.id
 			AND mp.app_id = a.id
@@ -162,8 +162,12 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			AND c.tenant_id = $2)
 	;`
 
-	var status, redirectionURIs, appName, appId, resName, resEnv, cType string
-	var issuedAt int64
+	/* these fields need to be nullable types for scanning.  This is because when using json snapshots,
+	   and therefore being responsible for inserts, we were able to default everything to be not null.  With
+	   sqlite snapshots, we are not necessarily guaranteed that
+	*/
+	var status, redirectionURIs, appName, appId, resName, resEnv, cType sql.NullString
+	var issuedAt sql.NullInt64
 	err := db.QueryRow(sSql, key, tenantId).Scan(&resName, &resEnv, &issuedAt, &status,
 		&redirectionURIs, &appName, &appId, &cType)
 	switch {
@@ -182,18 +186,18 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 	 * Perform all validations related to the Query made with the data
 	 * we just retrieved
 	 */
-	result := validatePath(resName, path)
+	result := validatePath(resName.String, path)
 	if result == false {
-		reason := "Path Validation Failed (" + resName + " vs " + path + ")"
+		reason := "Path Validation Failed (" + resName.String + " vs " + path + ")"
 		errorCode := "PATH_VALIDATION_FAILED"
 		return errorResponse(reason, errorCode)
 
 	}
 
 	/* Verify if the ENV matches */
-	result = validateEnv(resEnv, env)
+	result = validateEnv(resEnv.String, env)
 	if result == false {
-		reason := "ENV Validation Failed (" + resEnv + " vs " + env + ")"
+		reason := "ENV Validation Failed (" + resEnv.String + " vs " + env + ")"
 		errorCode := "ENV_VALIDATION_FAILED"
 		return errorResponse(reason, errorCode)
 	}
@@ -204,12 +208,12 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 		RspInfo: sucResponseDetail{
 			Key:             key,
 			ExpiresAt:       expiresAt,
-			IssuedAt:        issuedAt,
-			Status:          status,
-			RedirectionURIs: redirectionURIs,
-			Type:            cType,
-			AppId:           appId,
-			AppName:         appName},
+			IssuedAt:        issuedAt.Int64,
+			Status:          status.String,
+			RedirectionURIs: redirectionURIs.String,
+			Type:            cType.String,
+			AppId:           appId.String,
+			AppName:         appName.String},
 	}
 	return json.Marshal(resp)
 }
