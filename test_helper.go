@@ -13,7 +13,7 @@ func generateTestApiProduct(suffix int, txn *sql.Tx) {
 
 	s, err := txn.Prepare("INSERT INTO kms_api_product (id, api_resources, environments, tenant_id, _change_selector) VALUES(?, ?, ?, ?, ?)")
 	if err != nil {
-		log.Panicf("WHAT THE FUCK: " + err.Error())
+		log.Panicf("This is a bug : " + err.Error())
 	}
 	s.Exec("api_product_" + convertSuffix(suffix), "{/**, /test}", "{Env_0, Env_1}",
 		"tenant_id_xxxx", "Org_0")
