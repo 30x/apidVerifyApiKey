@@ -11,7 +11,7 @@ import (
 type sucResponseDetail struct {
 	Key             string `json:"key"`
 	ExpiresAt       int64  `json:"expiresAt"`
-	IssuedAt        int64  `json:"issuedAt"`
+	IssuedAt        string  `json:"issuedAt"`
 	Status          string `json:"status"`
 	Type            string `json:"cType"`
 	RedirectionURIs string `json:"redirectionURIs"`
@@ -91,9 +91,9 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 
 	db := getDB()
 
-	// DANGER: This relies on an external TABLE - DATA_SCOPE is maintained by apidApigeeSync
+	// DANGER: This relies on an external TABLE - EDGEX_DATA_SCOPE is maintained by apidApigeeSync
 	var env, tenantId string
-	error := db.QueryRow("SELECT env, scope FROM DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
+	error := db.QueryRow("SELECT env, scope FROM EDGEX_DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
 
 	switch {
 	case error == sql.ErrNoRows:
@@ -166,8 +166,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 	   and therefore being responsible for inserts, we were able to default everything to be not null.  With
 	   sqlite snapshots, we are not necessarily guaranteed that
 	*/
-	var status, redirectionURIs, appName, appId, resName, resEnv, cType sql.NullString
-	var issuedAt sql.NullInt64
+	var status, redirectionURIs, appName, appId, resName, resEnv, issuedAt, cType sql.NullString
 	err := db.QueryRow(sSql, key, tenantId).Scan(&resName, &resEnv, &issuedAt, &status,
 		&redirectionURIs, &appName, &appId, &cType)
 	switch {
@@ -208,7 +207,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 		RspInfo: sucResponseDetail{
 			Key:             key,
 			ExpiresAt:       expiresAt,
-			IssuedAt:        issuedAt.Int64,
+			IssuedAt:        issuedAt.String,
 			Status:          status.String,
 			RedirectionURIs: redirectionURIs.String,
 			Type:            cType.String,

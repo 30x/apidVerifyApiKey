@@ -168,7 +168,7 @@ CREATE INDEX IF NOT EXISTS app_id ON kms_app (id);
 
 func createApidClusterTables(db apid.DB) {
 	_, err := db.Exec(`
-CREATE TABLE apid_cluster (
+CREATE TABLE edgex_apid_cluster (
     id text,
     instance_id text,
     name text,
@@ -183,7 +183,7 @@ CREATE TABLE apid_cluster (
     lastSequence text,
     PRIMARY KEY (id)
 );
-CREATE TABLE data_scope (
+CREATE TABLE edgex_data_scope (
     id text,
     apid_cluster_id text,
     scope text,
