@@ -2,9 +2,10 @@ package apidVerifyApiKey
 
 import (
 	"database/sql"
-
 	"github.com/30x/apid-core"
 	"github.com/apigee-labs/transicator/common"
+	"strings"
+	"fmt"
 )
 
 type handler struct {
@@ -56,19 +57,19 @@ func processSnapshot(snapshot *common.Snapshot) {
 		for _, payload := range snapshot.Tables {
 			switch payload.Name {
 			case "kms.developer":
-				ok = insertDevelopers(payload.Rows, txn)
+				ok = insert("developer", payload.Rows, txn)
 			case "kms.app":
-				ok = insertApplications(payload.Rows, txn)
+				ok = insert("app", payload.Rows, txn)
 			case "kms.app_credential":
-				ok = insertCredentials(payload.Rows, txn)
+				ok = insert("app_credential", payload.Rows, txn)
 			case "kms.api_product":
-				ok = insertAPIproducts(payload.Rows, txn)
+				ok = insert("api_product", payload.Rows, txn)
 			case "kms.app_credential_apiproduct_mapper":
-				ok = insertAPIProductMappers(payload.Rows, txn)
+				ok = insert("app_credential_apiproduct_mapper", payload.Rows, txn)
 			case "kms.company":
-				ok = insertCompanies(payload.Rows, txn)
+				ok = insert("company", payload.Rows, txn)
 			case "kms.company_developer":
-				ok = insertCompanyDevelopers(payload.Rows, txn)
+				ok = insert("company_developer", payload.Rows, txn)
 			}
 			if !ok {
 				log.Error("Error encountered in Downloading Snapshot for VerifyApiKey")
@@ -82,6 +83,231 @@ func processSnapshot(snapshot *common.Snapshot) {
 
 	setDB(db)
 	return
+}
+
+func processChange(changes *common.ChangeList) {
+
+	db := getDB()
+
+	txn, err := db.Begin()
+	if err != nil {
+		log.Error("Unable to create transaction")
+		return
+	}
+	defer txn.Rollback()
+
+	ok := true
+
+	log.Debugf("apigeeSyncEvent: %d changes", len(changes.Changes))
+	for _, payload := range changes.Changes {
+		var newrows = []common.Row{payload.NewRow}
+		var oldrows = []common.Row{payload.OldRow}
+		switch payload.Table {
+		case "kms.developer":
+			switch payload.Operation {
+			case common.Insert:
+				ok = insert("developer", newrows, txn)
+			case common.Update:
+				ok = delete("DEVELOPER", oldrows, txn)
+				ok = ok && insert("developer", newrows, txn)
+			case common.Delete:
+				ok = delete("DEVELOPER", oldrows, txn)
+			}
+		case "kms.app":
+			switch payload.Operation {
+			case common.Insert:
+				ok = insert("app", newrows, txn)
+			case common.Update:
+				ok = delete("APP", oldrows, txn)
+				ok = ok && insert("app", newrows, txn)
+			case common.Delete:
+				ok = delete("APP", oldrows, txn)
+			}
+		case "kms.company":
+			switch payload.Operation {
+			case common.Insert:
+				ok = insert("company", newrows, txn)
+			case common.Update:
+				ok = delete("COMPANY", oldrows, txn)
+				ok = ok && insert("company", newrows, txn)
+			case common.Delete:
+				ok = delete("COMPANY", oldrows, txn)
+			}
+		case "kms.company_developer":
+			switch payload.Operation {
+			case common.Insert:
+				ok = insert("company_developer", newrows, txn)
+			case common.Update:
+				ok = delete("company_developer", oldrows, txn)
+				ok = ok && insert("company_developer", newrows, txn)
+			case common.Delete:
+				ok = delete("company_developer", oldrows, txn)
+			}
+		case "kms.app_credential":
+			switch payload.Operation {
+			case common.Insert:
+				ok = insert("app_credential", newrows, txn)
+			case common.Update:
+				ok = delete("APP_CREDENTIAL", oldrows, txn)
+				ok = ok && insert("app_credential", newrows, txn)
+			case common.Delete:
+				ok = delete("APP_CREDENTIAL", oldrows, txn)
+			}
+		case "kms.api_product":
+			switch payload.Operation {
+			case common.Insert:
+				ok = insert("api_product", newrows, txn)
+			case common.Update:
+				ok = delete("API_PRODUCT", oldrows, txn)
+				ok = ok && insert("api_product", newrows, txn)
+			case common.Delete:
+				ok = delete("API_PRODUCT", oldrows, txn)
+			}
+
+		case "kms.app_credential_apiproduct_mapper":
+			switch payload.Operation {
+			case common.Insert:
+				ok = insert("app_credential_apiproduct_mapper", newrows, txn)
+			case common.Update:
+				ok = delete("app_credential_apiproduct_mapper", oldrows, txn)
+				ok = ok && insert("app_credential_apiproduct_mapper", newrows, txn)
+			case common.Delete:
+				ok = delete("app_credential_apiproduct_mapper", oldrows, txn)
+			}
+		}
+		if !ok {
+			log.Error("Sql Operation error. Operation rollbacked")
+			return
+		}
+	}
+	txn.Commit()
+	return
+}
+
+func delete(tableName string, rows[] common.Row, txn *sql.Tx) bool {
+	pkeys, err := getPkeysForTable(tableName)
+	if (len(pkeys) == 0 || err != nil) {
+		log.Errorf("DELETE No primary keys found for table.", tableName)
+		return false
+	} else {
+		sql := buildDeleteSql(tableName, pkeys);
+		prep, err := txn.Prepare(sql)
+		if err != nil {
+			log.Errorf("DELETE Fail to prep statement [%s] error=[%v]", sql, err)
+			return false
+		}
+		defer prep.Close()
+		for _, row := range rows {
+			var values []interface{};
+			for _, pkey := range pkeys {
+				var value interface{}
+				row.Get(pkey, &value)
+				values = append(values, value)
+			}
+			_, err = prep.Exec(values)
+
+			if err != nil {
+				log.Errorf("DELETE Fail [%s] value=[%v] error=[%v]", sql, values, err)
+				return false
+			} else {
+				log.Debugf("DELETE Success [%s] value=[%v]", sql, values)
+			}
+		}
+		return true
+	}
+
+}
+
+func buildDeleteSql(tableName string, pkeys []string) string {
+
+	normalizedTableName := normalizeTableName(tableName)
+	var clauses []string
+	for i, columnName := range pkeys {
+		clauses = append(clauses, fmt.Sprint(columnName, "= $", (i + 1)))
+	}
+
+	sql := []string{"DELETE FROM ", normalizedTableName, "WHERE", strings.Join(clauses, "AND"), ";"}
+	return strings.Join(sql, " ")
+}
+func getPkeysForTable(tableName string) ([]string, error) {
+	db := getDB()
+	normalizedTableName := normalizeTableName(tableName)
+	sql := "SELECT columnName FROM _transicator_tables WHERE tableName = $1 AND primaryKey;"
+	rows, err := db.Query(sql, normalizedTableName)
+	if err != nil {
+		log.Errorf("Failed [%s] values=[s%] Error: %v", sql, normalizedTableName, err)
+		return nil, err
+	}
+	var columnNames []string
+	defer rows.Close()
+	for rows.Next() {
+		var value interface{}
+		err := rows.Scan(&value)
+		if err != nil {
+			log.Fatal(err)
+		}
+		columnNames = append(columnNames, fmt.Sprint(value))
+	}
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return columnNames, nil;
+}
+
+func buildInsertSql(tableName string, rows []common.Row) string {
+	if len(rows) == 0 {
+		return ""
+	}
+	normalizedTableName := normalizeTableName(tableName)
+	row := rows[0]
+	var columns, placeholders []string
+	i := 1
+	for columnName := range row {
+		columns = append(columns, columnName)
+		placeholders = append(placeholders, fmt.Sprint("$", i))
+		i++
+	}
+
+	sql := []string{"INSERT INTO", normalizedTableName, "(", strings.Join(columns, ","), ")",
+		"VALUES", "(", strings.Join(placeholders, ","), ");"}
+	return strings.Join(sql, " ")
+}
+
+func normalizeTableName(tableName string) string {
+	if (strings.Contains(tableName, ".")) {
+		split := strings.Split(tableName, ".")
+		return split[len(split) - 1];
+	}
+	return tableName;
+}
+
+func insert(tableName string, rows []common.Row, txn *sql.Tx) bool {
+
+	sql := buildInsertSql(tableName, rows)
+
+	prep, err := txn.Prepare(sql)
+	if err != nil {
+		log.Errorf("INSERT Fail to prepare statement [%s] error=[%v]", sql, err)
+		return false
+	}
+	defer prep.Close()
+	for _, ele := range rows {
+		var values []interface{};
+		for _, value := range ele {
+			values = append(values, value)
+		}
+
+		_, err = prep.Exec(values)
+
+		if err != nil {
+			log.Errorf("INSERT Fail [%s] value=[%v] error=[%v]", sql, values, err)
+			return false
+		} else {
+			log.Debugf("INSERT Success [%s] value=[%v]", sql, values)
+		}
+	}
+	return true
 }
 
 /*
@@ -470,161 +696,7 @@ func insertAPIProductMappers(rows []common.Row, txn *sql.Tx) bool {
 	return true
 }
 
-func processChange(changes *common.ChangeList) {
 
-	db := getDB()
-
-	txn, err := db.Begin()
-	if err != nil {
-		log.Error("Unable to create transaction")
-		return
-	}
-	defer txn.Rollback()
-
-	var rows []common.Row
-	ok := true
-
-	log.Debugf("apigeeSyncEvent: %d changes", len(changes.Changes))
-	for _, payload := range changes.Changes {
-		rows = nil
-		switch payload.Table {
-		case "kms.developer":
-			switch payload.Operation {
-			case common.Insert:
-				rows = append(rows, payload.NewRow)
-				ok = insertDevelopers(rows, txn)
-
-			case common.Update:
-				ok = deleteObject("DEVELOPER", payload.OldRow, txn)
-				rows = append(rows, payload.NewRow)
-				ok = insertDevelopers(rows, txn)
-
-			case common.Delete:
-				ok = deleteObject("DEVELOPER", payload.OldRow, txn)
-			}
-		case "kms.app":
-			switch payload.Operation {
-			case common.Insert:
-				rows = append(rows, payload.NewRow)
-				ok = insertApplications(rows, txn)
-
-			case common.Update:
-				ok = deleteObject("APP", payload.OldRow, txn)
-				rows = append(rows, payload.NewRow)
-				ok = insertApplications(rows, txn)
-
-			case common.Delete:
-				ok = deleteObject("APP", payload.OldRow, txn)
-			}
-		case "kms.company":
-			switch payload.Operation {
-			case common.Insert:
-				rows = append(rows, payload.NewRow)
-				ok = insertCompanies(rows, txn)
-
-			case common.Update:
-				ok = deleteObject("COMPANY", payload.OldRow, txn)
-				rows = append(rows, payload.NewRow)
-				ok = insertCompanies(rows, txn)
-
-			case common.Delete:
-				ok = deleteObject("COMPANY", payload.OldRow, txn)
-			}
-		case "kms.company_developer":
-			switch payload.Operation {
-			case common.Insert:
-				rows = append(rows, payload.NewRow)
-				ok = insertCompanyDevelopers(rows, txn)
-
-			case common.Update:
-				ok = deleteCompanyDeveloper(payload.OldRow, txn)
-				rows = append(rows, payload.NewRow)
-				ok = insertCompanyDevelopers(rows, txn)
-
-			case common.Delete:
-				ok = deleteCompanyDeveloper(payload.OldRow, txn)
-			}
-		case "kms.app_credential":
-			switch payload.Operation {
-			case common.Insert:
-				rows = append(rows, payload.NewRow)
-				ok = insertCredentials(rows, txn)
-
-			case common.Update:
-				ok = deleteObject("APP_CREDENTIAL", payload.OldRow, txn)
-				rows = append(rows, payload.NewRow)
-				ok = insertCredentials(rows, txn)
-
-			case common.Delete:
-				ok = deleteObject("APP_CREDENTIAL", payload.OldRow, txn)
-			}
-		case "kms.api_product":
-			switch payload.Operation {
-			case common.Insert:
-				rows = append(rows, payload.NewRow)
-				ok = insertAPIproducts(rows, txn)
-
-			case common.Update:
-				ok = deleteObject("API_PRODUCT", payload.OldRow, txn)
-				rows = append(rows, payload.NewRow)
-				ok = insertAPIproducts(rows, txn)
-
-			case common.Delete:
-				ok = deleteObject("API_PRODUCT", payload.OldRow, txn)
-			}
-
-		case "kms.app_credential_apiproduct_mapper":
-			switch payload.Operation {
-			case common.Insert:
-				rows = append(rows, payload.NewRow)
-				ok = insertAPIProductMappers(rows, txn)
-
-			case common.Update:
-				ok = deleteAPIproductMapper(payload.OldRow, txn)
-				rows = append(rows, payload.NewRow)
-				ok = insertAPIProductMappers(rows, txn)
-
-			case common.Delete:
-				ok = deleteAPIproductMapper(payload.OldRow, txn)
-			}
-		}
-		if !ok {
-			log.Error("Sql Operation error. Operation rollbacked")
-			return
-		}
-	}
-	txn.Commit()
-	return
-}
-
-/*
- * DELETE OBJECT as passed in the input
- */
-func deleteObject(object string, ele common.Row, txn *sql.Tx) bool {
-
-	var scope, objid string
-	ssql := "DELETE FROM " + object + " WHERE id = $1 AND _change_selector = $2"
-	prep, err := txn.Prepare(ssql)
-	if err != nil {
-		log.Error("DELETE ", object, " Failed: ", err)
-		return false
-	}
-	defer prep.Close()
-	ele.Get("_change_selector", &scope)
-	ele.Get("id", &objid)
-
-	res, err := prep.Exec(objid, scope)
-	if err == nil {
-		affect, err := res.RowsAffected()
-		if err == nil && affect != 0 {
-			log.Debugf("DELETE %s (%s, %s) success.", object, objid, scope)
-			return true
-		}
-	}
-	log.Errorf("DELETE %s (%s, %s) failed.", object, objid, scope)
-	return false
-
-}
 
 /*
  * DELETE  APIPRDT MAPPER
