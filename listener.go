@@ -363,9 +363,9 @@ func insertCompanies(rows []common.Row, txn *sql.Tx) bool {
  */
 func insertAPIproducts(rows []common.Row, txn *sql.Tx) bool {
 
-	var scope, apiProduct, res, env, tenantId string
-
-	prep, err := txn.Prepare("INSERT INTO API_PRODUCT (id, api_resources, environments, tenant_id,_change_selector) VALUES($1,$2,$3,$4,$5)")
+	var scope, apiProduct, res, env, tenantId, quota, quotaTimeUnit string
+	var quotaInterval int
+	prep, err := txn.Prepare("INSERT INTO API_PRODUCT (id, api_resources, environments, tenant_id,_change_selector, quota, quota_time_unit, quota_interval) VALUES($1,$2,$3,$4,$5,$6,$7,$8)")
 	if err != nil {
 		log.Error("INSERT API_PRODUCT Failed: ", err)
 		return false
@@ -379,6 +379,9 @@ func insertAPIproducts(rows []common.Row, txn *sql.Tx) bool {
 		ele.Get("api_resources", &res)
 		ele.Get("environments", &env)
 		ele.Get("tenant_id", &tenantId)
+		ele.Get("quota", &quota)
+		ele.Get("quota_time_unit", &quotaTimeUnit)
+		ele.Get("quota_interval", &quotaInterval)
 
 		/* Mandatory params check */
 		if apiProduct == "" || scope == "" || tenantId == "" {
@@ -390,7 +393,10 @@ func insertAPIproducts(rows []common.Row, txn *sql.Tx) bool {
 			res,
 			env,
 			tenantId,
-			scope)
+			scope,
+			quota,
+			quotaTimeUnit,
+			quotaInterval)
 
 		if err != nil {
 			log.Error("INSERT API_PRODUCT Failed: (", apiProduct, ", ", tenantId, ")", err)

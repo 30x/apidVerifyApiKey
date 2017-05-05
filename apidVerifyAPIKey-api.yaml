@@ -57,6 +57,7 @@ paths:
               responseType: APIKeyContext
               resultCode: "SUCCESS"
               result:
+                org: "abc123"
                 key: abc123
                 expiresAt: 1234567890
                 issuedAt: 1234567890
@@ -65,6 +66,9 @@ paths:
                 appName: abc123
                 appId: abc123
                 cType: "developer"
+                quota: abc123
+                quotaTimeUnit: "minute"
+                quotaInterval: 1
         default:
           description: 4xx or 5xx errors
           schema:
@@ -123,6 +127,8 @@ definitions:
           result:
             type: object
             properties:
+              org:
+                type: string
               key:
                 type: string
               expiresAt:
@@ -139,9 +145,16 @@ definitions:
                 type: string
               cType:
                 type: string
+              quota:
+                type: string
+              quotaTimeUnit:
+                type: string
+              quotaInterval:
+                type: int
     example:
       type: "APIKeyContext"
       result:
+        org: "abc123"
         key: "abc123"
         expiresAt: 1234567890
         issuedAt: 1234567890
@@ -150,6 +163,9 @@ definitions:
         appName: "abc123"
         appId: "abc123"
         cType: "company OR developer"
+        quota: "quotaName"
+        quotaTimeUnit: "timeUnit"
+        quotaInterval: 1
 
   VerifyAPIKeyResponseFailed:
     allOf:

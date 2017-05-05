@@ -9,6 +9,7 @@ import (
 )
 
 type sucResponseDetail struct {
+	Org             string `json:"org"`
 	Key             string `json:"key"`
 	ExpiresAt       int64  `json:"expiresAt"`
 	IssuedAt        int64  `json:"issuedAt"`
@@ -17,6 +18,9 @@ type sucResponseDetail struct {
 	RedirectionURIs string `json:"redirectionURIs"`
 	AppId           string `json:"appId"`
 	AppName         string `json:"appName"`
+	Quota           string `json:quota`
+	QuotaTimeUnit   string `json:quotaTimeUnit`
+	QuotaInterval   int    `json:quotaInterval`
 }
 
 type errResultDetail struct {
@@ -92,8 +96,8 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 	db := getDB()
 
 	// DANGER: This relies on an external TABLE - DATA_SCOPE is maintained by apidApigeeSync
-	var env, tenantId string
-	error := db.QueryRow("SELECT env, scope FROM DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
+	var org, env, tenantId string
+	error := db.QueryRow("SELECT org, env, scope FROM DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&org, &env, &tenantId)
 
 	switch {
 	case error == sql.ErrNoRows:
@@ -110,29 +114,32 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 
 	sSql := `
 		SELECT
-			ap.api_resources, 
-			ap.environments, 
+			ap.api_resources,
+			ap.environments,
 			c.issued_at,
 			c.status,
 			a.callback_url,
 			ad.email,
 			ad.id,
-			"developer" as ctype
+			"developer" as ctype,
+			COALESCE(ap.quota, '') as quota,
+			COALESCE(ap.quota_time_unit, '') as quotatimeunit,
+			COALESCE(ap.quota_interval, 0) as  quotainterval
 		FROM
-			APP_CREDENTIAL AS c 
+			APP_CREDENTIAL AS c
 			INNER JOIN APP AS a ON c.app_id = a.id
-			INNER JOIN DEVELOPER AS ad 
+			INNER JOIN DEVELOPER AS ad
 				ON ad.id = a.developer_id
-			INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp 
-				ON mp.appcred_id = c.id 
+			INNER JOIN APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
+				ON mp.appcred_id = c.id
 			INNER JOIN API_PRODUCT as ap ON ap.id = mp.apiprdt_id
-		WHERE (UPPER(ad.status) = 'ACTIVE' 
-			AND mp.apiprdt_id = ap.id 
+		WHERE (UPPER(ad.status) = 'ACTIVE'
+			AND mp.apiprdt_id = ap.id
 			AND mp.app_id = a.id
-			AND mp.appcred_id = c.id 
-			AND UPPER(mp.status) = 'APPROVED' 
+			AND mp.appcred_id = c.id
+			AND UPPER(mp.status) = 'APPROVED'
 			AND UPPER(a.status) = 'APPROVED'
-			AND c.id = $1 
+			AND c.id = $1
 			AND c.tenant_id = $2)
 		UNION ALL
 		SELECT
@@ -143,7 +150,10 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			a.callback_url,
 			ad.name,
 			ad.id,
-			"company" as ctype
+			"company" as ctype,
+			COALESCE(ap.quota, '') as quota,
+			COALESCE(ap.quota_time_unit, '') as quotatimeunit,
+			COALESCE(ap.quota_interval, 0) as  quotainterval
 		FROM
 			APP_CREDENTIAL AS c
 			INNER JOIN APP AS a ON c.app_id = a.id
@@ -162,10 +172,12 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			AND c.tenant_id = $2)
 	;`
 
-	var status, redirectionURIs, appName, appId, resName, resEnv, cType string
+	var status, redirectionURIs, appName, appId, resName, resEnv, cType, quota, quotaTimeUnit string
 	var issuedAt int64
+	var quotaInterval int
+
 	err := db.QueryRow(sSql, key, tenantId).Scan(&resName, &resEnv, &issuedAt, &status,
-		&redirectionURIs, &appName, &appId, &cType)
+		&redirectionURIs, &appName, &appId, &cType, &quota, &quotaTimeUnit, &quotaInterval)
 	switch {
 	case err == sql.ErrNoRows:
 		reason := "API Key verify failed for (" + key + ", " + scopeuuid + ", " + path + ")"
@@ -202,6 +214,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 	resp := kmsResponseSuccess{
 		Type: "APIKeyContext",
 		RspInfo: sucResponseDetail{
+			Org:             org,
 			Key:             key,
 			ExpiresAt:       expiresAt,
 			IssuedAt:        issuedAt,
@@ -209,7 +222,10 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			RedirectionURIs: redirectionURIs,
 			Type:            cType,
 			AppId:           appId,
-			AppName:         appName},
+			AppName:         appName,
+			Quota:           quota,
+			QuotaTimeUnit:   quotaTimeUnit,
+			QuotaInterval:   quotaInterval},
 	}
 	return json.Marshal(resp)
 }
