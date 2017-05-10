@@ -18,9 +18,9 @@ type sucResponseDetail struct {
 	RedirectionURIs string `json:"redirectionURIs"`
 	AppId           string `json:"appId"`
 	AppName         string `json:"appName"`
-	Quota           string `json:quota`
-	QuotaTimeUnit   string `json:quotaTimeUnit`
-	QuotaInterval   int    `json:quotaInterval`
+	Quota           string `json:"quota,omitempty"`
+	QuotaTimeUnit   string `json:"quotaTimeUnit,omitempty"`
+	QuotaInterval   int    `json:"quotaInterval,omitempty"`
 }
 
 type errResultDetail struct {
@@ -122,9 +122,9 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			ad.email,
 			ad.id,
 			"developer" as ctype,
-			COALESCE(ap.quota, '') as quota,
-			COALESCE(ap.quota_time_unit, '') as quotatimeunit,
-			COALESCE(ap.quota_interval, 0) as  quotainterval
+			ap.quota,
+			ap.quota_time_unit,
+			ap.quota_interval
 		FROM
 			APP_CREDENTIAL AS c
 			INNER JOIN APP AS a ON c.app_id = a.id
@@ -151,9 +151,9 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 			ad.name,
 			ad.id,
 			"company" as ctype,
-			COALESCE(ap.quota, '') as quota,
-			COALESCE(ap.quota_time_unit, '') as quotatimeunit,
-			COALESCE(ap.quota_interval, 0) as  quotainterval
+			ap.quota,
+			ap.quota_time_unit,
+			ap.quota_interval
 		FROM
 			APP_CREDENTIAL AS c
 			INNER JOIN APP AS a ON c.app_id = a.id
