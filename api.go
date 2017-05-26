@@ -11,7 +11,7 @@ import (
 type sucResponseDetail struct {
 	Key             string `json:"key"`
 	ExpiresAt       int64  `json:"expiresAt"`
-	IssuedAt        string  `json:"issuedAt"`
+	IssuedAt        string `json:"issuedAt"`
 	Status          string `json:"status"`
 	Type            string `json:"cType"`
 	RedirectionURIs string `json:"redirectionURIs"`
@@ -97,6 +97,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 
 	switch {
 	case error == sql.ErrNoRows:
+		log.Debug("verifyAPIKey: sql.ErrNoRows")
 		reason := "ENV Validation Failed"
 		errorCode := "ENV_VALIDATION_FAILED"
 		return errorResponse(reason, errorCode)

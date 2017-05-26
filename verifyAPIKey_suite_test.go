@@ -74,7 +74,7 @@ func createTestData(db apid.DB) {
 	// application
 	var j, k int
 	for i := 0; i < 10; i++ {
-		for j = k; j < 10 + k; j++ {
+		for j = k; j < 10+k; j++ {
 			generateTestApp(j, i, txn)
 		}
 		k = j
@@ -107,7 +107,7 @@ func createTestData(db apid.DB) {
 	// application
 	k = 100
 	for i := 100; i < 110; i++ {
-		for j = k; j < 100 + k; j++ {
+		for j = k; j < 100+k; j++ {
 			generateTestAppCompany(j, i, txn)
 		}
 		k = j
@@ -123,6 +123,6 @@ func createTestData(db apid.DB) {
 
 	txn.Commit()
 	var count int64
-	db.QueryRow("select count(*) from data_scope").Scan(&count)
+	db.QueryRow("select count(*) from EDGEX_DATA_SCOPE").Scan(&count)
 	log.Info("Found ", count)
 }

@@ -38,7 +38,7 @@ var _ = Describe("listener", func() {
 
 func addScopes(db apid.DB) {
 	txn, _ := db.Begin()
-	txn.Exec("INSERT INTO DATA_SCOPE (id, _change_selector, apid_cluster_id, scope, org, env) "+
+	txn.Exec("INSERT INTO EDGEX_DATA_SCOPE (id, _change_selector, apid_cluster_id, scope, org, env) "+
 		"VALUES"+
 		"($1,$2,$3,$4,$5,$6)",
 		"ABCDE",
@@ -48,7 +48,7 @@ func addScopes(db apid.DB) {
 		"test_org0",
 		"Env_0",
 	)
-	txn.Exec("INSERT INTO DATA_SCOPE (id, _change_selector, apid_cluster_id, scope, org, env) "+
+	txn.Exec("INSERT INTO EDGEX_DATA_SCOPE (id, _change_selector, apid_cluster_id, scope, org, env) "+
 		"VALUES"+
 		"($1,$2,$3,$4,$5,$6)",
 		"XYZ",
@@ -58,6 +58,6 @@ func addScopes(db apid.DB) {
 		"test_org0",
 		"Env_0",
 	)
-	log.Info("Inserted DATA_SCOPE for test")
+	log.Info("Inserted EDGEX_DATA_SCOPE for test")
 	txn.Commit()
 }
