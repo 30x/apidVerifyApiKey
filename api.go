@@ -97,7 +97,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 
 	switch {
 	case error == sql.ErrNoRows:
-		log.Debug("verifyAPIKey: sql.ErrNoRows")
+		log.Error("verifyAPIKey: sql.ErrNoRows")
 		reason := "ENV Validation Failed"
 		errorCode := "ENV_VALIDATION_FAILED"
 		return errorResponse(reason, errorCode)

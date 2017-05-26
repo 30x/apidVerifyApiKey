@@ -2,6 +2,7 @@ package apidVerifyApiKey
 
 import (
 	"encoding/json"
+	"github.com/30x/apid-core"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
@@ -98,5 +99,55 @@ var _ = Describe("api", func() {
 			Expect(respj.Type).Should(Equal("ErrorResult"))
 			Expect(respj.ErrInfo.ErrorCode).Should(Equal("REQ_ENTRY_NOT_FOUND"))
 		})
+
+		It("should report error for no scopes", func() {
+			v := url.Values{
+				"key":       []string{"credential_x"},
+				"uriPath":   []string{"/test"},
+				"scopeuuid": []string{"ABCDE"},
+				"action":    []string{"verify"},
+			}
+
+			clearDataScopeTable(getDB())
+			rsp, err := verifyAPIKey(v)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			var respj kmsResponseFail
+			json.Unmarshal(rsp, &respj)
+			Expect(respj.Type).Should(Equal("ErrorResult"))
+			Expect(respj.ErrInfo.ErrorCode).Should(Equal("ENV_VALIDATION_FAILED"))
+
+		})
+
+		It("should report error for invalid requests", func() {
+			v := url.Values{
+				"key":       []string{"credential_x"},
+				"uriPath":   []string{"/test"},
+				"scopeuuid": []string{"ABCDE"},
+				"action":    []string{"verify"},
+			}
+
+			fields := []string{"key", "uriPath", "scopeuuid", "action"}
+			for _, field := range fields {
+				tmp := v.Get(field)
+				v.Del(field)
+
+				rsp, err := verifyAPIKey(v)
+				Expect(err).ShouldNot(HaveOccurred())
+				var respj kmsResponseFail
+				json.Unmarshal(rsp, &respj)
+				Expect(respj.Type).Should(Equal("ErrorResult"))
+				Expect(respj.ErrInfo.ErrorCode).Should(Equal("INCORRECT_USER_INPUT"))
+
+				v.Set(field, tmp)
+			}
+		})
 	})
 })
+
+func clearDataScopeTable(db apid.DB) {
+	txn, _ := db.Begin()
+	txn.Exec("DELETE FROM EDGEX_DATA_SCOPE")
+	log.Info("clear EDGEX_DATA_SCOPE for test")
+	txn.Commit()
+}
