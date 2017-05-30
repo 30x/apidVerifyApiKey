@@ -2,7 +2,7 @@ package apidVerifyApiKey
 
 import (
 	"encoding/json"
-	"github.com/apigee-labs/transicator/common"
+	"github.com/30x/apid-core"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
@@ -15,98 +15,6 @@ import (
 var _ = Describe("api", func() {
 
 	Context("DB Inserts/Deletes verification", func() {
-
-		It("Positive DB test for Insert operations", func() {
-			db := getDB()
-			txn, err := db.Begin()
-			Expect(err).ShouldNot(HaveOccurred())
-			// api products
-			for i := 0; i < 10; i++ {
-				row := generateTestApiProduct(i)
-				res := insertAPIproducts([]common.Row{row}, txn)
-				Expect(res).Should(BeTrue())
-			}
-			// developers
-			for i := 0; i < 10; i++ {
-				row := generateTestDeveloper(i)
-				res := insertDevelopers([]common.Row{row}, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			// application
-			var j, k int
-			for i := 0; i < 10; i++ {
-				for j = k; j < 10+k; j++ {
-					row := generateTestApp(j, i)
-					res := insertApplications([]common.Row{row}, txn)
-					Expect(res).Should(BeTrue())
-				}
-				k = j
-			}
-			// app credentials
-			for i := 0; i < 10; i++ {
-				row := generateTestAppCreds(i)
-				res := insertCredentials([]common.Row{row}, txn)
-				Expect(res).Should(BeTrue())
-			}
-			// api product mapper
-			for i := 0; i < 10; i++ {
-				row := generateTestApiProductMapper(i)
-				res := insertAPIProductMappers([]common.Row{row}, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			// Following are data for company
-			// api products
-			for i := 100; i < 110; i++ {
-				row := generateTestApiProduct(i)
-				res := insertAPIproducts([]common.Row{row}, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			// companies
-			for i := 100; i < 110; i++ {
-				row := generateTestCompany(i)
-				res := insertCompanies([]common.Row{row}, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			// company developers
-			for i := 100; i < 110; i++ {
-				row := generateTestCompanyDeveloper(i)
-				res := insertCompanyDevelopers([]common.Row{row}, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			// application
-			k = 100
-			for i := 100; i < 110; i++ {
-				for j = k; j < 100+k; j++ {
-					row := generateTestAppCompany(j, i)
-					res := insertApplications([]common.Row{row}, txn)
-					Expect(res).Should(BeTrue())
-				}
-				k = j
-			}
-			// app credentials
-			for i := 100; i < 110; i++ {
-				row := generateTestAppCreds(i)
-				res := insertCredentials([]common.Row{row}, txn)
-				Expect(res).Should(BeTrue())
-			}
-			// api product mapper
-			for i := 100; i < 110; i++ {
-				row := generateTestApiProductMapper(i)
-				res := insertAPIProductMappers([]common.Row{row}, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			txn.Commit()
-			var count int64
-			db.QueryRow("select count(*) from data_scope").Scan(&count)
-			log.Info("Found ", count)
-
-		})
 
 		It("should reject a bad key", func() {
 			v := url.Values{
@@ -165,109 +73,6 @@ var _ = Describe("api", func() {
 			}
 		})
 
-		It("Positive DB test for Delete operations", func() {
-			db := getDB()
-			txn, err := db.Begin()
-			Expect(err).ShouldNot(HaveOccurred())
-
-			for i := 0; i < 10; i++ {
-				row := generateTestApiProductMapper(i)
-				res := deleteAPIproductMapper(row, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			for i := 0; i < 10; i++ {
-				row := generateTestAppCreds(i)
-				res := deleteObject("APP_CREDENTIAL", row, txn)
-				Expect(res).Should(BeTrue())
-			}
-			for i := 0; i < 100; i++ {
-				row := generateTestApp(i, 999) //TODO we use j in above insertions
-				res := deleteObject("APP", row, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			for i := 0; i < 10; i++ {
-				row := generateTestDeveloper(i)
-				res := deleteObject("DEVELOPER", row, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			for i := 0; i < 10; i++ {
-				row := generateTestApiProduct(i)
-				res := deleteObject("API_PRODUCT", row, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			for i := 100; i < 110; i++ {
-				row := generateTestCompanyDeveloper(i)
-				res := deleteCompanyDeveloper(row, txn)
-				Expect(res).Should(BeTrue())
-			}
-
-			txn.Commit()
-		})
-
-		It("Negative cases for DB Deletes on KMS tables", func() {
-			db := getDB()
-			txn, err := db.Begin()
-			Expect(err).ShouldNot(HaveOccurred())
-
-			row := generateTestApiProductMapper(999)
-
-			res := deleteAPIproductMapper(row, txn)
-			Expect(res).Should(BeFalse())
-
-			res = deleteObject("API_PRODUCT", row, txn)
-			Expect(res).Should(BeFalse())
-
-			res = deleteObject("APP_CREDENTIAL", row, txn)
-			Expect(res).Should(BeFalse())
-
-			res = deleteObject("DEVELOPER", row, txn)
-			Expect(res).Should(BeFalse())
-
-			res = deleteObject("APP", row, txn)
-			Expect(res).Should(BeFalse())
-
-			res = deleteObject("COMPANY", row, txn)
-			Expect(res).Should(BeFalse())
-
-			res = deleteCompanyDeveloper(row, txn)
-			Expect(res).Should(BeFalse())
-
-			txn.Rollback()
-
-		})
-
-		It("Negative cases for DB Inserts/updates on KMS tables", func() {
-
-			db := getDB()
-			txn, err := db.Begin()
-			Expect(err).ShouldNot(HaveOccurred())
-
-			row := generateTestApiProduct(999)
-			row["id"] = nil
-			res := insertAPIproducts([]common.Row{row}, txn)
-			Expect(res).Should(BeFalse())
-
-			res = insertApplications([]common.Row{row}, txn)
-			Expect(res).Should(BeFalse())
-
-			res = insertCredentials([]common.Row{row}, txn)
-			Expect(res).Should(BeFalse())
-
-			res = insertAPIProductMappers([]common.Row{row}, txn)
-			Expect(res).Should(BeFalse())
-
-			res = insertCompanies([]common.Row{row}, txn)
-			Expect(res).Should(BeFalse())
-
-			res = insertCompanyDevelopers([]common.Row{row}, txn)
-			Expect(res).Should(BeFalse())
-
-		})
-
 		It("should reject a bad key", func() {
 
 			uri, err := url.Parse(testServer.URL)
@@ -294,5 +99,55 @@ var _ = Describe("api", func() {
 			Expect(respj.Type).Should(Equal("ErrorResult"))
 			Expect(respj.ErrInfo.ErrorCode).Should(Equal("REQ_ENTRY_NOT_FOUND"))
 		})
+
+		It("should report error for no scopes", func() {
+			v := url.Values{
+				"key":       []string{"credential_x"},
+				"uriPath":   []string{"/test"},
+				"scopeuuid": []string{"ABCDE"},
+				"action":    []string{"verify"},
+			}
+
+			clearDataScopeTable(getDB())
+			rsp, err := verifyAPIKey(v)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			var respj kmsResponseFail
+			json.Unmarshal(rsp, &respj)
+			Expect(respj.Type).Should(Equal("ErrorResult"))
+			Expect(respj.ErrInfo.ErrorCode).Should(Equal("ENV_VALIDATION_FAILED"))
+
+		})
+
+		It("should report error for invalid requests", func() {
+			v := url.Values{
+				"key":       []string{"credential_x"},
+				"uriPath":   []string{"/test"},
+				"scopeuuid": []string{"ABCDE"},
+				"action":    []string{"verify"},
+			}
+
+			fields := []string{"key", "uriPath", "scopeuuid", "action"}
+			for _, field := range fields {
+				tmp := v.Get(field)
+				v.Del(field)
+
+				rsp, err := verifyAPIKey(v)
+				Expect(err).ShouldNot(HaveOccurred())
+				var respj kmsResponseFail
+				json.Unmarshal(rsp, &respj)
+				Expect(respj.Type).Should(Equal("ErrorResult"))
+				Expect(respj.ErrInfo.ErrorCode).Should(Equal("INCORRECT_USER_INPUT"))
+
+				v.Set(field, tmp)
+			}
+		})
 	})
 })
+
+func clearDataScopeTable(db apid.DB) {
+	txn, _ := db.Begin()
+	txn.Exec("DELETE FROM EDGEX_DATA_SCOPE")
+	log.Info("clear EDGEX_DATA_SCOPE for test")
+	txn.Commit()
+}
