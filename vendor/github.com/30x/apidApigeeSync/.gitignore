@@ -1,0 +1,8 @@
+profile.out
+cover.html
+coverage.txt
+vendor
+*.iml
+.idea
+*.lock
+cmd/mockServer/mockServer
