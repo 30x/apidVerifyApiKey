@@ -4,3 +4,4 @@ coverage.txt
 .idea
 *.lock
 *.iml
+vendor/
