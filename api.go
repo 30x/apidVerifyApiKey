@@ -107,16 +107,18 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 
 	// DANGER: This relies on an external TABLE - EDGEX_DATA_SCOPE is maintained by apidApigeeSync
 	var env, tenantId string
-	error := db.QueryRow("SELECT env, scope FROM EDGEX_DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
+	err := db.QueryRow("SELECT env, scope FROM EDGEX_DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
 
-	switch {
-	case error == sql.ErrNoRows:
+	switch err {
+	case sql.ErrNoRows:
 		log.Error("verifyAPIKey: sql.ErrNoRows")
 		reason := "ENV Validation Failed"
 		errorCode := "ENV_VALIDATION_FAILED"
 		return errorResponse(reason, errorCode)
-	case error != nil:
-		reason := error.Error()
+	case nil:
+
+	default:
+		reason := err.Error()
 		errorCode := "SEARCH_INTERNAL_ERROR"
 		return errorResponse(reason, errorCode)
 	}
@@ -182,7 +184,7 @@ func verifyAPIKey(f url.Values) ([]byte, error) {
 	   sqlite snapshots, we are not necessarily guaranteed that
 	*/
 	var status, redirectionURIs, appName, appId, resName, resEnv, issuedAt, cType sql.NullString
-	err := db.QueryRow(sSql, key, tenantId).Scan(&resName, &resEnv, &issuedAt, &status,
+	err = db.QueryRow(sSql, key, tenantId).Scan(&resName, &resEnv, &issuedAt, &status,
 		&redirectionURIs, &appName, &appId, &cType)
 	switch {
 	case err == sql.ErrNoRows:
