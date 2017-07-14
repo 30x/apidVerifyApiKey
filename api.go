@@ -48,6 +48,84 @@ type kmsResponseFail struct {
 	Type    string          `json:"type"`
 }
 
+type Attribute struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+	kind  string `json:"kind"`
+}
+
+type ClientIdDetails struct {
+	ClientId     string      `json:"clientId"`
+	ClientSecret string      `json:"clientSecret"`
+	RedirectUris []string    `json:"redirectUris"`
+	Status       string      `json:"status"`
+	Attributes   []Attribute `json:"attributes"`
+}
+
+type DeveloperDetails struct {
+	Id             string      `json:"id"`
+	UserName       string      `json:"userName"`
+	FirstName      string      `json:"firstName"`
+	LastName       string      `json:"lastName"`
+	Email          string      `json:"email"`
+	Status         string      `json:"status"`
+	Apps           []string    `json:"apps"`
+	CreatedAt      int         `json:"createdAt"`
+	CreatedBy      string      `json:"createdBy"`
+	LastModifiedAt int         `json:"lastModifiedAt"`
+	LastModifiedBy string      `json:"lastModifiedBy"`
+	Company        string      `json:"company"`
+	Attributes     []Attribute `json:"attributes"`
+}
+
+type CompanyDetails struct {
+	Id             string      `json:"id"`
+	Name           string      `json:"name"`
+	DisplayName    string      `json:"displayName"`
+	Status         string      `json:"status"`
+	Apps           []string    `json:"apps"`
+	CreatedAt      int         `json:"createdAt"`
+	CreatedBy      string      `json:"createdBy"`
+	LastModifiedAt int         `json:"lastModifiedAt"`
+	LastModifiedBy string      `json:"lastModifiedBy"`
+	Attributes     []Attribute `json:"attributes"`
+}
+
+type AppDetails struct {
+	Id             string      `json:"id"`
+	Name           string      `json:"name"`
+	AccessType     string      `json:"accessType"`
+	CallbackUrl    string      `json:"callbackUrl"`
+	DisplayName    string      `json:"displayName"`
+	Status         string      `json:"status"`
+	ApiProducts    []string    `json:"apiProducts"`
+	AppFamily      string      `json:"appFamily"`
+	CreatedAt      int         `json:"createdAt"`
+	CreatedBy      string      `json:"createdBy"`
+	LastModifiedAt int         `json:"lastModifiedAt"`
+	LastModifiedBy string      `json:"lastModifiedBy"`
+	Company        string      `json:"company"`
+	Attributes     []Attribute `json:"attributes"`
+}
+
+type ApiProductDetails struct {
+	Id             string      `json:"id"`
+	Name           string      `json:"name"`
+	DisplayName    string      `json:"displayName"`
+	QuotaLimit     int         `json:"quotaLimit"`
+	QuotaInterval  int         `json:"quotaInterval"`
+	QuotaTimeUnit  int         `json:"quotaTimeUnit"`
+	Status         string      `json:"status"`
+	CreatedAt      int         `json:"createdAt"`
+	CreatedBy      string      `json:"createdBy"`
+	LastModifiedAt int         `json:"lastModifiedAt"`
+	LastModifiedBy string      `json:"lastModifiedBy"`
+	Company        string      `json:"company"`
+	Environments   []string    `json:"environments"`
+	ApiProxies     []string    `json:"apiProxies"`
+	Attributes     []Attribute `json:"attributes"`
+}
+
 // handle client API
 func handleRequest(w http.ResponseWriter, r *http.Request) {
 
@@ -66,9 +144,10 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	f := r.Form
-	elems := []string{"action", "key", "uriPath", "scopeuuid"}
+	elems := []string{"action", "key", "uriPath", "organizationName", "environmentName", "apiProxyName"}
 	for _, elem := range elems {
-		if f.Get(elem) == "" {
+		if _, ok := f[elem]; !ok {
+			log.Debug("Input params Incomplete: " + elem)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(fmt.Sprintf("Missing element: %s", elem)))
 			return
@@ -91,14 +170,16 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 // returns []byte to be written to client
 func verifyAPIKey(f url.Values) ([]byte, error) {
 
-	key := f.Get("key")
-	scopeuuid := f.Get("scopeuuid")
-	path := f.Get("uriPath")
 	action := f.Get("action")
+	key := f.Get("key")
+	path := f.Get("uriPath")
+	organizationName := f.Get("organizationName")
+	environmentName := f.Get("environmentName")
+	apiProxyName := f.Get("apiProxyName")
+	validateAgainstApiProxiesAndEnvs := f.Get("validateAgainstApiProxiesAndEnvs")
+	if action != "verify" {
 
-	if key == "" || scopeuuid == "" || path == "" || action != "verify" {
-		log.Debug("Input params Invalid/Incomplete")
-		reason := "Input Params Incomplete or Invalid"
+		reason := "action must be 'verify'"
 		errorCode := "INCORRECT_USER_INPUT"
 		return errorResponse(reason, errorCode)
 	}
