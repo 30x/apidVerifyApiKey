@@ -15,8 +15,10 @@
 package apidVerifyApiKey
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 /*
@@ -25,11 +27,8 @@ import (
  * "**" gets de-normalized as ".*" and "*" as everything till
  * the next "/".
  */
-func validatePath(basePath, requestBase string) bool {
+func validatePath(fs []string, requestBase string) bool {
 
-	s := strings.TrimPrefix(basePath, "{")
-	s = strings.TrimSuffix(s, "}")
-	fs := strings.Split(s, ",")
 	for _, a := range fs {
 		str1 := strings.Replace(a, "**", "(.*)", -1)
 		str2 := strings.Replace(a, "*", "([^/]+)", -1)
@@ -54,5 +53,28 @@ func validatePath(basePath, requestBase string) bool {
 		 */
 	}
 	/* if the i/p resource is empty, no checks need to be made */
-	return s == ""
+	return len(fs) == 0
+}
+
+func jsonToStringArray(fjson string) []string {
+	var array []string
+	if err := json.Unmarshal([]byte(fjson), &array); err == nil {
+		return array
+	}
+	s := strings.TrimPrefix(fjson, "{")
+	s = strings.TrimSuffix(s, "}")
+	if utf8.RuneCountInString(s) > 0 {
+		array = strings.Split(s, ",")
+	}
+	log.Debug("unmarshall error for string, performing custom unmarshal ", fjson, " and result is : ", array)
+	return array
+}
+
+func contains(givenArray []string, searchString string) bool {
+	for _, element := range givenArray {
+		if element == searchString {
+			return true
+		}
+	}
+	return false
 }

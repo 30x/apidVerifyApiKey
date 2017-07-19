@@ -19,31 +19,35 @@ import (
 	"github.com/apigee-labs/transicator/common"
 )
 
-type handler struct {
+const (
+	APIGEE_SYNC_EVENT = "ApigeeSync"
+)
+
+type apigeeSyncHandler struct {
+	dbMan  dbManagerInterface
+	apiMan apiManager
 }
 
-func (h *handler) String() string {
+func (h *apigeeSyncHandler) initListener(services apid.Services) {
+	services.Events().Listen(APIGEE_SYNC_EVENT, h)
+}
+
+func (h *apigeeSyncHandler) String() string {
 	return "verifyAPIKey"
 }
 
-func (h *handler) Handle(e apid.Event) {
-
-	snapData, ok := e.(*common.Snapshot)
-	if ok {
-		processSnapshot(snapData)
-	}
-	return
+func (h *apigeeSyncHandler) processSnapshot(snapshot *common.Snapshot) {
+	log.Debugf("Snapshot received. Switching to DB version: %s", snapshot.SnapshotInfo)
+	h.dbMan.setDbVersion(snapshot.SnapshotInfo)
+	h.apiMan.InitAPI()
+	log.Debug("Snapshot processed")
 }
 
-func processSnapshot(snapshot *common.Snapshot) {
+func (h *apigeeSyncHandler) Handle(e apid.Event) {
 
-	log.Debugf("Snapshot received. Switching to DB version: %s", snapshot.SnapshotInfo)
-
-	db, err := data.DBVersion(snapshot.SnapshotInfo)
-	if err != nil {
-		log.Panicf("Unable to access database: %v", err)
+	if snapData, ok := e.(*common.Snapshot); ok {
+		h.processSnapshot(snapData)
+	} else {
+		log.Debugf("Received event. No action required for verifyApiKey plugin. Ignoring. %v", e)
 	}
-
-	setDB(db)
-	return
 }

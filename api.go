@@ -15,236 +15,285 @@
 package apidVerifyApiKey
 
 import (
-	"database/sql"
 	"encoding/json"
-	"fmt"
+	"errors"
+	"io"
+	"io/ioutil"
 	"net/http"
-	"net/url"
+	"strings"
 )
 
-type sucResponseDetail struct {
-	Key             string `json:"key"`
-	ExpiresAt       int64  `json:"expiresAt"`
-	IssuedAt        string `json:"issuedAt"`
-	Status          string `json:"status"`
-	Type            string `json:"cType"`
-	RedirectionURIs string `json:"redirectionURIs"`
-	AppId           string `json:"appId"`
-	AppName         string `json:"appName"`
+type apiManagerInterface interface {
+	InitAPI()
+	handleRequest(w http.ResponseWriter, r *http.Request)
+	verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) (*VerifyApiKeySuccessResponse, *ErrorResponse)
 }
 
-type errResultDetail struct {
-	ErrorCode string `json:"errorCode"`
-	Reason    string `json:"reason"`
+type apiManager struct {
+	dbMan             dbManagerInterface
+	verifiersEndpoint string
+	apiInitialized    bool
 }
 
-type kmsResponseSuccess struct {
-	RspInfo sucResponseDetail `json:"result"`
-	Type    string            `json:"type"`
-}
-
-type kmsResponseFail struct {
-	ErrInfo errResultDetail `json:"result"`
-	Type    string          `json:"type"`
+func (a *apiManager) InitAPI() {
+	if a.apiInitialized {
+		return
+	}
+	services.API().HandleFunc(a.verifiersEndpoint, a.handleRequest).Methods("POST")
+	a.apiInitialized = true
+	log.Debug("API endpoints initialized")
 }
 
 // handle client API
-func handleRequest(w http.ResponseWriter, r *http.Request) {
-
-	db := getDB()
-	if db == nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte("initializing"))
-		return
-	}
-
-	err := r.ParseForm()
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Unable to parse form"))
-		return
-	}
-
-	f := r.Form
-	elems := []string{"action", "key", "uriPath", "scopeuuid"}
-	for _, elem := range elems {
-		if f.Get(elem) == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(fmt.Sprintf("Missing element: %s", elem)))
-			return
-		}
-	}
+func (a *apiManager) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
-	b, err := verifyAPIKey(f)
-	if err != nil {
-		log.Errorf("error: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
 
-	log.Debugf("handleVerifyAPIKey result %s", b)
-	w.Write(b)
+	var returnValue interface{}
+
+	if verifyApiKeyReq, err := validateRequest(r.Body, w); err == nil {
+		verifyApiKeyResponse, errorResponse := a.verifyAPIKey(verifyApiKeyReq)
+
+		if errorResponse != nil {
+			setResponseHeader(errorResponse, w)
+			returnValue = errorResponse
+		} else {
+			returnValue = verifyApiKeyResponse
+		}
+		b, _ := json.Marshal(returnValue)
+		log.Debugf("handleVerifyAPIKey result %s", b)
+		w.Write(b)
+	}
+}
+
+func setResponseHeader(errorResponse *ErrorResponse, w http.ResponseWriter) {
+	if errorResponse.StatusCode != 0 {
+		w.WriteHeader(errorResponse.StatusCode)
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func validateRequest(requestBody io.ReadCloser, w http.ResponseWriter) (VerifyApiKeyRequest, error) {
+	// 1. read request boby
+	var verifyApiKeyReq VerifyApiKeyRequest
+	body, err := ioutil.ReadAll(requestBody)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		return verifyApiKeyReq, errors.New("Bad_REQUEST")
+	}
+	log.Debug(string(body))
+	// 2. umarshall json to struct
+	err = json.Unmarshal(body, &verifyApiKeyReq)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		return verifyApiKeyReq, errors.New("Bad_REQUEST")
+	}
+	log.Debug(verifyApiKeyReq)
+
+	// 2. verify params
+	if isValid, err := verifyApiKeyReq.validate(); !isValid {
+		errorResponse, _ := json.Marshal(errorResponse("Bad_REQUEST", err.Error(), http.StatusBadRequest))
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(errorResponse)
+		return verifyApiKeyReq, errors.New("Bad_REQUEST")
+	}
+	return verifyApiKeyReq, nil
 }
 
 // returns []byte to be written to client
-func verifyAPIKey(f url.Values) ([]byte, error) {
+func (apiM apiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) (*VerifyApiKeySuccessResponse, *ErrorResponse) {
 
-	key := f.Get("key")
-	scopeuuid := f.Get("scopeuuid")
-	path := f.Get("uriPath")
-	action := f.Get("action")
-
-	if key == "" || scopeuuid == "" || path == "" || action != "verify" {
-		log.Debug("Input params Invalid/Incomplete")
-		reason := "Input Params Incomplete or Invalid"
-		errorCode := "INCORRECT_USER_INPUT"
-		return errorResponse(reason, errorCode)
+	dataWrapper := VerifyApiKeyRequestResponseDataWrapper{
+		verifyApiKeyRequest: verifyApiKeyReq,
 	}
+	dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId = verifyApiKeyReq.Key
+	dataWrapper.verifyApiKeySuccessResponse.Environment = verifyApiKeyReq.EnvironmentName
 
-	db := getDB()
+	err := apiM.dbMan.getApiKeyDetails(&dataWrapper)
 
-	// DANGER: This relies on an external TABLE - EDGEX_DATA_SCOPE is maintained by apidApigeeSync
-	var env, tenantId string
-	err := db.QueryRow("SELECT env, scope FROM EDGEX_DATA_SCOPE WHERE id = ?;", scopeuuid).Scan(&env, &tenantId)
-
-	switch err {
-	case sql.ErrNoRows:
-		log.Error("verifyAPIKey: sql.ErrNoRows")
-		reason := "ENV Validation Failed"
-		errorCode := "ENV_VALIDATION_FAILED"
-		return errorResponse(reason, errorCode)
-	case nil:
-
-	default:
-		reason := err.Error()
-		errorCode := "SEARCH_INTERNAL_ERROR"
-		return errorResponse(reason, errorCode)
-	}
-
-	log.Debug("Found tenant_id='", tenantId, "' with env='", env, "' for scopeuuid='", scopeuuid, "'")
-
-	sSql := `
-		SELECT
-			ap.api_resources, 
-			ap.environments, 
-			c.issued_at,
-			c.status,
-			a.callback_url,
-			ad.email,
-			ad.id,
-			"developer" as ctype
-		FROM
-			KMS_APP_CREDENTIAL AS c
-			INNER JOIN KMS_APP AS a ON c.app_id = a.id
-			INNER JOIN KMS_DEVELOPER AS ad
-				ON ad.id = a.developer_id
-			INNER JOIN KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
-				ON mp.appcred_id = c.id 
-			INNER JOIN KMS_API_PRODUCT as ap ON ap.id = mp.apiprdt_id
-		WHERE (UPPER(ad.status) = 'ACTIVE' 
-			AND mp.apiprdt_id = ap.id 
-			AND mp.app_id = a.id
-			AND mp.appcred_id = c.id 
-			AND UPPER(mp.status) = 'APPROVED' 
-			AND UPPER(a.status) = 'APPROVED'
-			AND c.id = $1 
-			AND c.tenant_id = $2)
-		UNION ALL
-		SELECT
-			ap.api_resources,
-			ap.environments,
-			c.issued_at,
-			c.status,
-			a.callback_url,
-			ad.name,
-			ad.id,
-			"company" as ctype
-		FROM
-			KMS_APP_CREDENTIAL AS c
-			INNER JOIN KMS_APP AS a ON c.app_id = a.id
-			INNER JOIN KMS_COMPANY AS ad
-				ON ad.id = a.company_id
-			INNER JOIN KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
-				ON mp.appcred_id = c.id
-			INNER JOIN KMS_API_PRODUCT as ap ON ap.id = mp.apiprdt_id
-		WHERE (UPPER(ad.status) = 'ACTIVE'
-			AND mp.apiprdt_id = ap.id
-			AND mp.app_id = a.id
-			AND mp.appcred_id = c.id
-			AND UPPER(mp.status) = 'APPROVED'
-			AND UPPER(a.status) = 'APPROVED'
-			AND c.id = $1
-			AND c.tenant_id = $2)
-	;`
-
-	/* these fields need to be nullable types for scanning.  This is because when using json snapshots,
-	   and therefore being responsible for inserts, we were able to default everything to be not null.  With
-	   sqlite snapshots, we are not necessarily guaranteed that
-	*/
-	var status, redirectionURIs, appName, appId, resName, resEnv, issuedAt, cType sql.NullString
-	err = db.QueryRow(sSql, key, tenantId).Scan(&resName, &resEnv, &issuedAt, &status,
-		&redirectionURIs, &appName, &appId, &cType)
 	switch {
-	case err == sql.ErrNoRows:
-		reason := "API Key verify failed for (" + key + ", " + scopeuuid + ", " + path + ")"
-		errorCode := "REQ_ENTRY_NOT_FOUND"
-		return errorResponse(reason, errorCode)
+	case err != nil && err.Error() == "InvalidApiKey":
+		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
+		errorCode := "oauth.v2.InvalidApiKey"
+		errResponse := errorResponse(reason, errorCode, http.StatusOK)
+		return nil, &errResponse
 
 	case err != nil:
 		reason := err.Error()
 		errorCode := "SEARCH_INTERNAL_ERROR"
-		return errorResponse(reason, errorCode)
+		errResponse := errorResponse(reason, errorCode, http.StatusInternalServerError)
+		return nil, &errResponse
 	}
 
+	dataWrapper.verifyApiKeySuccessResponse.ApiProduct = shortListApiProduct(dataWrapper.apiProducts, verifyApiKeyReq)
 	/*
-	 * Perform all validations related to the Query made with the data
-	 * we just retrieved
+	 * Perform all validations
 	 */
-	result := validatePath(resName.String, path)
-	if result == false {
-		reason := "Path Validation Failed (" + resName.String + " vs " + path + ")"
-		errorCode := "PATH_VALIDATION_FAILED"
-		return errorResponse(reason, errorCode)
-
+	errResponse := apiM.performValidations(dataWrapper)
+	if errResponse != nil {
+		return nil, errResponse
 	}
 
-	/* Verify if the ENV matches */
-	result = validateEnv(resEnv.String, env)
-	if result == false {
-		reason := "ENV Validation Failed (" + resEnv.String + " vs " + env + ")"
-		errorCode := "ENV_VALIDATION_FAILED"
-		return errorResponse(reason, errorCode)
-	}
+	apiM.enrichAttributes(&dataWrapper)
 
-	var expiresAt int64 = -1
-	resp := kmsResponseSuccess{
-		Type: "APIKeyContext",
-		RspInfo: sucResponseDetail{
-			Key:             key,
-			ExpiresAt:       expiresAt,
-			IssuedAt:        issuedAt.String,
-			Status:          status.String,
-			RedirectionURIs: redirectionURIs.String,
-			Type:            cType.String,
-			AppId:           appId.String,
-			AppName:         appName.String},
-	}
-	return json.Marshal(resp)
+	setDevOrCompanyInResponseBasedOnCtype(dataWrapper.ctype, dataWrapper.tempDeveloperDetails, &dataWrapper.verifyApiKeySuccessResponse)
+
+	return &dataWrapper.verifyApiKeySuccessResponse, nil
 }
 
-func errorResponse(reason, errorCode string) ([]byte, error) {
+func setDevOrCompanyInResponseBasedOnCtype(ctype string, tempDeveloperDetails DeveloperDetails, response *VerifyApiKeySuccessResponse) {
+	if ctype == "developer" {
+		response.Developer = tempDeveloperDetails
+	} else {
+		response.Company = CompanyDetails{
+			Id:             tempDeveloperDetails.Id,
+			Name:           tempDeveloperDetails.FirstName,
+			DisplayName:    tempDeveloperDetails.UserName,
+			Status:         tempDeveloperDetails.Status,
+			CreatedAt:      tempDeveloperDetails.CreatedAt,
+			CreatedBy:      tempDeveloperDetails.CreatedBy,
+			LastmodifiedAt: tempDeveloperDetails.LastmodifiedAt,
+			LastmodifiedBy: tempDeveloperDetails.LastmodifiedBy,
+			Attributes:     tempDeveloperDetails.Attributes,
+		}
+	}
+}
+
+func shortListApiProduct(details []ApiProductDetails, verifyApiKeyReq VerifyApiKeyRequest) ApiProductDetails {
+	var bestMathcedProduct ApiProductDetails
+	rankedProducts := make(map[int][]ApiProductDetails)
+	rankedProducts[2] = []ApiProductDetails{}
+	rankedProducts[3] = []ApiProductDetails{}
+
+	for _, apiProd := range details {
+		if len(apiProd.Resources) == 0 || validatePath(apiProd.Resources, verifyApiKeyReq.UriPath) {
+			if len(apiProd.Apiproxies) == 0 || contains(apiProd.Apiproxies, verifyApiKeyReq.ApiProxyName) {
+				if len(apiProd.Environments) == 0 || contains(apiProd.Environments, verifyApiKeyReq.EnvironmentName) {
+					bestMathcedProduct = apiProd
+					return bestMathcedProduct
+					// set rank 1 or just return
+				} else {
+					// set rank to 2
+					rankedProducts[2] = append(rankedProducts[2], apiProd)
+				}
+			} else {
+				// set rank to 3,
+				rankedProducts[3] = append(rankedProducts[3], apiProd)
+			}
+		}
+	}
+
+	if len(rankedProducts[2]) > 0 {
+		return rankedProducts[2][0]
+	} else if len(rankedProducts[3]) > 0 {
+		return rankedProducts[3][0]
+	}
+
+	return bestMathcedProduct
+
+}
+
+func (apiM apiManager) performValidations(dataWrapper VerifyApiKeyRequestResponseDataWrapper) *ErrorResponse {
+	clientIdDetails := dataWrapper.verifyApiKeySuccessResponse.ClientId
+	verifyApiKeyReq := dataWrapper.verifyApiKeyRequest
+	appDetails := dataWrapper.verifyApiKeySuccessResponse.App
+	tempDeveloperDetails := dataWrapper.tempDeveloperDetails
+	cType := dataWrapper.ctype
+	apiProductDetails := dataWrapper.verifyApiKeySuccessResponse.ApiProduct
+	var reason, errorCode string
+
+	if !strings.EqualFold("APPROVED", clientIdDetails.Status) {
+		reason = "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
+		errorCode = "oauth.v2.ApiKeyNotApproved"
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
+	}
+
+	if !strings.EqualFold("APPROVED", appDetails.Status) {
+		reason = "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
+		errorCode = "keymanagement.service.invalid_client-app_not_approved"
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
+	}
+
+	if !strings.EqualFold("ACTIVE", tempDeveloperDetails.Status) {
+		reason = "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
+		errorCode = "keymanagement.service.DeveloperStatusNotActive"
+		if cType == "company" {
+			errorCode = "keymanagement.service.CompanyStatusNotActive"
+		}
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
+	}
+
+	if dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id == "" {
+		reason = "Path Validation Failed. Product not resolved"
+		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
+	}
+
+	result := len(apiProductDetails.Resources) == 0 || validatePath(apiProductDetails.Resources, verifyApiKeyReq.UriPath)
+	if !result {
+		reason = "Path Validation Failed (" + strings.Join(apiProductDetails.Resources, ", ") + " vs " + verifyApiKeyReq.UriPath + ")"
+		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
+	}
+
+	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && (len(apiProductDetails.Apiproxies) > 0 && !contains(apiProductDetails.Apiproxies, verifyApiKeyReq.ApiProxyName)) {
+		reason = "Proxy Validation Failed (" + strings.Join(apiProductDetails.Apiproxies, ", ") + " vs " + verifyApiKeyReq.ApiProxyName + ")"
+		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
+	}
+	/* Verify if the ENV matches */
+	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && (len(apiProductDetails.Environments) > 0 && !contains(apiProductDetails.Environments, verifyApiKeyReq.EnvironmentName)) {
+		reason = "ENV Validation Failed (" + strings.Join(apiProductDetails.Environments, ", ") + " vs " + verifyApiKeyReq.EnvironmentName + ")"
+		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
+	}
+
+	return nil
+
+}
+
+func (a *apiManager) enrichAttributes(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) {
+
+	attributeMap := a.dbMan.getKmsAttributes(dataWrapper.tenant_id, dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId, dataWrapper.tempDeveloperDetails.Id, dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id, dataWrapper.verifyApiKeySuccessResponse.App.Id)
+
+	clientIdAttributes := attributeMap[dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId]
+	developerAttributes := attributeMap[dataWrapper.tempDeveloperDetails.Id]
+	appAttributes := attributeMap[dataWrapper.verifyApiKeySuccessResponse.App.Id]
+	apiProductAttributes := attributeMap[dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id]
+
+	dataWrapper.verifyApiKeySuccessResponse.ClientId.Attributes = clientIdAttributes
+	dataWrapper.verifyApiKeySuccessResponse.App.Attributes = appAttributes
+	dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Attributes = apiProductAttributes
+	dataWrapper.tempDeveloperDetails.Attributes = developerAttributes
+}
+
+func errorResponse(reason, errorCode string, statusCode int) ErrorResponse {
 	if errorCode == "SEARCH_INTERNAL_ERROR" {
 		log.Error(reason)
 	} else {
 		log.Debug(reason)
 	}
-	resp := kmsResponseFail{
-		Type: "ErrorResult",
-		ErrInfo: errResultDetail{
-			Reason:    reason,
-			ErrorCode: errorCode},
+	resp := ErrorResponse{
+		ResponseCode:    errorCode,
+		ResponseMessage: reason,
+		StatusCode:      statusCode,
 	}
-	return json.Marshal(resp)
+	return resp
 }
