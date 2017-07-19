@@ -56,7 +56,7 @@ func initPlugin(services apid.Services) (apid.PluginData, error) {
 	data = services.Data()
 	events = services.Events()
 
-	services.API().HandleFunc(apiPath, handleRequest).Methods("POST")
+	services.API().HandleFunc(apiPath, handleRequestv2).Methods("POST")
 
 	events.Listen("ApigeeSync", &handler{})
 	log.Debug("end init")
