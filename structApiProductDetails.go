@@ -8,19 +8,19 @@ type ApiProductDetails struct {
 
 	DisplayName string `json:"displayName,omitempty"`
 
-	QuotaLimit int64 `json:"quota.limit,omitempty"`
+	QuotaLimit string `json:"quota.limit,omitempty"`
 
-	QuotaInterval int64 `json:"quota.interval,omitempty"`
+	QuotaInterval string `json:"quota.interval,omitempty"`
 
-	QuotaTimeunit int64 `json:"quota.timeunit,omitempty"`
+	QuotaTimeunit string `json:"quota.timeunit,omitempty"`
 
 	Status string `json:"status,omitempty"`
 
-	CreatedAt int64 `json:"created_at,omitempty"`
+	CreatedAt string `json:"created_at,omitempty"`
 
 	CreatedBy string `json:"created_by,omitempty"`
 
-	LastmodifiedAt int64 `json:"lastmodified_at,omitempty"`
+	LastmodifiedAt string `json:"lastmodified_at,omitempty"`
 
 	LastmodifiedBy string `json:"lastmodified_by,omitempty"`
 

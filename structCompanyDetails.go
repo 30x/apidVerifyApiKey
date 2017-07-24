@@ -12,11 +12,11 @@ type CompanyDetails struct {
 
 	Apps []string `json:"apps,omitempty"`
 
-	CreatedAt int64 `json:"created_at,omitempty"`
+	CreatedAt string `json:"created_at,omitempty"`
 
 	CreatedBy string `json:"created_by,omitempty"`
 
-	LastmodifiedAt int64 `json:"lastmodified_at,omitempty"`
+	LastmodifiedAt string `json:"lastmodified_at,omitempty"`
 
 	LastmodifiedBy string `json:"lastmodified_by,omitempty"`
 

@@ -18,9 +18,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/url"
 	"github.com/30x/apid-core"
+	"net/http"
+	"io/ioutil"
 )
 
 // handle client API
@@ -33,25 +33,30 @@ func handleRequestv2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := r.ParseForm()
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Unable to parse form"))
+		w.Write([]byte(err.Error()))
+		return
+	}
+	log.Println(string(body))
+	var verifyApiKeyReq VerifyApiKeyRequest
+	err = json.Unmarshal(body, &verifyApiKeyReq)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	log.Info(verifyApiKeyReq)
+
+	if verifyApiKeyReq.Action == "" || verifyApiKeyReq.ApiProxyName == "" || verifyApiKeyReq.EnvironmentName == "" || verifyApiKeyReq.Key == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(fmt.Sprintf("Missing element: %s", verifyApiKeyReq)))
 		return
 	}
 
-	f := r.Form
-	elems := []string{"action", "key", "uriPath", "organizationName", "environmentName", "apiProxyName", "validateAgainstApiProxiesAndEnvs"}
-	for _, elem := range elems {
-		if f.Get(elem) == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(fmt.Sprintf("Missing element: %s", elem)))
-			return
-		}
-	}
-
 	w.Header().Set("Content-Type", "application/json")
-	b, err := verifyAPIKeyv2(f)
+	b, err := verifyAPIKeyv2(verifyApiKeyReq)
 	if err != nil {
 		log.Errorf("error: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -64,13 +69,13 @@ func handleRequestv2(w http.ResponseWriter, r *http.Request) {
 }
 
 // returns []byte to be written to client
-func verifyAPIKeyv2(f url.Values) ([]byte, error) {
+func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 
-	key := f.Get("key")
-	organizationName := f.Get("organizationName")
-	environmentName := f.Get("environmentName")
-	path := f.Get("uriPath")
-	action := f.Get("action")
+	key := verifyApiKeyReq.Key
+	organizationName := verifyApiKeyReq.OrganizationName
+	environmentName := verifyApiKeyReq.EnvironmentName
+	path := verifyApiKeyReq.UriPath
+	action := verifyApiKeyReq.Action
 
 	if key == "" || organizationName == "" || environmentName == "" || path == "" || action != "verify" {
 		log.Debug("Input params Invalid/Incomplete")
@@ -80,7 +85,7 @@ func verifyAPIKeyv2(f url.Values) ([]byte, error) {
 	}
 
 	db := getDB()
-	tenantId := f.Get("tenantId")
+	tenantId := verifyApiKeyReq.TenantId
 
 	sSql := `
 		SELECT
@@ -188,179 +193,129 @@ func verifyAPIKeyv2(f url.Values) ([]byte, error) {
 	clientIdAttributes := getKmsAttributes(db, tenantId, key)
 
 	clientIdDetails := ClientIdDetails{
-		ClientId: key,
-
+		ClientId:     key,
 		ClientSecret: cSecret.String,
-
-		//RedirectURIs : { callback.String },
-
-		Status: status.String,
-
+		Status:       status.String,
 		// Attributes associated with the client Id.
 		Attributes: clientIdAttributes,
+	}
+	if callback.String != "" {
+		clientIdDetails.RedirectURIs = []string{callback.String}
 	}
 	var developerDetails DeveloperDetails
 	var companyDetails CompanyDetails
 	if cType.String == "developer" {
-		// TODO : get developer details
-		// select * from kms_developer where tenant_id = '' and id = ' devId.String'
+		developerDetails = DeveloperDetails{}
 		developerAttributes := getKmsAttributes(db, tenantId, devId.String)
-		developerDetails = DeveloperDetails{
-			Id: devId.String,
-			//UserName : "",
-			//FirstName "",
-			//LastName string `json:"lastName,omitempty"`
-			//Email string `json:"email,omitempty"`
-			//Status string `json:"status,omitempty"`
-			//
+		getDevQuery := "select id, username, first_name, last_name, email, status, created_at, created_by, updated_at, updated_by from kms_developer where tenant_id = $1 and id = $2"
+		developer := db.QueryRow(getDevQuery, tenantId, devId.String)
+		err = developer.Scan(
+			&developerDetails.Id,
+			&developerDetails.UserName,
+			&developerDetails.FirstName,
+			&developerDetails.LastName,
+			&developerDetails.Email,
+			&developerDetails.Status,
+			&developerDetails.CreatedAt,
+			&developerDetails.CreatedBy,
+			&developerDetails.LastmodifiedAt,
+			&developerDetails.LastmodifiedBy,
 			// TODO : check do we need all ??
-			//Apps []string `json:"apps,omitempty"`
-			//
-			//CreatedAt int64 `json:"created_at,omitempty"`
-			//
-			//CreatedBy string `json:"created_by,omitempty"`
-			//
-			//LastmodifiedAt int64 `json:"lastmodified_at,omitempty"`
-			//
-			//LastmodifiedBy string `json:"lastmodified_by,omitempty"`
-			//
+			//Apps []string `json:"apps,omitempty"
+			// TODO : is this being used ??
 			//Company string `json:"company,omitempty"`
-			//
-			//// Attributes associated with the developer.
-			// TODO : fetch this
-			// select * from kms_attributes where tenant_id = '' and entity_id = 'key'
-			Attributes : developerAttributes,
+		)
+		developerDetails.Attributes = developerAttributes
+		if err != nil {
+			log.Error("error getting developerDetails" , err)
 		}
 	} else {
-		// TODO :get company details
-		// select * from kms_company where tenant_id = '' and id = ' devId.String'
+		companyDetails := CompanyDetails{}
 		companyAttributes := getKmsAttributes(db, tenantId, devId.String)
-		companyDetails = CompanyDetails{
-			Id: devId.String,
-			//
-			//Name string `json:"name,omitempty"`
-			//
-			//DisplayName string `json:"displayName,omitempty"`
-			//
-			//Status string `json:"status,omitempty"`
-			//
+		getCompanyQuery := "select id, display_name, status, created_at, created_by, updated_at. updated_by from kms_company where tenant_id = $1 and id = $2"
+		company := db.QueryRow(getCompanyQuery)
+		err = company.Scan(
+			&companyDetails.Id,
+			&companyDetails.DisplayName,
+			&companyDetails.Status,
+			&companyDetails.CreatedAt,
+			&companyDetails.CreatedBy,
+			&companyDetails.LastmodifiedAt,
+			&companyDetails.LastmodifiedBy,
 			// TODO : check do we need all ??
 			//Apps []string `json:"apps,omitempty"`
-			//
-			//CreatedAt int64 `json:"created_at,omitempty"`
-			//
-			//CreatedBy string `json:"created_by,omitempty"`
-			//
-			//LastmodifiedAt int64 `json:"lastmodified_at,omitempty"`
-			//
-			//LastmodifiedBy string `json:"lastmodified_by,omitempty"`
-			//
-			//// Attributes associated with the company.
-			// TODO : fetch this
-			// select * from kms_attributes where tenant_id = '' and entity_id = 'key'
-			Attributes: companyAttributes,
+		)
+		companyDetails.Attributes = companyAttributes
+		if err != nil {
+			log.Error("error getting companyDetails " , err)
 		}
 	}
 
-	// TODO :get app details
-	// select * from kms_app where tenant_id = '' and id = 'aId.String'
 	appAttributes := getKmsAttributes(db, tenantId, aId.String)
-	appDetails := AppDetails{
-		Id: aId.String,
-		//
-		//Name string `json:"name,omitempty"`
-		//
-		//AccessType string `json:"accessType,omitempty"`
-		//
-		//CallbackUrl string `json:"callbackUrl,omitempty"`
-		//
-		//DisplayName string `json:"displayName,omitempty"`
-		//
-		//Status string `json:"status,omitempty"`
-		//
-		// TODO : apiproducts - is this specific to credential or app ?? - do we have to get all products for an app or credential
-		//Apiproducts []string `json:"apiproducts,omitempty"`
-		//
-		//AppFamily string `json:"appFamily,omitempty"`
-		//
-		//CreatedAt int64 `json:"created_at,omitempty"`
-		//
-		//CreatedBy string `json:"created_by,omitempty"`
-		//
-		//LastmodifiedAt int64 `json:"lastmodified_at,omitempty"`
-		//
-		//LastmodifiedBy string `json:"lastmodified_by,omitempty"`
-		//
-		//Company string `json:"company,omitempty"`
-		//
-		//// Attributes associated with the app.
-		// TODO : fetch this
-		// select * from kms_attributes where tenant_id = '' and entity_id = 'key'
-		Attributes: appAttributes,
-	}
+	appDetails := AppDetails{}
+	getAppDetails := "select id, name, access_type, callback_url, display_name, status, app_family, company_id, created_at, created_by, updated_at, updated_by from kms_app where tenant_id = $1 and id = $2 "
+	apps := db.QueryRow(getAppDetails, tenantId, aId.String)
 
-	// TODO : fetch and populate
-	// select * from kms_developer where tenant_id = '' and id = ' devId.String'
+	err = apps.Scan(
+		&appDetails.Id,
+		&appDetails.Name,
+		&appDetails.AccessType,
+		&appDetails.CallbackUrl,
+		&appDetails.DisplayName,
+		&appDetails.Status,
+		&appDetails.AppFamily,
+		&appDetails.Company,
+		&appDetails.CreatedAt,
+		&appDetails.CreatedBy,
+		&appDetails.LastmodifiedAt,
+		&appDetails.LastmodifiedBy,
+	)
+	if err != nil {
+		log.Error("error getting apps ",err)
+	}
+	appDetails.Attributes = appAttributes
+
 	apiProductAttributes := getKmsAttributes(db, tenantId, apiProductId.String)
-	apiProductDetails := ApiProductDetails{
-
-		Id: apiProductId.String,
-
-		//Name string `json:"name,omitempty"`
-
-		//DisplayName string `json:"displayName,omitempty"`
-		//
-		//QuotaLimit int64 `json:"quota.limit,omitempty"`
-		//
-		//QuotaInterval int64 `json:"quota.interval,omitempty"`
-		//
-		//QuotaTimeunit int64 `json:"quota.timeunit,omitempty"`
-		//
-		//Status string `json:"status,omitempty"`
-		//
-		//CreatedAt int64 `json:"created_at,omitempty"`
-		//
-		//CreatedBy string `json:"created_by,omitempty"`
-		//
-		//LastmodifiedAt int64 `json:"lastmodified_at,omitempty"`
-		//
-		//LastmodifiedBy string `json:"lastmodified_by,omitempty"`
-		//
-		//Company string `json:"company,omitempty"`
-		//
-		//Environments []string `json:"environments,omitempty"`
-		//
-		//Apiproxies []string `json:"apiproxies,omitempty"`
-		//
-		//TODO : fetch apiProduct attributes
-		// Attributes associated with the apiproduct.
-		// TODO : fetch this
-		// select * from kms_attributes where tenant_id = '' and entity_id = 'key'
-		Attributes: apiProductAttributes,
+	apiProductDetails := ApiProductDetails{}
+	getApiProductsQuery := "select id, name, display_name, quota, COALESCE(quota_interval, '') , quota_time_unit, created_at, created_by, updated_at, updated_by, proxies, environments from kms_api_product where tenant_id = $1 and id = $2 "
+	apiProducts := db.QueryRow(getApiProductsQuery, tenantId, apiProductId.String)
+	var proxies, environments string
+	err = apiProducts.Scan(
+		&apiProductDetails.Id,
+		&apiProductDetails.Name,
+		&apiProductDetails.DisplayName,
+		&apiProductDetails.QuotaLimit,
+		&apiProductDetails.QuotaInterval,
+		&apiProductDetails.QuotaTimeunit,
+		&apiProductDetails.CreatedAt,
+		&apiProductDetails.CreatedBy,
+		&apiProductDetails.LastmodifiedAt,
+		&apiProductDetails.LastmodifiedBy,
+		// TODO: set below values
+		&proxies,
+		&environments,
+	)
+	if err != nil {
+		log.Error("error getting apiProductDetails " , err)
 	}
+
+	if err := json.Unmarshal([]byte(proxies), &apiProductDetails.Apiproxies); err != nil {
+		log.Debug("unmarshalled error for proxies " , err)
+	}
+
+	apiProductDetails.Attributes = apiProductAttributes
 
 	resp := VerifyApiKeySuccessResponse{
 		ClientId: clientIdDetails,
-		// Self string `json:"self,omitempty"`
-
-		// Organization Identifier/Name
-		Organization: "test", // TODO : find where to get this info from and fix.
-
-		// Environment Identifier/Name
+		Organization: organizationName,
 		Environment: resEnv.String,
-
-		Developer: developerDetails,
-
-		Company: companyDetails,
-
-		App: appDetails,
-
-		ApiProduct: apiProductDetails,
-
+		Developer:   developerDetails,
+		Company:     companyDetails,
+		App:         appDetails,
+		ApiProduct:  apiProductDetails,
 		// Identifier of the authorization code. This will be unique for each request.
-		Identifier: "id", // TODO : what is this ?????
-
-		Kind: "your_kind", // TODO : what is this ????
+		Identifier: key,        // TODO : what is this ?????
+		Kind:       "Collection", // TODO : what is this ????
 
 	}
 
@@ -369,20 +324,21 @@ func verifyAPIKeyv2(f url.Values) ([]byte, error) {
 func getKmsAttributes(db apid.DB, tenantId string, entityId string) []Attribute {
 	sql := "select name, value, type from kms_attributes where tenant_id = $1 and entity_id = $2"
 	attributesForQuery := []Attribute{}
-	attributes, err := db.Query(sql,tenantId, entityId)
+	attributes, err := db.Query(sql, tenantId, entityId)
 
-	if(err == nil){
-		log.Error("Error while fetching attributes for tenant id : [{}] and entityId : [{}]", tenantId, entityId ,err)
-		return attributesForQuery;
+	if err != nil {
+		log.Error("Error while fetching attributes for tenant id : %s and entityId : %s", tenantId, entityId, err)
+		return attributesForQuery
 	}
 	for attributes.Next() {
 		att := Attribute{}
 		attributes.Scan(
 			&att.Name,
 			&att.Value,
-			&att.Kind,
 		)
-		attributesForQuery = append(attributesForQuery, att)
+		if att.Name != "" {
+			attributesForQuery = append(attributesForQuery, att)
+		}
 	}
 	return attributesForQuery
 }
