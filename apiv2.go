@@ -85,7 +85,6 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 	}
 
 	db := getDB()
-	tenantId := verifyApiKeyReq.TenantId
 
 	sSql := `
 		SELECT
@@ -100,15 +99,20 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 			ad.id,
 			"developer" as ctype,
 			c.consumer_secret,
-			a.callback_url
+			a.callback_url,
+			c.tenant_id
 		FROM
 			KMS_APP_CREDENTIAL AS c
-			INNER JOIN KMS_APP AS a ON c.app_id = a.id
+			INNER JOIN KMS_APP AS a
+				ON c.app_id = a.id
 			INNER JOIN KMS_DEVELOPER AS ad
 				ON ad.id = a.developer_id
 			INNER JOIN KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
 				ON mp.appcred_id = c.id
-			INNER JOIN KMS_API_PRODUCT as ap ON ap.id = mp.apiprdt_id
+			INNER JOIN KMS_API_PRODUCT as ap
+				ON ap.id = mp.apiprdt_id
+			INNER JOIN KMS_ORGANIZATION AS o
+				ON o.tenant_id = c.tenant_id
 		WHERE (UPPER(ad.status) = 'ACTIVE'
 			AND mp.apiprdt_id = ap.id
 			AND mp.app_id = a.id
@@ -116,7 +120,7 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 			AND UPPER(mp.status) = 'APPROVED'
 			AND UPPER(a.status) = 'APPROVED'
 			AND c.id = $1
-			AND c.tenant_id = $2)
+			AND o.name = $2)
 		UNION ALL
 		SELECT
 			ap.id,
@@ -130,15 +134,20 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 			ad.id,
 			"company" as ctype,
 			c.consumer_secret,
-			a.callback_url
+			a.callback_url,
+			c.tenant_id
 		FROM
 			KMS_APP_CREDENTIAL AS c
-			INNER JOIN KMS_APP AS a ON c.app_id = a.id
+			INNER JOIN KMS_APP AS a
+				ON c.app_id = a.id
 			INNER JOIN KMS_COMPANY AS ad
 				ON ad.id = a.company_id
 			INNER JOIN KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
 				ON mp.appcred_id = c.id
-			INNER JOIN KMS_API_PRODUCT as ap ON ap.id = mp.apiprdt_id
+			INNER JOIN KMS_API_PRODUCT as ap
+				ON ap.id = mp.apiprdt_id
+			INNER JOIN KMS_ORGANIZATION AS o
+				ON o.tenant_id = c.tenant_id
 		WHERE (UPPER(ad.status) = 'ACTIVE'
 			AND mp.apiprdt_id = ap.id
 			AND mp.app_id = a.id
@@ -146,16 +155,16 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 			AND UPPER(mp.status) = 'APPROVED'
 			AND UPPER(a.status) = 'APPROVED'
 			AND c.id = $1
-			AND c.tenant_id = $2)
+			AND o.name = $2)
 	;`
 
 	/* these fields need to be nullable types for scanning.  This is because when using json snapshots,
 	   and therefore being responsible for inserts, we were able to default everything to be not null.  With
 	   sqlite snapshots, we are not necessarily guaranteed that
 	*/
-	var status, redirectionURIs, appName, devId, resName, resEnv, issuedAt, cType, cSecret, callback, aId, apiProductId sql.NullString
-	err := db.QueryRow(sSql, key, tenantId).Scan(&apiProductId, &resName, &resEnv, &issuedAt, &status,
-		&redirectionURIs, &aId, &appName, &devId, &cType, &cSecret, &callback)
+	var status, redirectionURIs, appName, devId, resName, resEnv, issuedAt, cType, cSecret, callback, aId, apiProductId, tenantId sql.NullString
+	err := db.QueryRow(sSql, key, organizationName).Scan(&apiProductId, &resName, &resEnv, &issuedAt, &status,
+		&redirectionURIs, &aId, &appName, &devId, &cType, &cSecret, &callback, &tenantId)
 	switch {
 	case err == sql.ErrNoRows:
 		reason := "API Key verify failed for (" + key + ", " + organizationName + ", " + path + ")"
@@ -190,7 +199,7 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 
 	//var expiresAt int64 = -1
 	// select * from kms_attributes where tenant_id = '' and entity_id = 'key'
-	clientIdAttributes := getKmsAttributes(db, tenantId, key)
+	clientIdAttributes := getKmsAttributes(db, tenantId.String, key)
 
 	clientIdDetails := ClientIdDetails{
 		ClientId:     key,
@@ -206,7 +215,7 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 	var companyDetails CompanyDetails
 	if cType.String == "developer" {
 		developerDetails = DeveloperDetails{}
-		developerAttributes := getKmsAttributes(db, tenantId, devId.String)
+		developerAttributes := getKmsAttributes(db, tenantId.String, devId.String)
 		getDevQuery := "select id, username, first_name, last_name, email, status, created_at, created_by, updated_at, updated_by from kms_developer where tenant_id = $1 and id = $2"
 		developer := db.QueryRow(getDevQuery, tenantId, devId.String)
 		err = developer.Scan(
@@ -231,7 +240,7 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 		}
 	} else {
 		companyDetails := CompanyDetails{}
-		companyAttributes := getKmsAttributes(db, tenantId, devId.String)
+		companyAttributes := getKmsAttributes(db, tenantId.String, devId.String)
 		getCompanyQuery := "select id, display_name, status, created_at, created_by, updated_at. updated_by from kms_company where tenant_id = $1 and id = $2"
 		company := db.QueryRow(getCompanyQuery)
 		err = company.Scan(
@@ -251,7 +260,7 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 		}
 	}
 
-	appAttributes := getKmsAttributes(db, tenantId, aId.String)
+	appAttributes := getKmsAttributes(db, tenantId.String, aId.String)
 	appDetails := AppDetails{}
 	getAppDetails := "select id, name, access_type, callback_url, display_name, status, app_family, company_id, created_at, created_by, updated_at, updated_by from kms_app where tenant_id = $1 and id = $2 "
 	apps := db.QueryRow(getAppDetails, tenantId, aId.String)
@@ -275,7 +284,7 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 	}
 	appDetails.Attributes = appAttributes
 
-	apiProductAttributes := getKmsAttributes(db, tenantId, apiProductId.String)
+	apiProductAttributes := getKmsAttributes(db, tenantId.String, apiProductId.String)
 	apiProductDetails := ApiProductDetails{}
 	getApiProductsQuery := "select id, name, display_name, quota, COALESCE(quota_interval, '') , quota_time_unit, created_at, created_by, updated_at, updated_by, proxies, environments from kms_api_product where tenant_id = $1 and id = $2 "
 	apiProducts := db.QueryRow(getApiProductsQuery, tenantId, apiProductId.String)
@@ -291,7 +300,6 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 		&apiProductDetails.CreatedBy,
 		&apiProductDetails.LastmodifiedAt,
 		&apiProductDetails.LastmodifiedBy,
-		// TODO: set below values
 		&proxies,
 		&environments,
 	)
@@ -300,7 +308,12 @@ func verifyAPIKeyv2(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
 	}
 
 	if err := json.Unmarshal([]byte(proxies), &apiProductDetails.Apiproxies); err != nil {
-		log.Debug("unmarshalled error for proxies " , err)
+		log.Debug("unmarshall error for proxies, sending as is " , err)
+		apiProductDetails.Apiproxies = []string{ proxies }
+	}
+	if err := json.Unmarshal([]byte(environments), &apiProductDetails.Environments); err != nil {
+		log.Debug("unmarshall error for proxies, sending as is " , err)
+		apiProductDetails.Environments = []string{ environments }
 	}
 
 	apiProductDetails.Attributes = apiProductAttributes

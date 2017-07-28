@@ -15,6 +15,4 @@ type VerifyApiKeyRequest struct {
 
 	// when this flag is false, authentication of key and authorization for uripath is done and authorization for apiproxies and environments is skipped. Default is true.
 	ValidateAgainstApiProxiesAndEnvs bool `json:"validateAgainstApiProxiesAndEnvs,omitempty"`
-
-	TenantId string `json:"tenantId"`
 }
