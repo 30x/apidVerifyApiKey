@@ -25,40 +25,38 @@ const (
 )
 
 var (
-	log      apid.LogService
-	data     apid.DataService
-	events   apid.EventsService
-	unsafeDB apid.DB
-	dbMux    sync.RWMutex
+	services         apid.Services
+	log              apid.LogService
 )
-
-func getDB() apid.DB {
-	dbMux.RLock()
-	db := unsafeDB
-	dbMux.RUnlock()
-	return db
-}
-
-func setDB(db apid.DB) {
-	dbMux.Lock()
-	unsafeDB = db
-	dbMux.Unlock()
-}
 
 func init() {
 	apid.RegisterPlugin(initPlugin)
 }
 
-func initPlugin(services apid.Services) (apid.PluginData, error) {
+func initPlugin(s apid.Services) (apid.PluginData, error) {
+	services = s
+
 	log = services.Log().ForModule("apidVerifyAPIKey")
 	log.Debug("start init")
 
-	data = services.Data()
-	events = services.Events()
+	log = services.Log()
+	dbMan := &dbManager{
+		data:  services.Data(),
+		dbMux: sync.RWMutex{},
+	}
+	dbMan.initDb()
+	apiMan := apiManager{
+		dbMan: dbMan,
+		verifiersEndpoint:  apiPath,
+	}
 
-	services.API().HandleFunc(apiPath, handleRequestv2).Methods("POST")
+	syncHandler := apigeeSyncHandler{
+		dbMan : dbMan,
+		apiMan: apiMan,
+	}
 
-	events.Listen("ApigeeSync", &handler{})
+	syncHandler.initListener(services)
+
 	log.Debug("end init")
 
 	return pluginData, nil
