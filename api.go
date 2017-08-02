@@ -22,7 +22,9 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type apiManagerInterface interface {
@@ -56,41 +58,45 @@ func (a *apiManager) handleRequest(w http.ResponseWriter, r *http.Request) {
 	b, err := verifyAPIKey(verifyApiKeyReq, a.dbMan.getDb())
 
 	if err != nil {
-		log.Errorf("error: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		respStatusCode, atoierr := strconv.Atoi(err.Error())
+		if atoierr != nil {
+			w.WriteHeader(respStatusCode)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	}
 
 	log.Debugf("handleVerifyAPIKey result %s", b)
 	w.Write(b)
+	return
 }
 
 func validateRequest(requestBody io.ReadCloser, w http.ResponseWriter) (VerifyApiKeyRequest, error) {
 	// 1. read request boby
+	var verifyApiKeyReq VerifyApiKeyRequest
 	body, err := ioutil.ReadAll(requestBody)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
-		return VerifyApiKeyRequest{}, errors.New("Bad_REQUEST")
+		return verifyApiKeyReq, errors.New("Bad_REQUEST")
 	}
 	log.Debug(string(body))
 	// 2. umarshall json to struct
-	var verifyApiKeyReq VerifyApiKeyRequest
 	err = json.Unmarshal(body, &verifyApiKeyReq)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
-		return VerifyApiKeyRequest{}, errors.New("Bad_REQUEST")
+		return verifyApiKeyReq, errors.New("Bad_REQUEST")
 	}
 	log.Debug(verifyApiKeyReq)
 
 	// 2. verify params
 	if verifyApiKeyReq.Action == "" || verifyApiKeyReq.ApiProxyName == "" || verifyApiKeyReq.EnvironmentName == "" || verifyApiKeyReq.Key == "" {
 		// TODO : set correct fields in error response
-		errorResponse, _ := errorResponse("Bad_REQUEST", "Missing element")
+		errorResponse := errorResponse("Bad_REQUEST", "Missing element")
+		w.WriteHeader(http.StatusBadRequest)
 		w.Write(errorResponse)
-		return VerifyApiKeyRequest{}, errors.New("Bad_REQUEST")
+		return verifyApiKeyReq, errors.New("Bad_REQUEST")
 	}
 	return verifyApiKeyReq, nil
 }
@@ -118,12 +124,12 @@ func verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest, db apid.DB) ([]byte, erro
 	case err == sql.ErrNoRows:
 		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
 		errorCode := "oauth.v2.InvalidApiKey"
-		return errorResponse(reason, errorCode)
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
 
 	case err != nil:
 		reason := err.Error()
 		errorCode := "SEARCH_INTERNAL_ERROR"
-		return errorResponse(reason, errorCode)
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusInternalServerError))
 	}
 
 	/*
@@ -136,7 +142,7 @@ func verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest, db apid.DB) ([]byte, erro
 		return errResponse, err
 	}
 
-	encrichAttributes(db, tenantId.String, &clientIdDetails, &appDetails, &tempDeveloperDetails, &apiProductDetails)
+	enrichAttributes(db, tenantId.String, &clientIdDetails, &appDetails, &tempDeveloperDetails, &apiProductDetails)
 
 	if cType.String == "developer" {
 		finalDeveloperDetails = tempDeveloperDetails
@@ -175,13 +181,13 @@ func performValidations(verifyApiKeyReq VerifyApiKeyRequest, clientIdDetails Cli
 	if !strings.EqualFold("APPROVED", clientIdDetails.Status) {
 		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
 		errorCode := "oauth.v2.ApiKeyNotApproved"
-		return errorResponse(reason, errorCode)
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
 	}
 
 	if !strings.EqualFold("APPROVED", appDetails.Status) {
 		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
 		errorCode := "keymanagement.service.invalid_client-app_not_approved"
-		return errorResponse(reason, errorCode)
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
 	}
 
 	if !strings.EqualFold("ACTIVE", tempDeveloperDetails.Status) {
@@ -190,27 +196,27 @@ func performValidations(verifyApiKeyReq VerifyApiKeyRequest, clientIdDetails Cli
 		if cType.String == "company" {
 			errorCode = "keymanagement.service.CompanyStatusNotActive"
 		}
-		return errorResponse(reason, errorCode)
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
 	}
 
 	result := validatePathRegex(apiProductDetails.Resources, verifyApiKeyReq.UriPath)
 	if result == false {
 		reason := "Path Validation Failed (" + strings.Join(apiProductDetails.Resources, ", ") + " vs " + verifyApiKeyReq.UriPath + ")"
 		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
-		return errorResponse(reason, errorCode)
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
 	}
 
 	/* Verify if the ENV matches */
 	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && !contains(apiProductDetails.Environments, verifyApiKeyReq.EnvironmentName) {
 		reason := "ENV Validation Failed (" + strings.Join(apiProductDetails.Environments, ", ") + " vs " + verifyApiKeyReq.EnvironmentName + ")"
 		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
-		return errorResponse(reason, errorCode)
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
 	}
 
 	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && !contains(apiProductDetails.Apiproxies, verifyApiKeyReq.ApiProxyName) {
 		reason := "Proxy Validation Failed (" + strings.Join(apiProductDetails.Apiproxies, ", ") + " vs " + verifyApiKeyReq.ApiProxyName + ")"
 		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
-		return errorResponse(reason, errorCode)
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
 	}
 
 	return nil, nil
@@ -226,7 +232,7 @@ func contains(givenArray []string, searchString string) bool {
 	return false
 }
 
-func encrichAttributes(db apid.DB, tenantId string, clientIdDetails *ClientIdDetails, appDetails *AppDetails, tempDeveloperDetails *DeveloperDetails, apiProductDetails *ApiProductDetails) {
+func enrichAttributes(db apid.DB, tenantId string, clientIdDetails *ClientIdDetails, appDetails *AppDetails, tempDeveloperDetails *DeveloperDetails, apiProductDetails *ApiProductDetails) {
 	clientIdAttributes := getKmsAttributes(db, tenantId, clientIdDetails.ClientId)
 	developerAttributes := getKmsAttributes(db, tenantId, tempDeveloperDetails.Id)
 	appAttributes := getKmsAttributes(db, tenantId, appDetails.Id)
@@ -238,24 +244,26 @@ func encrichAttributes(db apid.DB, tenantId string, clientIdDetails *ClientIdDet
 	tempDeveloperDetails.Attributes = developerAttributes
 }
 func getKmsAttributes(db apid.DB, tenantId string, entityId string) []Attribute {
+
+	var attName, attValue sql.NullString
 	sql := "select name, value from kms_attributes where tenant_id = $1 and entity_id = $2"
 	attributesForQuery := []Attribute{}
 	attributes, err := db.Query(sql, tenantId, entityId)
-
 	if err != nil {
 		log.Error("Error while fetching attributes for tenant id : %s and entityId : %s", tenantId, entityId, err)
 		return attributesForQuery
 	}
+
 	for attributes.Next() {
-		att := Attribute{}
 		err := attributes.Scan(
-			&att.Name,
-			&att.Value,
+			&attName,
+			&attValue,
 		)
 		if err != nil {
 			log.Error("error fetching attributes for entityid ", entityId, err)
 		}
-		if att.Name != "errorResponse" {
+		if attName.String != "" {
+			att := Attribute{Name: attName.String, Value: attValue.String}
 			attributesForQuery = append(attributesForQuery, att)
 		}
 	}
@@ -263,7 +271,7 @@ func getKmsAttributes(db apid.DB, tenantId string, entityId string) []Attribute 
 	return attributesForQuery
 }
 
-func errorResponse(reason, errorCode string) ([]byte, error) {
+func errorResponse(reason, errorCode string) []byte {
 	if errorCode == "SEARCH_INTERNAL_ERROR" {
 		log.Error(reason)
 	} else {
@@ -273,7 +281,8 @@ func errorResponse(reason, errorCode string) ([]byte, error) {
 		ResponseCode:    errorCode,
 		ResponseMessage: reason,
 	}
-	return json.Marshal(resp)
+	ret, _ := json.Marshal(resp)
+	return ret
 }
 
 func getApiKeyDetails(db apid.DB, verifyApiKeyReq VerifyApiKeyRequest, cType, tenantId *sql.NullString, tempDeveloperDetails *DeveloperDetails, appDetails *AppDetails, apiProductDetails *ApiProductDetails, clientIdDetails *ClientIdDetails) error {
@@ -460,24 +469,19 @@ func getApiKeyDetails(db apid.DB, verifyApiKeyReq VerifyApiKeyRequest, cType, te
 
 	if err := json.Unmarshal([]byte(proxies), &apiProductDetails.Apiproxies); err != nil {
 		log.Debug("unmarshall error for proxies, performing custom unmarshal ", proxies, err)
-		stringArray := splitMalformedJson(proxies)
-		if len(stringArray) > 0 {
-			apiProductDetails.Apiproxies = splitMalformedJson(proxies)
-		}
+
+		apiProductDetails.Apiproxies = splitMalformedJson(proxies)
+
 	}
 	if err := json.Unmarshal([]byte(environments), &apiProductDetails.Environments); err != nil {
 		log.Debug("unmarshall error for proxies, performing custom unmarshal ", environments, err)
-		stringArray := splitMalformedJson(environments)
-		if len(stringArray) > 0 {
-			apiProductDetails.Environments = splitMalformedJson(environments)
-		}
+		apiProductDetails.Environments = splitMalformedJson(environments)
+
 	}
 	if err := json.Unmarshal([]byte(resources), &apiProductDetails.Resources); err != nil {
 		log.Debug("unmarshall error for proxies, performing custom unmarshal ", resources, err)
-		stringArray := splitMalformedJson(resources)
-		if len(stringArray) > 0 {
-			apiProductDetails.Resources = stringArray
-		}
+		apiProductDetails.Resources = splitMalformedJson(resources)
+
 	}
 
 	if appDetails.CallbackUrl != "" {
@@ -488,9 +492,11 @@ func getApiKeyDetails(db apid.DB, verifyApiKeyReq VerifyApiKeyRequest, cType, te
 }
 
 func splitMalformedJson(fjson string) []string {
+	var fs []string
 	s := strings.TrimPrefix(fjson, "{")
 	s = strings.TrimSuffix(s, "}")
-	fs := strings.Split(s, ",")
-	log.Debug("processing splitMalformedJson for ", fjson, " and result is ", fs)
+	if utf8.RuneCountInString(s) > 0 {
+		fs = strings.Split(s, ",")
+	}
 	return fs
 }
