@@ -14,9 +14,9 @@
 package apidVerifyApiKey
 
 import (
+	"errors"
 	"github.com/30x/apid-core"
 	"sync"
-	"errors"
 )
 
 type dbManager struct {
@@ -52,6 +52,5 @@ func (dbc *dbManager) initDb() error {
 type dbManagerInterface interface {
 	setDbVersion(string)
 	initDb() error
-	getDb() (apid.DB)
+	getDb() apid.DB
 }
-

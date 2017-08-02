@@ -17,11 +17,12 @@ package apidVerifyApiKey
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/30x/apid-core"
-	"net/http"
-	"io/ioutil"
 	"errors"
+	"github.com/30x/apid-core"
 	"io"
+	"io/ioutil"
+	"net/http"
+	"strings"
 )
 
 type apiManagerInterface interface {
@@ -30,9 +31,9 @@ type apiManagerInterface interface {
 	//distributeEvents()
 }
 type apiManager struct {
-	dbMan               dbManagerInterface
+	dbMan             dbManagerInterface
 	verifiersEndpoint string
-	apiInitialized      bool
+	apiInitialized    bool
 }
 
 func (a *apiManager) InitAPI() {
@@ -87,7 +88,7 @@ func validateRequest(requestBody io.ReadCloser, w http.ResponseWriter) (VerifyAp
 	// 2. verify params
 	if verifyApiKeyReq.Action == "" || verifyApiKeyReq.ApiProxyName == "" || verifyApiKeyReq.EnvironmentName == "" || verifyApiKeyReq.Key == "" {
 		// TODO : set correct fields in error response
-		errorResponse , _ := errorResponse("Bad_REQUEST","Missing element")
+		errorResponse, _ := errorResponse("Bad_REQUEST", "Missing element")
 		w.Write(errorResponse)
 		return VerifyApiKeyRequest{}, errors.New("Bad_REQUEST")
 	}
@@ -97,33 +98,26 @@ func validateRequest(requestBody io.ReadCloser, w http.ResponseWriter) (VerifyAp
 // returns []byte to be written to client
 func verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest, db apid.DB) ([]byte, error) {
 
-	key := verifyApiKeyReq.Key
-	organizationName := verifyApiKeyReq.OrganizationName
-	environmentName := verifyApiKeyReq.EnvironmentName
-	path := verifyApiKeyReq.UriPath
-	//action := verifyApiKeyReq.Action
-
 	/* these fields need to be nullable types for scanning.  This is because when using json snapshots,
 	   and therefore being responsible for inserts, we were able to default everything to be not null.  With
 	   sqlite snapshots, we are not necessarily guaranteed that
 	*/
 	var finalDeveloperDetails DeveloperDetails
 	var companyDetails CompanyDetails
-	var proxies, environments string
-	var resName, resEnv, cType, tenantId sql.NullString
+	var cType, tenantId sql.NullString
 
 	tempDeveloperDetails := DeveloperDetails{}
 	appDetails := AppDetails{}
 	apiProductDetails := ApiProductDetails{}
 	clientIdDetails := ClientIdDetails{}
-	clientIdDetails.ClientId = key
+	clientIdDetails.ClientId = verifyApiKeyReq.Key
 
-	err := getApiKeyDetails(db, verifyApiKeyReq, &proxies, &environments, &resName, &resEnv, &cType, &tenantId, &tempDeveloperDetails, &appDetails, &apiProductDetails,&clientIdDetails)
+	err := getApiKeyDetails(db, verifyApiKeyReq, &cType, &tenantId, &tempDeveloperDetails, &appDetails, &apiProductDetails, &clientIdDetails)
 
 	switch {
 	case err == sql.ErrNoRows:
-		reason := "API Key verify failed for (" + key + ", " + organizationName +")"
-		errorCode := "REQ_ENTRY_NOT_FOUND"
+		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
+		errorCode := "oauth.v2.InvalidApiKey"
 		return errorResponse(reason, errorCode)
 
 	case err != nil:
@@ -136,70 +130,103 @@ func verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest, db apid.DB) ([]byte, erro
 	 * Perform all validations related to the Query made with the data
 	 * we just retrieved
 	 */
-	result := validatePath(resName.String, path)
-	if result == false {
-		reason := "Path Validation Failed (" + resName.String + " vs " + path + ")"
-		errorCode := "PATH_VALIDATION_FAILED"
-		return errorResponse(reason, errorCode)
+	errResponse, err := performValidations(verifyApiKeyReq, clientIdDetails, appDetails, tempDeveloperDetails, apiProductDetails, cType)
 
+	if errResponse != nil {
+		return errResponse, err
 	}
 
-	/* Verify if the ENV matches */
-	result = validateEnv(resEnv.String, environmentName)
-	if result == false {
-		reason := "ENV Validation Failed (" + resEnv.String + " vs " + environmentName + ")"
-		errorCode := "ENV_VALIDATION_FAILED"
-		return errorResponse(reason, errorCode)
-	}
-
-	setAttributes(db, tenantId.String, &clientIdDetails, &appDetails, &tempDeveloperDetails, &apiProductDetails)
-
-	if appDetails.CallbackUrl != "" {
-		clientIdDetails.RedirectURIs = []string{appDetails.CallbackUrl}
-	}
-	if err := json.Unmarshal([]byte(proxies), &apiProductDetails.Apiproxies); err != nil {
-		log.Debug("unmarshall error for proxies, sending as is ", err)
-		apiProductDetails.Apiproxies = []string{proxies }
-	}
-	if err := json.Unmarshal([]byte(environments), &apiProductDetails.Environments); err != nil {
-		log.Debug("unmarshall error for proxies, sending as is ", err)
-		apiProductDetails.Environments = []string{environments }
-	}
+	encrichAttributes(db, tenantId.String, &clientIdDetails, &appDetails, &tempDeveloperDetails, &apiProductDetails)
 
 	if cType.String == "developer" {
 		finalDeveloperDetails = tempDeveloperDetails
 	} else {
 		companyDetails = CompanyDetails{
-			Id: tempDeveloperDetails.Id,
-			DisplayName: tempDeveloperDetails.UserName,
-			Status: tempDeveloperDetails.Status,
-			CreatedAt: tempDeveloperDetails.CreatedAt,
-			CreatedBy: tempDeveloperDetails.CreatedBy,
+			Id:             tempDeveloperDetails.Id,
+			DisplayName:    tempDeveloperDetails.UserName,
+			Status:         tempDeveloperDetails.Status,
+			CreatedAt:      tempDeveloperDetails.CreatedAt,
+			CreatedBy:      tempDeveloperDetails.CreatedBy,
 			LastmodifiedAt: tempDeveloperDetails.LastmodifiedAt,
 			LastmodifiedBy: tempDeveloperDetails.LastmodifiedBy,
-			Attributes: tempDeveloperDetails.Attributes,
+			Attributes:     tempDeveloperDetails.Attributes,
 		}
 
 	}
 
 	resp := VerifyApiKeySuccessResponse{
-		ClientId: clientIdDetails,
-		Organization: organizationName,
-		Environment: resEnv.String,
-		Developer:   finalDeveloperDetails,
-		Company:     companyDetails,
-		App:         appDetails,
-		ApiProduct:  apiProductDetails,
+		ClientId:     clientIdDetails,
+		Organization: verifyApiKeyReq.OrganizationName,
+		Environment:  verifyApiKeyReq.EnvironmentName,
+		Developer:    finalDeveloperDetails,
+		Company:      companyDetails,
+		App:          appDetails,
+		ApiProduct:   apiProductDetails,
 		// Identifier of the authorization code. This will be unique for each request.
-		Identifier: key, // TODO : what is this ?????
-		Kind:       "Collection", // TODO : what is this ????
+		Identifier: verifyApiKeyReq.Key, // TODO : what is this ?????
+		Kind:       "Collection",        // TODO : what is this ????
 
 	}
 
 	return json.Marshal(resp)
 }
 
-func setAttributes(db apid.DB, tenantId string, clientIdDetails *ClientIdDetails, appDetails *AppDetails, tempDeveloperDetails *DeveloperDetails, apiProductDetails *ApiProductDetails ){
+func performValidations(verifyApiKeyReq VerifyApiKeyRequest, clientIdDetails ClientIdDetails, appDetails AppDetails, tempDeveloperDetails DeveloperDetails, apiProductDetails ApiProductDetails, cType sql.NullString) ([]byte, error) {
+	if !strings.EqualFold("APPROVED", clientIdDetails.Status) {
+		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
+		errorCode := "oauth.v2.ApiKeyNotApproved"
+		return errorResponse(reason, errorCode)
+	}
+
+	if !strings.EqualFold("APPROVED", appDetails.Status) {
+		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
+		errorCode := "keymanagement.service.invalid_client-app_not_approved"
+		return errorResponse(reason, errorCode)
+	}
+
+	if !strings.EqualFold("ACTIVE", tempDeveloperDetails.Status) {
+		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
+		errorCode := "keymanagement.service.DeveloperStatusNotActive"
+		if cType.String == "company" {
+			errorCode = "keymanagement.service.CompanyStatusNotActive"
+		}
+		return errorResponse(reason, errorCode)
+	}
+
+	result := validatePathRegex(apiProductDetails.Resources, verifyApiKeyReq.UriPath)
+	if result == false {
+		reason := "Path Validation Failed (" + strings.Join(apiProductDetails.Resources, ", ") + " vs " + verifyApiKeyReq.UriPath + ")"
+		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
+		return errorResponse(reason, errorCode)
+	}
+
+	/* Verify if the ENV matches */
+	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && !contains(apiProductDetails.Environments, verifyApiKeyReq.EnvironmentName) {
+		reason := "ENV Validation Failed (" + strings.Join(apiProductDetails.Environments, ", ") + " vs " + verifyApiKeyReq.EnvironmentName + ")"
+		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
+		return errorResponse(reason, errorCode)
+	}
+
+	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && !contains(apiProductDetails.Apiproxies, verifyApiKeyReq.ApiProxyName) {
+		reason := "Proxy Validation Failed (" + strings.Join(apiProductDetails.Apiproxies, ", ") + " vs " + verifyApiKeyReq.ApiProxyName + ")"
+		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
+		return errorResponse(reason, errorCode)
+	}
+
+	return nil, nil
+
+}
+
+func contains(givenArray []string, searchString string) bool {
+	for _, element := range givenArray {
+		if element == searchString {
+			return true
+		}
+	}
+	return false
+}
+
+func encrichAttributes(db apid.DB, tenantId string, clientIdDetails *ClientIdDetails, appDetails *AppDetails, tempDeveloperDetails *DeveloperDetails, apiProductDetails *ApiProductDetails) {
 	clientIdAttributes := getKmsAttributes(db, tenantId, clientIdDetails.ClientId)
 	developerAttributes := getKmsAttributes(db, tenantId, tempDeveloperDetails.Id)
 	appAttributes := getKmsAttributes(db, tenantId, appDetails.Id)
@@ -215,7 +242,6 @@ func getKmsAttributes(db apid.DB, tenantId string, entityId string) []Attribute 
 	attributesForQuery := []Attribute{}
 	attributes, err := db.Query(sql, tenantId, entityId)
 
-
 	if err != nil {
 		log.Error("Error while fetching attributes for tenant id : %s and entityId : %s", tenantId, entityId, err)
 		return attributesForQuery
@@ -227,13 +253,13 @@ func getKmsAttributes(db apid.DB, tenantId string, entityId string) []Attribute 
 			&att.Value,
 		)
 		if err != nil {
-			log.Error("error fetching attributes for entityid ", entityId , err)
+			log.Error("error fetching attributes for entityid ", entityId, err)
 		}
-		if att.Name != "" {
+		if att.Name != "errorResponse" {
 			attributesForQuery = append(attributesForQuery, att)
 		}
 	}
-	log.Debug("attributes returned for query ", sql , " are ", attributesForQuery , tenantId , entityId)
+	log.Debug("attributes returned for query ", sql, " are ", attributesForQuery, tenantId, entityId)
 	return attributesForQuery
 }
 
@@ -250,54 +276,54 @@ func errorResponse(reason, errorCode string) ([]byte, error) {
 	return json.Marshal(resp)
 }
 
-func getApiKeyDetails(db apid.DB, verifyApiKeyReq VerifyApiKeyRequest, proxies, environments *string, resName, resEnv, cType, tenantId *sql.NullString, tempDeveloperDetails *DeveloperDetails, appDetails *AppDetails, apiProductDetails *ApiProductDetails, clientIdDetails *ClientIdDetails) (error) {
+func getApiKeyDetails(db apid.DB, verifyApiKeyReq VerifyApiKeyRequest, cType, tenantId *sql.NullString, tempDeveloperDetails *DeveloperDetails, appDetails *AppDetails, apiProductDetails *ApiProductDetails, clientIdDetails *ClientIdDetails) error {
 
+	var proxies, environments, resources string
 	sSql := `
 		SELECT
-			ap.api_resources,
-			ap.environments,
-			"developer" as ctype,
-			c.tenant_id,
+			COALESCE("developer","") as ctype,
+			COALESCE(c.tenant_id,""),
 
-			c.status,
-			c.consumer_secret,
+			COALESCE(c.status,""),
+			COALESCE(c.consumer_secret,""),
 
-			ad.id as dev_id,
-			ad.username as dev_username,
-			ad.first_name as dev_first_name,
-			ad.last_name as dev_last_name,
-			ad.email as dev_email,
-			ad.status as dev_status,
-			ad.created_at as dev_created_at,
-			ad.created_by as dev_created_by,
-			ad.updated_at as dev_updated_at,
-			ad.updated_by as dev_updated_by,
+			COALESCE(ad.id,"") as dev_id,
+			COALESCE(ad.username,"") as dev_username,
+			COALESCE(ad.first_name,"") as dev_first_name,
+			COALESCE(ad.last_name,"") as dev_last_name,
+			COALESCE(ad.email,"") as dev_email,
+			COALESCE(ad.status,"") as dev_status,
+			COALESCE(ad.created_at,"") as dev_created_at,
+			COALESCE(ad.created_by,"") as dev_created_by,
+			COALESCE(ad.updated_at,"") as dev_updated_at,
+			COALESCE(ad.updated_by,"") as dev_updated_by,
 
-			a.id as app_id,
-			a.name as app_name,
-			a.access_type as app_access_type,
-			a.callback_url as app_callback_url,
-			a.display_name as app_display_name,
-			a.status as app_status,
-			a.app_family as app_app_family,
-			a.company_id as app_company_id,
-			a.created_at as app_created_at,
-			a.created_by as app_created_by,
-			a.updated_at as app_updated_at,
-			a.updated_by as app_updated_by,
+			COALESCE(a.id,"") as app_id,
+			COALESCE(a.name,"") as app_name,
+			COALESCE(a.access_type,"") as app_access_type,
+			COALESCE(a.callback_url,"") as app_callback_url,
+			COALESCE(a.display_name,"") as app_display_name,
+			COALESCE(a.status,"") as app_status,
+			COALESCE(a.app_family,"") as app_app_family,
+			COALESCE(a.company_id,"") as app_company_id,
+			COALESCE(a.created_at,"") as app_created_at,
+			COALESCE(a.created_by,"") as app_created_by,
+			COALESCE(a.updated_at,"") as app_updated_at,
+			COALESCE(a.updated_by,"") as app_updated_by,
 
-			ap.id as prod_id,
-			ap.name as prod_name,
-			ap.display_name as prod_display_name,
-			ap.quota as prod_quota,
-			COALESCE(ap.quota_interval, '') as prod_quota_interval,
-			ap.quota_time_unit as prod_quota_time_unit,
-			ap.created_at as prod_created_at,
-			ap.created_by as prod_created_by,
-			ap.updated_at as prod_updated_at,
-			ap.updated_by as prod_updated_by,
-			ap.proxies as prod_proxies,
-			ap.environments as prod_environments
+			COALESCE(ap.id,"") as prod_id,
+			COALESCE(ap.name,"") as prod_name,
+			COALESCE(ap.display_name,"") as prod_display_name,
+			COALESCE(ap.quota,"") as prod_quota,
+			COALESCE(ap.quota_interval, 0) as prod_quota_interval,
+			COALESCE(ap.quota_time_unit,"") as prod_quota_time_unit,
+			COALESCE(ap.created_at,"") as prod_created_at,
+			COALESCE(ap.created_by,"") as prod_created_by,
+			COALESCE(ap.updated_at,"") as prod_updated_at,
+			COALESCE(ap.updated_by,"") as prod_updated_by,
+			COALESCE(ap.proxies,"") as prod_proxies,
+			COALESCE(ap.environments,"") as prod_environments,
+			COALESCE(ap.api_resources,"") as prod_resources
 		FROM
 			KMS_APP_CREDENTIAL AS c
 			INNER JOIN KMS_APP AS a
@@ -310,60 +336,56 @@ func getApiKeyDetails(db apid.DB, verifyApiKeyReq VerifyApiKeyRequest, proxies, 
 				ON ap.id = mp.apiprdt_id
 			INNER JOIN KMS_ORGANIZATION AS o
 				ON o.tenant_id = c.tenant_id
-		WHERE (UPPER(ad.status) = 'ACTIVE'
-			AND mp.apiprdt_id = ap.id
+		WHERE 	(mp.apiprdt_id = ap.id
 			AND mp.app_id = a.id
 			AND mp.appcred_id = c.id
-			AND UPPER(mp.status) = 'APPROVED'
-			AND UPPER(a.status) = 'APPROVED'
 			AND c.id = $1
 			AND o.name = $2)
 		UNION ALL
 		SELECT
-			ap.api_resources,
-			ap.environments,
-			"company" as ctype,
-			c.tenant_id,
+			COALESCE("company","") as ctype,
+			COALESCE(c.tenant_id,""),
 
-			c.status,
-			c.consumer_secret,
+			COALESCE(c.status,""),
+			COALESCE(c.consumer_secret,""),
 
-			ad.id as dev_id,
-			ad.display_name as dev_username,
-			"" as dev_first_name,
-			"" as dev_last_name,
-			"" as dev_email,
-			ad.status as dev_status,
-			ad.created_at as dev_created_at,
-			ad.created_by as dev_created_by,
-			ad.updated_at as dev_updated_at,
-			ad.updated_by as dev_updated_by,
+			COALESCE(ad.id,"") as dev_id,
+			COALESCE(ad.display_name,"") as dev_username,
+			COALESCE("","") as dev_first_name,
+			COALESCE("","") as dev_last_name,
+			COALESCE("","") as dev_email,
+			COALESCE(ad.status,"") as dev_status,
+			COALESCE(ad.created_at,"") as dev_created_at,
+			COALESCE(ad.created_by,"") as dev_created_by,
+			COALESCE(ad.updated_at,"") as dev_updated_at,
+			COALESCE(ad.updated_by,"") as dev_updated_by,
 
-			a.id as app_id,
-			a.name as app_name,
-			a.access_type as app_access_type,
-			a.callback_url as app_callback_url,
-			a.display_name as app_display_name,
-			a.status as app_status,
-			a.app_family as app_app_family,
-			a.company_id as app_company_id,
-			a.created_at as app_created_at,
-			a.created_by as app_created_by,
-			a.updated_at as app_updated_at,
-			a.updated_by as app_updated_by,
+			COALESCE(a.id,"") as app_id,
+			COALESCE(a.name,"") as app_name,
+			COALESCE(a.access_type,"") as app_access_type,
+			COALESCE(a.callback_url,"") as app_callback_url,
+			COALESCE(a.display_name,"") as app_display_name,
+			COALESCE(a.status,"") as app_status,
+			COALESCE(a.app_family,"") as app_app_family,
+			COALESCE(a.company_id,"") as app_company_id,
+			COALESCE(a.created_at,"") as app_created_at,
+			COALESCE(a.created_by,"") as app_created_by,
+			COALESCE(a.updated_at,"") as app_updated_at,
+			COALESCE(a.updated_by,"") as app_updated_by,
 
-			ap.id as prod_id,
-			ap.name as prod_name,
-			ap.display_name as prod_display_name,
-			ap.quota as prod_quota,
-			COALESCE(ap.quota_interval, '') as prod_quota_interval,
-			ap.quota_time_unit as prod_quota_time_unit,
-			ap.created_at as prod_created_at,
-			ap.created_by as prod_created_by,
-			ap.updated_at as prod_updated_at,
-			ap.updated_by as prod_updated_by,
-			ap.proxies as prod_proxies,
-			ap.environments as prod_environments
+			COALESCE(ap.id,"") as prod_id,
+			COALESCE(ap.name,"") as prod_name,
+			COALESCE(ap.display_name,"") as prod_display_name,
+			COALESCE(ap.quota,"") as prod_quota,
+			COALESCE(ap.quota_interval,0) as prod_quota_interval,
+			COALESCE(ap.quota_time_unit,"") as prod_quota_time_unit,
+			COALESCE(ap.created_at,"") as prod_created_at,
+			COALESCE(ap.created_by,"") as prod_created_by,
+			COALESCE(ap.updated_at,"") as prod_updated_at,
+			COALESCE(ap.updated_by,"") as prod_updated_by,
+			COALESCE(ap.proxies,"") as prod_proxies,
+			COALESCE(ap.environments,"") as prod_environments,
+			COALESCE(ap.api_resources,"") as prod_resources
 
 		FROM
 			KMS_APP_CREDENTIAL AS c
@@ -377,62 +399,98 @@ func getApiKeyDetails(db apid.DB, verifyApiKeyReq VerifyApiKeyRequest, proxies, 
 				ON ap.id = mp.apiprdt_id
 			INNER JOIN KMS_ORGANIZATION AS o
 				ON o.tenant_id = c.tenant_id
-		WHERE (UPPER(ad.status) = 'ACTIVE'
-			AND mp.apiprdt_id = ap.id
+		WHERE   (mp.apiprdt_id = ap.id
 			AND mp.app_id = a.id
 			AND mp.appcred_id = c.id
-			AND UPPER(mp.status) = 'APPROVED'
-			AND UPPER(a.status) = 'APPROVED'
 			AND c.id = $1
 			AND o.name = $2)
 	;`
 
+	//cid,csecret,did,dusername,dfirstname,dlastname,demail,dstatus,dcreated_at,dcreated_by,dlast_modified_at,dlast_modified_by, aid,aname,aaccesstype,acallbackurl,adisplay_name,astatus,aappfamily, acompany,acreated_at,acreated_by,alast_modified_at,alast_modified_by,pid,pname,pdisplayname,pquota_limit,pqutoainterval,pquotatimeout,pcreated_at,pcreated_by,plast_modified_at,plast_modified_by sql.NullString
+
 	err := db.QueryRow(sSql, verifyApiKeyReq.Key, verifyApiKeyReq.OrganizationName).
 		Scan(
-		resName,
-		resEnv,
-		cType,
-		tenantId,
-		&clientIdDetails.Status,
-		&clientIdDetails.ClientSecret,
+			cType,
+			tenantId,
+			&clientIdDetails.Status,
+			&clientIdDetails.ClientSecret,
 
-		&tempDeveloperDetails.Id,
-		&tempDeveloperDetails.UserName,
-		&tempDeveloperDetails.FirstName,
-		&tempDeveloperDetails.LastName,
-		&tempDeveloperDetails.Email,
-		&tempDeveloperDetails.Status,
-		&tempDeveloperDetails.CreatedAt,
-		&tempDeveloperDetails.CreatedBy,
-		&tempDeveloperDetails.LastmodifiedAt,
-		&tempDeveloperDetails.LastmodifiedBy,
+			&tempDeveloperDetails.Id,
+			&tempDeveloperDetails.UserName,
+			&tempDeveloperDetails.FirstName,
+			&tempDeveloperDetails.LastName,
+			&tempDeveloperDetails.Email,
+			&tempDeveloperDetails.Status,
+			&tempDeveloperDetails.CreatedAt,
+			&tempDeveloperDetails.CreatedBy,
+			&tempDeveloperDetails.LastmodifiedAt,
+			&tempDeveloperDetails.LastmodifiedBy,
 
-		&appDetails.Id,
-		&appDetails.Name,
-		&appDetails.AccessType,
-		&appDetails.CallbackUrl,
-		&appDetails.DisplayName,
-		&appDetails.Status,
-		&appDetails.AppFamily,
-		&appDetails.Company,
-		&appDetails.CreatedAt,
-		&appDetails.CreatedBy,
-		&appDetails.LastmodifiedAt,
-		&appDetails.LastmodifiedBy,
+			&appDetails.Id,
+			&appDetails.Name,
+			&appDetails.AccessType,
+			&appDetails.CallbackUrl,
+			&appDetails.DisplayName,
+			&appDetails.Status,
+			&appDetails.AppFamily,
+			&appDetails.Company,
+			&appDetails.CreatedAt,
+			&appDetails.CreatedBy,
+			&appDetails.LastmodifiedAt,
+			&appDetails.LastmodifiedBy,
 
-		&apiProductDetails.Id,
-		&apiProductDetails.Name,
-		&apiProductDetails.DisplayName,
-		&apiProductDetails.QuotaLimit,
-		&apiProductDetails.QuotaInterval,
-		&apiProductDetails.QuotaTimeunit,
-		&apiProductDetails.CreatedAt,
-		&apiProductDetails.CreatedBy,
-		&apiProductDetails.LastmodifiedAt,
-		&apiProductDetails.LastmodifiedBy,
-		proxies,
-		environments,
-	)
+			&apiProductDetails.Id,
+			&apiProductDetails.Name,
+			&apiProductDetails.DisplayName,
+			&apiProductDetails.QuotaLimit,
+			&apiProductDetails.QuotaInterval,
+			&apiProductDetails.QuotaTimeunit,
+			&apiProductDetails.CreatedAt,
+			&apiProductDetails.CreatedBy,
+			&apiProductDetails.LastmodifiedAt,
+			&apiProductDetails.LastmodifiedBy,
+			&proxies,
+			&environments,
+			&resources,
+		)
+
+	if err != nil {
+		log.Error("error fetching verify apikey details", err)
+	}
+
+	if err := json.Unmarshal([]byte(proxies), &apiProductDetails.Apiproxies); err != nil {
+		log.Debug("unmarshall error for proxies, performing custom unmarshal ", proxies, err)
+		stringArray := splitMalformedJson(proxies)
+		if len(stringArray) > 0 {
+			apiProductDetails.Apiproxies = splitMalformedJson(proxies)
+		}
+	}
+	if err := json.Unmarshal([]byte(environments), &apiProductDetails.Environments); err != nil {
+		log.Debug("unmarshall error for proxies, performing custom unmarshal ", environments, err)
+		stringArray := splitMalformedJson(environments)
+		if len(stringArray) > 0 {
+			apiProductDetails.Environments = splitMalformedJson(environments)
+		}
+	}
+	if err := json.Unmarshal([]byte(resources), &apiProductDetails.Resources); err != nil {
+		log.Debug("unmarshall error for proxies, performing custom unmarshal ", resources, err)
+		stringArray := splitMalformedJson(resources)
+		if len(stringArray) > 0 {
+			apiProductDetails.Resources = stringArray
+		}
+	}
+
+	if appDetails.CallbackUrl != "" {
+		clientIdDetails.RedirectURIs = []string{appDetails.CallbackUrl}
+	}
 
 	return err
+}
+
+func splitMalformedJson(fjson string) []string {
+	s := strings.TrimPrefix(fjson, "{")
+	s = strings.TrimSuffix(s, "}")
+	fs := strings.Split(s, ",")
+	log.Debug("processing splitMalformedJson for ", fjson, " and result is ", fs)
+	return fs
 }

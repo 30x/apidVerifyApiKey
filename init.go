@@ -25,8 +25,8 @@ const (
 )
 
 var (
-	services         apid.Services
-	log              apid.LogService
+	services apid.Services
+	log      apid.LogService
 )
 
 func init() {
@@ -46,12 +46,12 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
 	}
 	dbMan.initDb()
 	apiMan := apiManager{
-		dbMan: dbMan,
-		verifiersEndpoint:  apiPath,
+		dbMan:             dbMan,
+		verifiersEndpoint: apiPath,
 	}
 
 	syncHandler := apigeeSyncHandler{
-		dbMan : dbMan,
+		dbMan:  dbMan,
 		apiMan: apiMan,
 	}
 

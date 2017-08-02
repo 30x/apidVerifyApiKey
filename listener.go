@@ -20,14 +20,13 @@ import (
 )
 
 const (
-	APIGEE_SYNC_EVENT     = "ApigeeSync"
+	APIGEE_SYNC_EVENT = "ApigeeSync"
 )
 
-
 type apigeeSyncHandler struct {
-	dbMan     dbManagerInterface
-	apiMan 	apiManager
-	closed    bool
+	dbMan  dbManagerInterface
+	apiMan apiManager
+	closed bool
 }
 
 func (h *apigeeSyncHandler) initListener(services apid.Services) {
