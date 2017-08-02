@@ -60,9 +60,9 @@ func (a *apiManager) handleRequest(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respStatusCode, atoierr := strconv.Atoi(err.Error())
 		if atoierr != nil {
-			w.WriteHeader(respStatusCode)
-		} else {
 			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(respStatusCode)
 		}
 	}
 

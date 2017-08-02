@@ -48,8 +48,8 @@ type AppDetails struct {
 }
 
 type Attribute struct {
-	Name  string `json:"Name,omitempty"`
-	Value string `json:"Value,omitempty"`
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
 	Kind  string `json:"kind,omitempty"`
 }
 
