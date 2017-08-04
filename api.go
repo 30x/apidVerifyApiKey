@@ -133,7 +133,7 @@ func (apiM apiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) ([]byte
 		return errResponse, err
 	}
 
-	apiM.enrichAttributes(dataWrapper)
+	apiM.enrichAttributes(&dataWrapper)
 
 	if dataWrapper.ctype == "developer" {
 		dataWrapper.verifyApiKeySuccessResponse.Developer = dataWrapper.tempDeveloperDetails
@@ -217,7 +217,7 @@ func contains(givenArray []string, searchString string) bool {
 	return false
 }
 
-func (a *apiManager) enrichAttributes(dataWrapper VerifyApiKeyRequestResponseDataWrapper) {
+func (a *apiManager) enrichAttributes(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) {
 	clientIdAttributes := a.dbMan.getKmsAttributes(dataWrapper.tenant_id, dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId)
 	developerAttributes := a.dbMan.getKmsAttributes(dataWrapper.tenant_id, dataWrapper.tempDeveloperDetails.Id)
 	appAttributes := a.dbMan.getKmsAttributes(dataWrapper.tenant_id, dataWrapper.verifyApiKeySuccessResponse.App.Id)

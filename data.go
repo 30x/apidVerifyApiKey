@@ -15,12 +15,9 @@ package apidVerifyApiKey
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"github.com/30x/apid-core"
-	"strings"
 	"sync"
-	"unicode/utf8"
 )
 
 type dbManager struct {
@@ -274,22 +271,9 @@ func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 		return err
 	}
 
-	if err := json.Unmarshal([]byte(proxies), &dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Apiproxies); err != nil {
-		log.Debug("unmarshall error for proxies, performing custom unmarshal ", proxies, err)
-
-		dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Apiproxies = splitMalformedJson(proxies)
-
-	}
-	if err := json.Unmarshal([]byte(environments), &dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Environments); err != nil {
-		log.Debug("unmarshall error for proxies, performing custom unmarshal ", environments, err)
-		dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Environments = splitMalformedJson(environments)
-
-	}
-	if err := json.Unmarshal([]byte(resources), &dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Resources); err != nil {
-		log.Debug("unmarshall error for proxies, performing custom unmarshal ", resources, err)
-		dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Resources = splitMalformedJson(resources)
-
-	}
+	dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Apiproxies = jsonToStringArray(proxies)
+	dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Environments = jsonToStringArray(environments)
+	dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Resources = jsonToStringArray(resources)
 
 	if dataWrapper.verifyApiKeySuccessResponse.App.CallbackUrl != "" {
 		dataWrapper.verifyApiKeySuccessResponse.ClientId.RedirectURIs = []string{dataWrapper.verifyApiKeySuccessResponse.App.CallbackUrl}
@@ -298,14 +282,4 @@ func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 	log.Debug("dataWrapper : ", dataWrapper)
 
 	return err
-}
-
-func splitMalformedJson(fjson string) []string {
-	var fs []string
-	s := strings.TrimPrefix(fjson, "{")
-	s = strings.TrimSuffix(s, "}")
-	if utf8.RuneCountInString(s) > 0 {
-		fs = strings.Split(s, ",")
-	}
-	return fs
 }
