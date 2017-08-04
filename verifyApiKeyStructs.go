@@ -116,3 +116,11 @@ type VerifyApiKeySuccessResponse struct {
 	Identifier string `json:"identifier,omitempty"`
 	Kind       string `json:"kind,omitempty"`
 }
+
+type VerifyApiKeyRequestResponseDataWrapper struct {
+	verifyApiKeyRequest         VerifyApiKeyRequest
+	verifyApiKeySuccessResponse VerifyApiKeySuccessResponse
+	tempDeveloperDetails        DeveloperDetails
+	ctype                       string
+	tenant_id                   string
+}
