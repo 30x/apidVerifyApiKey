@@ -121,6 +121,7 @@ type VerifyApiKeyRequestResponseDataWrapper struct {
 	verifyApiKeyRequest         VerifyApiKeyRequest
 	verifyApiKeySuccessResponse VerifyApiKeySuccessResponse
 	tempDeveloperDetails        DeveloperDetails
+	apiProducts                 []ApiProductDetails
 	ctype                       string
 	tenant_id                   string
 }

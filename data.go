@@ -17,6 +17,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/30x/apid-core"
+	"strings"
 	"sync"
 )
 
@@ -54,11 +55,11 @@ type dbManagerInterface interface {
 	setDbVersion(string)
 	initDb() error
 	getDb() apid.DB
-	getKmsAttributes(tenantId string, entityId string) []Attribute
+	getKmsAttributes(tenantId string, entities ...string) map[string][]Attribute
 	getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) error
 }
 
-func (dbc *dbManager) getKmsAttributes(tenantId string, entityId string) []Attribute {
+func (dbc *dbManager) getKmsAttributesOld(tenantId, entityId string) []Attribute {
 
 	db := dbc.db
 	var attName, attValue sql.NullString
@@ -87,10 +88,40 @@ func (dbc *dbManager) getKmsAttributes(tenantId string, entityId string) []Attri
 	return attributesForQuery
 }
 
+func (dbc *dbManager) getKmsAttributes(tenantId string, entities ...string) map[string][]Attribute {
+
+	db := dbc.db
+	var attName, attValue sql.NullString
+	var entity_id string
+	// TODO : is there no other better way to do in caluse???
+	sql := `select entity_id, name, value from kms_attributes where tenant_id = $1 and entity_id in ('` + strings.Join(entities, `','`) + `')`
+	mapOfAttributes := make(map[string][]Attribute)
+	attributes, err := db.Query(sql, tenantId)
+	if err != nil {
+		log.Error("Error while fetching attributes for tenant id : %s and entityId : %s", tenantId, err)
+		return mapOfAttributes
+	}
+	for attributes.Next() {
+		err := attributes.Scan(
+			&entity_id,
+			&attName,
+			&attValue,
+		)
+		if err != nil {
+			log.Error("error fetching attributes for entityid ", entities, err)
+		}
+		if attName.String != "" {
+			att := Attribute{Name: attName.String, Value: attValue.String}
+			mapOfAttributes[entity_id] = append(mapOfAttributes[entity_id], att)
+		}
+	}
+	log.Debug("attributes returned for query ", sql, " are ", mapOfAttributes)
+	return mapOfAttributes
+}
+
 func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) error {
 
 	db := dbc.db
-	var proxies, environments, resources string
 	sSql := `
 			SELECT
 				COALESCE("developer","") as ctype,
@@ -121,21 +152,8 @@ func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 				COALESCE(a.created_at,"") as app_created_at,
 				COALESCE(a.created_by,"") as app_created_by,
 				COALESCE(a.updated_at,"") as app_updated_at,
-				COALESCE(a.updated_by,"") as app_updated_by,
+				COALESCE(a.updated_by,"") as app_updated_by
 
-				COALESCE(ap.id,"") as prod_id,
-				COALESCE(ap.name,"") as prod_name,
-				COALESCE(ap.display_name,"") as prod_display_name,
-				COALESCE(ap.quota,"") as prod_quota,
-				COALESCE(ap.quota_interval, 0) as prod_quota_interval,
-				COALESCE(ap.quota_time_unit,"") as prod_quota_time_unit,
-				COALESCE(ap.created_at,"") as prod_created_at,
-				COALESCE(ap.created_by,"") as prod_created_by,
-				COALESCE(ap.updated_at,"") as prod_updated_at,
-				COALESCE(ap.updated_by,"") as prod_updated_by,
-				COALESCE(ap.proxies,"") as prod_proxies,
-				COALESCE(ap.environments,"") as prod_environments,
-				COALESCE(ap.api_resources,"") as prod_resources
 			FROM
 				KMS_APP_CREDENTIAL AS c
 				INNER JOIN KMS_APP AS a
@@ -144,12 +162,10 @@ func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 					ON ad.id = a.developer_id
 				INNER JOIN KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
 					ON mp.appcred_id = c.id
-				INNER JOIN KMS_API_PRODUCT as ap
-					ON ap.id = mp.apiprdt_id
 				INNER JOIN KMS_ORGANIZATION AS o
 					ON o.tenant_id = c.tenant_id
-			WHERE 	(mp.apiprdt_id = ap.id
-				AND mp.app_id = a.id
+			WHERE 	(
+				mp.app_id = a.id
 				AND mp.appcred_id = c.id
 				AND c.id = $1
 				AND o.name = $2)
@@ -183,21 +199,7 @@ func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 				COALESCE(a.created_at,"") as app_created_at,
 				COALESCE(a.created_by,"") as app_created_by,
 				COALESCE(a.updated_at,"") as app_updated_at,
-				COALESCE(a.updated_by,"") as app_updated_by,
-
-				COALESCE(ap.id,"") as prod_id,
-				COALESCE(ap.name,"") as prod_name,
-				COALESCE(ap.display_name,"") as prod_display_name,
-				COALESCE(ap.quota,"") as prod_quota,
-				COALESCE(ap.quota_interval,0) as prod_quota_interval,
-				COALESCE(ap.quota_time_unit,"") as prod_quota_time_unit,
-				COALESCE(ap.created_at,"") as prod_created_at,
-				COALESCE(ap.created_by,"") as prod_created_by,
-				COALESCE(ap.updated_at,"") as prod_updated_at,
-				COALESCE(ap.updated_by,"") as prod_updated_by,
-				COALESCE(ap.proxies,"") as prod_proxies,
-				COALESCE(ap.environments,"") as prod_environments,
-				COALESCE(ap.api_resources,"") as prod_resources
+				COALESCE(a.updated_by,"") as app_updated_by
 
 			FROM
 				KMS_APP_CREDENTIAL AS c
@@ -207,12 +209,10 @@ func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 					ON ad.id = a.company_id
 				INNER JOIN KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
 					ON mp.appcred_id = c.id
-				INNER JOIN KMS_API_PRODUCT as ap
-					ON ap.id = mp.apiprdt_id
 				INNER JOIN KMS_ORGANIZATION AS o
 					ON o.tenant_id = c.tenant_id
-			WHERE   (mp.apiprdt_id = ap.id
-				AND mp.app_id = a.id
+			WHERE   (
+				mp.app_id = a.id
 				AND mp.appcred_id = c.id
 				AND c.id = $1
 				AND o.name = $2)
@@ -250,36 +250,90 @@ func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 			&dataWrapper.verifyApiKeySuccessResponse.App.CreatedBy,
 			&dataWrapper.verifyApiKeySuccessResponse.App.LastmodifiedAt,
 			&dataWrapper.verifyApiKeySuccessResponse.App.LastmodifiedBy,
-
-			&dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id,
-			&dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Name,
-			&dataWrapper.verifyApiKeySuccessResponse.ApiProduct.DisplayName,
-			&dataWrapper.verifyApiKeySuccessResponse.ApiProduct.QuotaLimit,
-			&dataWrapper.verifyApiKeySuccessResponse.ApiProduct.QuotaInterval,
-			&dataWrapper.verifyApiKeySuccessResponse.ApiProduct.QuotaTimeunit,
-			&dataWrapper.verifyApiKeySuccessResponse.ApiProduct.CreatedAt,
-			&dataWrapper.verifyApiKeySuccessResponse.ApiProduct.CreatedBy,
-			&dataWrapper.verifyApiKeySuccessResponse.ApiProduct.LastmodifiedAt,
-			&dataWrapper.verifyApiKeySuccessResponse.ApiProduct.LastmodifiedBy,
-			&proxies,
-			&environments,
-			&resources,
 		)
 
 	if err != nil {
-		log.Error("error fetching verify apikey details", err)
+		log.Error("error fetching verify apikey details ", err)
 		return err
 	}
-
-	dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Apiproxies = jsonToStringArray(proxies)
-	dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Environments = jsonToStringArray(environments)
-	dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Resources = jsonToStringArray(resources)
 
 	if dataWrapper.verifyApiKeySuccessResponse.App.CallbackUrl != "" {
 		dataWrapper.verifyApiKeySuccessResponse.ClientId.RedirectURIs = []string{dataWrapper.verifyApiKeySuccessResponse.App.CallbackUrl}
 	}
 
+	dataWrapper.apiProducts = dbc.getApiProductsForApiKey(dataWrapper.verifyApiKeyRequest.Key, dataWrapper.tenant_id)
+
 	log.Debug("dataWrapper : ", dataWrapper)
 
 	return err
+}
+
+func (dbc dbManager) getApiProductsForApiKey(key, tenantId string) []ApiProductDetails {
+
+	db := dbc.db
+	allProducts := []ApiProductDetails{}
+	var proxies, environments, resources string
+	sSql := `
+			SELECT
+				COALESCE(ap.id,"") as prod_id,
+				COALESCE(ap.name,"") as prod_name,
+				COALESCE(ap.display_name,"") as prod_display_name,
+				COALESCE(ap.quota,"") as prod_quota,
+				COALESCE(ap.quota_interval, 0) as prod_quota_interval,
+				COALESCE(ap.quota_time_unit,"") as prod_quota_time_unit,
+				COALESCE(ap.created_at,"") as prod_created_at,
+				COALESCE(ap.created_by,"") as prod_created_by,
+				COALESCE(ap.updated_at,"") as prod_updated_at,
+				COALESCE(ap.updated_by,"") as prod_updated_by,
+				COALESCE(ap.proxies,"") as prod_proxies,
+				COALESCE(ap.environments,"") as prod_environments,
+				COALESCE(ap.api_resources,"") as prod_resources
+			FROM
+				KMS_APP_CREDENTIAL AS c
+				INNER JOIN KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER as mp
+					ON mp.appcred_id = c.id
+				INNER JOIN KMS_API_PRODUCT as ap
+					ON ap.id = mp.apiprdt_id
+			WHERE 	(mp.apiprdt_id = ap.id
+				AND mp.appcred_id = c.id
+				AND c.id = $1
+				AND ap.tenant_id = $2)
+		;`
+
+	//cid,csecret,did,dusername,dfirstname,dlastname,demail,dstatus,dcreated_at,dcreated_by,dlast_modified_at,dlast_modified_by, aid,aname,aaccesstype,acallbackurl,adisplay_name,astatus,aappfamily, acompany,acreated_at,acreated_by,alast_modified_at,alast_modified_by,pid,pname,pdisplayname,pquota_limit,pqutoainterval,pquotatimeout,pcreated_at,pcreated_by,plast_modified_at,plast_modified_by sql.NullString
+
+	rows, err := db.Query(sSql, key, tenantId)
+
+	if err != nil {
+		log.Error("error fetching apiProduct details", err)
+		return allProducts
+	}
+
+	for rows.Next() {
+		apiProductDetais := ApiProductDetails{}
+		rows.Scan(
+			&apiProductDetais.Id,
+			&apiProductDetais.Name,
+			&apiProductDetais.DisplayName,
+			&apiProductDetais.QuotaLimit,
+			&apiProductDetais.QuotaInterval,
+			&apiProductDetais.QuotaTimeunit,
+			&apiProductDetais.CreatedAt,
+			&apiProductDetais.CreatedBy,
+			&apiProductDetais.LastmodifiedAt,
+			&apiProductDetais.LastmodifiedBy,
+			&proxies,
+			&environments,
+			&resources,
+		)
+		apiProductDetais.Apiproxies = jsonToStringArray(proxies)
+		apiProductDetais.Environments = jsonToStringArray(environments)
+		apiProductDetais.Resources = jsonToStringArray(resources)
+
+		allProducts = append(allProducts, apiProductDetais)
+	}
+
+	log.Debug("Api products retrieved for key : [%s] , tenantId : [%s] is ", key, tenantId, allProducts)
+
+	return allProducts
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/30x/apid-core"
 	"github.com/30x/apid-core/factory"
 	"io/ioutil"
-	"net/http"
+	//"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -47,15 +47,15 @@ var _ = BeforeSuite(func() {
 
 	db, err := apid.Data().DB()
 	Expect(err).NotTo(HaveOccurred())
-	setDB(db)
-	createTables(db)
-	createApidClusterTables(db)
-	addScopes(db)
-	testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path == apiPath {
-			handleRequest(w, req)
-		}
-	}))
+	//setDB(db)
+	//createTables(db)
+	//createApidClusterTables(db)
+	//addScopes(db)
+	//testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	//	if req.URL.Path == apiPath {
+	//		handleRequest(w, req)
+	//	}
+	//}))
 
 	createTestData(db)
 })

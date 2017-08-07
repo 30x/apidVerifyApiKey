@@ -49,6 +49,6 @@ func (h *apigeeSyncHandler) Handle(e apid.Event) {
 	if snapData, ok := e.(*common.Snapshot); ok {
 		h.processSnapshot(snapData)
 	} else {
-		log.Debugf("Received invalid event. Ignoring. %v", e)
+		log.Debugf("Received event. No action required for verifyApiKey plugin. Ignoring. %v", e)
 	}
 }

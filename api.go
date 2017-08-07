@@ -63,8 +63,6 @@ func (apiManager *apiManager) handleRequest(w http.ResponseWriter, r *http.Reque
 		} else {
 			w.WriteHeader(respStatusCode)
 		}
-		// TODO : discuss and finalize on error codes.
-		w.WriteHeader(http.StatusBadRequest)
 	}
 
 	log.Debugf("handleVerifyAPIKey result %s", b)
@@ -117,7 +115,7 @@ func (apiM apiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) ([]byte
 	case err == sql.ErrNoRows:
 		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
 		errorCode := "oauth.v2.InvalidApiKey"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusBadRequest))
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
 
 	case err != nil:
 		reason := err.Error()
@@ -125,6 +123,8 @@ func (apiM apiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) ([]byte
 		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusInternalServerError))
 	}
 
+	apiProduct := shortListApiProduct(dataWrapper.apiProducts, verifyApiKeyReq)
+	dataWrapper.verifyApiKeySuccessResponse.ApiProduct = apiProduct
 	/*
 	 * Perform all validations
 	 */
@@ -135,24 +135,65 @@ func (apiM apiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) ([]byte
 
 	apiM.enrichAttributes(&dataWrapper)
 
-	if dataWrapper.ctype == "developer" {
-		dataWrapper.verifyApiKeySuccessResponse.Developer = dataWrapper.tempDeveloperDetails
-	} else {
-		dataWrapper.verifyApiKeySuccessResponse.Company = CompanyDetails{
-			Id:             dataWrapper.tempDeveloperDetails.Id,
-			DisplayName:    dataWrapper.tempDeveloperDetails.UserName,
-			Status:         dataWrapper.tempDeveloperDetails.Status,
-			CreatedAt:      dataWrapper.tempDeveloperDetails.CreatedAt,
-			CreatedBy:      dataWrapper.tempDeveloperDetails.CreatedBy,
-			LastmodifiedAt: dataWrapper.tempDeveloperDetails.LastmodifiedAt,
-			LastmodifiedBy: dataWrapper.tempDeveloperDetails.LastmodifiedBy,
-			Attributes:     dataWrapper.tempDeveloperDetails.Attributes,
-		}
-	}
+	setDevOrCompanyInResponseBasedOnCtype(dataWrapper.ctype, dataWrapper.tempDeveloperDetails, &dataWrapper.verifyApiKeySuccessResponse)
 
 	resp := dataWrapper.verifyApiKeySuccessResponse
 
 	return json.Marshal(resp)
+}
+
+func setDevOrCompanyInResponseBasedOnCtype(ctype string, tempDeveloperDetails DeveloperDetails, response *VerifyApiKeySuccessResponse) {
+	if ctype == "developer" {
+		response.Developer = tempDeveloperDetails
+	} else {
+		response.Company = CompanyDetails{
+			Id:             tempDeveloperDetails.Id,
+			DisplayName:    tempDeveloperDetails.UserName,
+			Status:         tempDeveloperDetails.Status,
+			CreatedAt:      tempDeveloperDetails.CreatedAt,
+			CreatedBy:      tempDeveloperDetails.CreatedBy,
+			LastmodifiedAt: tempDeveloperDetails.LastmodifiedAt,
+			LastmodifiedBy: tempDeveloperDetails.LastmodifiedBy,
+			Attributes:     tempDeveloperDetails.Attributes,
+		}
+	}
+}
+
+func shortListApiProduct(details []ApiProductDetails, verifyApiKeyReq VerifyApiKeyRequest) ApiProductDetails {
+	var bestMathcedProduct ApiProductDetails
+	rankedProducts := make(map[int][]ApiProductDetails)
+	rankedProducts[2] = []ApiProductDetails{}
+	rankedProducts[3] = []ApiProductDetails{}
+
+	for _, apiProd := range details {
+		if len(apiProd.Resources) == 0 || validatePath(apiProd.Resources, verifyApiKeyReq.UriPath) {
+			if len(apiProd.Apiproxies) == 0 || contains(apiProd.Apiproxies, verifyApiKeyReq.ApiProxyName) {
+				if len(apiProd.Environments) == 0 || contains(apiProd.Environments, verifyApiKeyReq.EnvironmentName) {
+					bestMathcedProduct = apiProd
+					return bestMathcedProduct
+					// set rank 1 or just return
+				} else {
+					// set rank to 2
+					rankedProducts[2] = append(rankedProducts[2], apiProd)
+				}
+			} else {
+				// set rank to 3,
+				rankedProducts[3] = append(rankedProducts[3], apiProd)
+			}
+		}
+	}
+
+	// TODO : remove this check from here and let performValidations take care of checking this
+	if !verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs {
+		if len(rankedProducts[2]) > 0 {
+			return rankedProducts[2][0]
+		} else if len(rankedProducts[3]) > 0 {
+			return rankedProducts[3][0]
+		}
+	}
+
+	return bestMathcedProduct
+
 }
 
 func (apiM apiManager) performValidations(dataWrapper VerifyApiKeyRequestResponseDataWrapper) ([]byte, error) {
@@ -166,13 +207,13 @@ func (apiM apiManager) performValidations(dataWrapper VerifyApiKeyRequestRespons
 	if !strings.EqualFold("APPROVED", clientIdDetails.Status) {
 		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
 		errorCode := "oauth.v2.ApiKeyNotApproved"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
 	}
 
 	if !strings.EqualFold("APPROVED", appDetails.Status) {
 		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
 		errorCode := "keymanagement.service.invalid_client-app_not_approved"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
 	}
 
 	if !strings.EqualFold("ACTIVE", tempDeveloperDetails.Status) {
@@ -181,47 +222,46 @@ func (apiM apiManager) performValidations(dataWrapper VerifyApiKeyRequestRespons
 		if cType == "company" {
 			errorCode = "keymanagement.service.CompanyStatusNotActive"
 		}
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
+	}
+
+	if dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id == "" {
+		reason := "Path Validation Failed. Product not resolved"
+		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
 	}
 
 	result := validatePath(apiProductDetails.Resources, verifyApiKeyReq.UriPath)
 	if result == false {
 		reason := "Path Validation Failed (" + strings.Join(apiProductDetails.Resources, ", ") + " vs " + verifyApiKeyReq.UriPath + ")"
 		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
 	}
 
+	// TODO : empty check
+	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && !contains(apiProductDetails.Apiproxies, verifyApiKeyReq.ApiProxyName) {
+		reason := "Proxy Validation Failed (" + strings.Join(apiProductDetails.Apiproxies, ", ") + " vs " + verifyApiKeyReq.ApiProxyName + ")"
+		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
+	}
 	/* Verify if the ENV matches */
 	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && !contains(apiProductDetails.Environments, verifyApiKeyReq.EnvironmentName) {
 		reason := "ENV Validation Failed (" + strings.Join(apiProductDetails.Environments, ", ") + " vs " + verifyApiKeyReq.EnvironmentName + ")"
 		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
-	}
-
-	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && !contains(apiProductDetails.Apiproxies, verifyApiKeyReq.ApiProxyName) {
-		reason := "Proxy Validation Failed (" + strings.Join(apiProductDetails.Apiproxies, ", ") + " vs " + verifyApiKeyReq.ApiProxyName + ")"
-		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusUnauthorized))
+		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
 	}
 
 	return nil, nil
 
 }
 
-func contains(givenArray []string, searchString string) bool {
-	for _, element := range givenArray {
-		if element == searchString {
-			return true
-		}
-	}
-	return false
-}
-
 func (a *apiManager) enrichAttributes(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) {
-	clientIdAttributes := a.dbMan.getKmsAttributes(dataWrapper.tenant_id, dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId)
-	developerAttributes := a.dbMan.getKmsAttributes(dataWrapper.tenant_id, dataWrapper.tempDeveloperDetails.Id)
-	appAttributes := a.dbMan.getKmsAttributes(dataWrapper.tenant_id, dataWrapper.verifyApiKeySuccessResponse.App.Id)
-	apiProductAttributes := a.dbMan.getKmsAttributes(dataWrapper.tenant_id, dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id)
+	attributeMap := a.dbMan.getKmsAttributes(dataWrapper.tenant_id, dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId, dataWrapper.tempDeveloperDetails.Id, dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id, dataWrapper.verifyApiKeySuccessResponse.App.Id)
+
+	clientIdAttributes := attributeMap[dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId]
+	developerAttributes := attributeMap[dataWrapper.tempDeveloperDetails.Id]
+	appAttributes := attributeMap[dataWrapper.verifyApiKeySuccessResponse.App.Id]
+	apiProductAttributes := attributeMap[dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id]
 
 	dataWrapper.verifyApiKeySuccessResponse.ClientId.Attributes = clientIdAttributes
 	dataWrapper.verifyApiKeySuccessResponse.App.Attributes = appAttributes

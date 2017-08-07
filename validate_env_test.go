@@ -22,19 +22,19 @@ import (
 var _ = Describe("Validate Env", func() {
 
 	It("validation1", func() {
-		s := validateEnv("{foo,bar}", "foo")
+		s := contains([]string{"foo", "bar"}, "foo")
 		Expect(s).Should(BeTrue())
 	})
 	It("validation2", func() {
-		s := validateEnv("{foo,bar}", "bar")
+		s := contains([]string{"foo", "bar"}, "bar")
 		Expect(s).Should(BeTrue())
 	})
 	It("validation3", func() {
-		s := validateEnv("{foo,bar}", "xxx")
+		s := contains([]string{"foo", "bar"}, "xxx")
 		Expect(s).Should(BeFalse())
 	})
 	It("validation4", func() {
-		s := validateEnv("{}", "xxx")
+		s := contains([]string{}, "xxx")
 		Expect(s).Should(BeFalse())
 	})
 })

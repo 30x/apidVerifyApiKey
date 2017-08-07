@@ -21,21 +21,6 @@ import (
 	"unicode/utf8"
 )
 
-func validateEnv(envLocal string, envInPath string) bool {
-	if envInPath == "" {
-		return false
-	}
-	s := strings.TrimPrefix(envLocal, "{")
-	s = strings.TrimSuffix(s, "}")
-	fs := strings.Split(s, ",")
-	for _, a := range fs {
-		if a == envInPath {
-			return true
-		}
-	}
-	return false
-}
-
 /*
  * Check for the base path (API_Product) match with the path
  * received in the Request, via the customized regex, where
@@ -76,11 +61,20 @@ func jsonToStringArray(fjson string) []string {
 	if err := json.Unmarshal([]byte(fjson), array); err == nil {
 		return array
 	}
-	log.Debug("unmarshall error for string, performing custom unmarshal ", fjson)
 	s := strings.TrimPrefix(fjson, "{")
 	s = strings.TrimSuffix(s, "}")
 	if utf8.RuneCountInString(s) > 0 {
 		array = strings.Split(s, ",")
 	}
+	log.Debug("unmarshall error for string, performing custom unmarshal ", fjson, " and result is : ", array)
 	return array
+}
+
+func contains(givenArray []string, searchString string) bool {
+	for _, element := range givenArray {
+		if element == searchString {
+			return true
+		}
+	}
+	return false
 }
