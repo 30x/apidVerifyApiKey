@@ -15,6 +15,7 @@
 package apidVerifyApiKey
 
 import (
+	"encoding/json"
 	"github.com/30x/apid-core"
 	"github.com/30x/apid-core/factory"
 	"testing"
@@ -212,6 +213,102 @@ var performValidationsTestData = []struct {
 			},
 		},
 	},
+	{
+		testDesc:                           "resources not configured in db",
+		expectedResult:                     "",
+		expectedWhenValidateProxyEnvIsTrue: "",
+		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+			verifyApiKeyRequest: VerifyApiKeyRequest{
+				Key:              "test-key",
+				OrganizationName: "test-org",
+				UriPath:          "/test",
+				ApiProxyName:     "test-proxy-name",
+				EnvironmentName:  "test-env-name",
+			},
+			tempDeveloperDetails: DeveloperDetails{
+				Status: "ACTIVE",
+			},
+			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+				ApiProduct: ApiProductDetails{
+					Id:           "test-api-product",
+					Resources:    []string{},
+					Apiproxies:   []string{"test-proxy-name"},
+					Environments: []string{"test-env-name"},
+					Status:       "APPROVED",
+				},
+				App: AppDetails{
+					Status: "APPROVED",
+				},
+				ClientId: ClientIdDetails{
+					Status: "APPROVED",
+				},
+			},
+		},
+	},
+	{
+		testDesc:                           "proxies not configured in db",
+		expectedResult:                     "",
+		expectedWhenValidateProxyEnvIsTrue: "",
+		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+			verifyApiKeyRequest: VerifyApiKeyRequest{
+				Key:              "test-key",
+				OrganizationName: "test-org",
+				UriPath:          "/test",
+				ApiProxyName:     "test-proxy-name",
+				EnvironmentName:  "test-env-name",
+			},
+			tempDeveloperDetails: DeveloperDetails{
+				Status: "ACTIVE",
+			},
+			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+				ApiProduct: ApiProductDetails{
+					Id:           "test-api-product",
+					Resources:    []string{"/test"},
+					Apiproxies:   []string{},
+					Environments: []string{"test-env-name"},
+					Status:       "APPROVED",
+				},
+				App: AppDetails{
+					Status: "APPROVED",
+				},
+				ClientId: ClientIdDetails{
+					Status: "APPROVED",
+				},
+			},
+		},
+	},
+	{
+		testDesc:                           "environments not configured in db",
+		expectedResult:                     "",
+		expectedWhenValidateProxyEnvIsTrue: "",
+		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+			verifyApiKeyRequest: VerifyApiKeyRequest{
+				Key:              "test-key",
+				OrganizationName: "test-org",
+				UriPath:          "/test",
+				ApiProxyName:     "test-proxy-name",
+				EnvironmentName:  "test-env-name",
+			},
+			tempDeveloperDetails: DeveloperDetails{
+				Status: "ACTIVE",
+			},
+			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+				ApiProduct: ApiProductDetails{
+					Id:           "test-api-product",
+					Resources:    []string{"/test"},
+					Apiproxies:   []string{"test-proxy-name"},
+					Environments: []string{},
+					Status:       "APPROVED",
+				},
+				App: AppDetails{
+					Status: "APPROVED",
+				},
+				ClientId: ClientIdDetails{
+					Status: "APPROVED",
+				},
+			},
+		},
+	},
 }
 
 func TestPerformValidation(t *testing.T) {
@@ -221,12 +318,16 @@ func TestPerformValidation(t *testing.T) {
 	log = factory.DefaultServicesFactory().Log()
 	a := apiManager{}
 	for _, td := range performValidationsTestData {
-		actual, err := a.performValidations(td.dataWrapper)
-		if string(actual) != td.expectedResult {
-			t.Errorf("TestData (%s) ValidateProxyEnv (%t) : expected (%s), actual (%s)", td.testDesc, td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs, td.expectedResult, string(actual))
+		actualObject := a.performValidations(td.dataWrapper)
+		var actual string
+		if actualObject != nil {
+			a, _ := json.Marshal(&actualObject)
+			actual = string(a)
+		} else {
+			actual = ""
 		}
-		if err != nil && err.Error() != "200" {
-			t.Error("Expected to return 200 status code")
+		if string(actual) != td.expectedResult {
+			t.Errorf("TestData (%s) ValidateProxyEnv (%t) : expected (%s), actual (%s)", td.testDesc, td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs, td.expectedResult, actual)
 		}
 	}
 }
@@ -239,12 +340,17 @@ func TestPerformValidationValidateProxyEnv(t *testing.T) {
 	a := apiManager{}
 	for _, td := range performValidationsTestData {
 		td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs = true
-		actual, err := a.performValidations(td.dataWrapper)
-		if string(actual) != td.expectedWhenValidateProxyEnvIsTrue {
-			t.Errorf("TestData (%s) ValidateProxyEnv (%t) : expected (%s), actual (%s)", td.testDesc, td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs, td.expectedWhenValidateProxyEnvIsTrue, string(actual))
+		actualObject := a.performValidations(td.dataWrapper)
+		var actual string
+		if actualObject != nil {
+			a, _ := json.Marshal(&actualObject)
+			actual = string(a)
+		} else {
+			actual = ""
 		}
-		if err != nil && err.Error() != "200" {
-			t.Error("Expected to return 200 status code")
+		if string(actual) != td.expectedWhenValidateProxyEnvIsTrue {
+
+			t.Errorf("TestData (%s) ValidateProxyEnv (%t) : expected (%s), actual (%s)", td.testDesc, td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs, td.expectedWhenValidateProxyEnvIsTrue, actual)
 		}
 	}
 }

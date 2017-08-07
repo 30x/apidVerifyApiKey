@@ -254,7 +254,7 @@ func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 
 	if err != nil {
 		log.Error("error fetching verify apikey details ", err)
-		return err
+		return errors.New("InvalidApiKey")
 	}
 
 	if dataWrapper.verifyApiKeySuccessResponse.App.CallbackUrl != "" {

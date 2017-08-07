@@ -15,7 +15,6 @@
 package apidVerifyApiKey
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -47,14 +46,14 @@ func (a *apiManager) InitAPI() {
 }
 
 // handle client API
-func (apiManager *apiManager) handleRequest(w http.ResponseWriter, r *http.Request) {
+func (a *apiManager) handleRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	verifyApiKeyReq, err := validateRequest(r.Body, w)
 	if err != nil {
 		return
 	}
 
-	b, err := apiManager.verifyAPIKey(verifyApiKeyReq)
+	b, err := a.verifyAPIKey(verifyApiKeyReq)
 
 	if err != nil {
 		respStatusCode, atoierr := strconv.Atoi(err.Error())
@@ -91,9 +90,10 @@ func validateRequest(requestBody io.ReadCloser, w http.ResponseWriter) (VerifyAp
 	log.Debug(verifyApiKeyReq)
 
 	// 2. verify params
+	// TODO : make this method of verifyApiKeyReq struct
 	if verifyApiKeyReq.Action == "" || verifyApiKeyReq.ApiProxyName == "" || verifyApiKeyReq.OrganizationName == "" || verifyApiKeyReq.EnvironmentName == "" || verifyApiKeyReq.Key == "" {
-		// TODO : set correct fields in error response
-		errorResponse := errorResponse("Bad_REQUEST", "Missing element")
+		// TODO : set correct missing fields in error response
+		errorResponse, _ := json.Marshal(errorResponse("Bad_REQUEST", "Missing element", http.StatusBadRequest))
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write(errorResponse)
 		return verifyApiKeyReq, errors.New("Bad_REQUEST")
@@ -112,25 +112,26 @@ func (apiM apiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) ([]byte
 	err := apiM.dbMan.getApiKeyDetails(&dataWrapper)
 
 	switch {
-	case err == sql.ErrNoRows:
+	case err != nil && err.Error() == "InvalidApiKey":
 		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
 		errorCode := "oauth.v2.InvalidApiKey"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
+		errResponse := errorResponse(reason, errorCode, http.StatusOK)
+		return json.Marshal(errResponse)
 
 	case err != nil:
 		reason := err.Error()
 		errorCode := "SEARCH_INTERNAL_ERROR"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusInternalServerError))
+		errResponse := errorResponse(reason, errorCode, http.StatusInternalServerError)
+		return json.Marshal(errResponse)
 	}
 
-	apiProduct := shortListApiProduct(dataWrapper.apiProducts, verifyApiKeyReq)
-	dataWrapper.verifyApiKeySuccessResponse.ApiProduct = apiProduct
+	dataWrapper.verifyApiKeySuccessResponse.ApiProduct = shortListApiProduct(dataWrapper.apiProducts, verifyApiKeyReq)
 	/*
 	 * Perform all validations
 	 */
-	errResponse, err := apiM.performValidations(dataWrapper)
+	errResponse := apiM.performValidations(dataWrapper)
 	if errResponse != nil {
-		return errResponse, err
+		return json.Marshal(&errResponse)
 	}
 
 	apiM.enrichAttributes(&dataWrapper)
@@ -183,79 +184,78 @@ func shortListApiProduct(details []ApiProductDetails, verifyApiKeyReq VerifyApiK
 		}
 	}
 
-	// TODO : remove this check from here and let performValidations take care of checking this
-	if !verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs {
-		if len(rankedProducts[2]) > 0 {
-			return rankedProducts[2][0]
-		} else if len(rankedProducts[3]) > 0 {
-			return rankedProducts[3][0]
-		}
+	if len(rankedProducts[2]) > 0 {
+		return rankedProducts[2][0]
+	} else if len(rankedProducts[3]) > 0 {
+		return rankedProducts[3][0]
 	}
 
 	return bestMathcedProduct
 
 }
 
-func (apiM apiManager) performValidations(dataWrapper VerifyApiKeyRequestResponseDataWrapper) ([]byte, error) {
+func (apiM apiManager) performValidations(dataWrapper VerifyApiKeyRequestResponseDataWrapper) *ErrorResponse {
 	clientIdDetails := dataWrapper.verifyApiKeySuccessResponse.ClientId
 	verifyApiKeyReq := dataWrapper.verifyApiKeyRequest
 	appDetails := dataWrapper.verifyApiKeySuccessResponse.App
 	tempDeveloperDetails := dataWrapper.tempDeveloperDetails
 	cType := dataWrapper.ctype
 	apiProductDetails := dataWrapper.verifyApiKeySuccessResponse.ApiProduct
+	var reason, errorCode string
 
 	if !strings.EqualFold("APPROVED", clientIdDetails.Status) {
-		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
-		errorCode := "oauth.v2.ApiKeyNotApproved"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
+		reason = "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
+		errorCode = "oauth.v2.ApiKeyNotApproved"
 	}
 
 	if !strings.EqualFold("APPROVED", appDetails.Status) {
-		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
-		errorCode := "keymanagement.service.invalid_client-app_not_approved"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
+		reason = "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
+		errorCode = "keymanagement.service.invalid_client-app_not_approved"
 	}
 
 	if !strings.EqualFold("ACTIVE", tempDeveloperDetails.Status) {
-		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
-		errorCode := "keymanagement.service.DeveloperStatusNotActive"
+		reason = "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
+		errorCode = "keymanagement.service.DeveloperStatusNotActive"
 		if cType == "company" {
 			errorCode = "keymanagement.service.CompanyStatusNotActive"
 		}
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
 	}
 
 	if dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id == "" {
-		reason := "Path Validation Failed. Product not resolved"
-		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
+		reason = "Path Validation Failed. Product not resolved"
+		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
 	}
 
-	result := validatePath(apiProductDetails.Resources, verifyApiKeyReq.UriPath)
-	if result == false {
-		reason := "Path Validation Failed (" + strings.Join(apiProductDetails.Resources, ", ") + " vs " + verifyApiKeyReq.UriPath + ")"
-		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
+	result := len(apiProductDetails.Resources) == 0 || validatePath(apiProductDetails.Resources, verifyApiKeyReq.UriPath)
+	if !result {
+		reason = "Path Validation Failed (" + strings.Join(apiProductDetails.Resources, ", ") + " vs " + verifyApiKeyReq.UriPath + ")"
+		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
 	}
 
 	// TODO : empty check
-	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && !contains(apiProductDetails.Apiproxies, verifyApiKeyReq.ApiProxyName) {
-		reason := "Proxy Validation Failed (" + strings.Join(apiProductDetails.Apiproxies, ", ") + " vs " + verifyApiKeyReq.ApiProxyName + ")"
-		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
+	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && (len(apiProductDetails.Apiproxies) > 0 && !contains(apiProductDetails.Apiproxies, verifyApiKeyReq.ApiProxyName)) {
+		reason = "Proxy Validation Failed (" + strings.Join(apiProductDetails.Apiproxies, ", ") + " vs " + verifyApiKeyReq.ApiProxyName + ")"
+		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
 	}
 	/* Verify if the ENV matches */
-	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && !contains(apiProductDetails.Environments, verifyApiKeyReq.EnvironmentName) {
-		reason := "ENV Validation Failed (" + strings.Join(apiProductDetails.Environments, ", ") + " vs " + verifyApiKeyReq.EnvironmentName + ")"
-		errorCode := "oauth.v2.InvalidApiKeyForGivenResource"
-		return errorResponse(reason, errorCode), errors.New(strconv.Itoa(http.StatusOK))
+	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && (len(apiProductDetails.Environments) > 0 && !contains(apiProductDetails.Environments, verifyApiKeyReq.EnvironmentName)) {
+		reason = "ENV Validation Failed (" + strings.Join(apiProductDetails.Environments, ", ") + " vs " + verifyApiKeyReq.EnvironmentName + ")"
+		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
+
 	}
 
-	return nil, nil
+	if errorCode != "" {
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
+	}
+
+	return nil
 
 }
 
 func (a *apiManager) enrichAttributes(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) {
+
 	attributeMap := a.dbMan.getKmsAttributes(dataWrapper.tenant_id, dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId, dataWrapper.tempDeveloperDetails.Id, dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id, dataWrapper.verifyApiKeySuccessResponse.App.Id)
 
 	clientIdAttributes := attributeMap[dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId]
@@ -269,7 +269,7 @@ func (a *apiManager) enrichAttributes(dataWrapper *VerifyApiKeyRequestResponseDa
 	dataWrapper.tempDeveloperDetails.Attributes = developerAttributes
 }
 
-func errorResponse(reason, errorCode string) []byte {
+func errorResponse(reason, errorCode string, statusCode int) ErrorResponse {
 	if errorCode == "SEARCH_INTERNAL_ERROR" {
 		log.Error(reason)
 	} else {
@@ -278,7 +278,7 @@ func errorResponse(reason, errorCode string) []byte {
 	resp := ErrorResponse{
 		ResponseCode:    errorCode,
 		ResponseMessage: reason,
+		StatusCode:      statusCode,
 	}
-	ret, _ := json.Marshal(resp)
-	return ret
+	return resp
 }

@@ -87,6 +87,7 @@ type DeveloperDetails struct {
 type ErrorResponse struct {
 	ResponseCode    string `json:"response_code,omitempty"`
 	ResponseMessage string `json:"response_message,omitempty"`
+	StatusCode      int    `json:"-"`
 	Kind            string `json:"kind,omitempty"`
 }
 

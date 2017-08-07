@@ -130,13 +130,3 @@ func TestShortListApiProduct(t *testing.T) {
 		}
 	}
 }
-
-func TestShortListApiProductValidateProxyEnv(t *testing.T) {
-	for _, td := range shortListApiProductTestData {
-		td.req.ValidateAgainstApiProxiesAndEnvs = true
-		actual := shortListApiProduct(td.dbData, td.req)
-		if actual.Id != td.expectedWhenValidateProxyEnvIsTrue {
-			t.Errorf("TestData (%s) ValidateProxyEnv (%t) : expected (%s), actual (%s)", td.testDesc, td.req.ValidateAgainstApiProxiesAndEnvs, td.expectedResult, actual.Id)
-		}
-	}
-}
