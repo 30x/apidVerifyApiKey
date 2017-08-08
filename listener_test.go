@@ -16,63 +16,75 @@ package apidVerifyApiKey
 
 import (
 	"github.com/30x/apid-core"
+	"github.com/30x/apid-core/factory"
 	"github.com/apigee-labs/transicator/common"
 	. "github.com/onsi/ginkgo"
-	//. "github.com/onsi/gomega"
-	//"github.com/30x/apid-core/data"
+	. "github.com/onsi/gomega"
+	"io/ioutil"
+	"os"
+	"sync"
 )
 
 var _ = Describe("listener", func() {
 
-	Context("KMS create/updates verification via changes for Developer", func() {
+	var listnerTestSyncHandler apigeeSyncHandler
+	var listnerTestTempDir string
+	var _ = BeforeEach(func() {
+		var err error
+		listnerTestTempDir, err = ioutil.TempDir("", "listner_test")
+		s := factory.DefaultServicesFactory()
+		apid.Initialize(s)
+		config := apid.Config()
+		config.Set("data_path", listnerTestTempDir)
+		Expect(err).NotTo(HaveOccurred())
 
-		handler := apigeeSyncHandler{}
+		apid.InitializePlugins("")
+
+		db, err := apid.Data().DB()
+		Expect(err).NotTo(HaveOccurred())
+
+		dbMan := &dbManager{
+			data:  s.Data(),
+			dbMux: sync.RWMutex{},
+			db:    db,
+		}
+		dbMan.initDb()
+
+		listnerTestSyncHandler = apigeeSyncHandler{
+			dbMan:  dbMan,
+			apiMan: apiManager{},
+		}
+
+		listnerTestSyncHandler.initListener(s)
+	})
+
+	var _ = AfterEach(func() {
+		os.RemoveAll(listnerTestTempDir)
+	})
+
+	Context("Apigee Sync Event Processing", func() {
 
 		It("should set DB to appropriate version", func() {
-
-			//saveDb := handler.dbMan.getDb()
-
 			s := &common.Snapshot{
 				SnapshotInfo: "test_snapshot",
 				Tables:       []common.Table{},
 			}
+			listnerTestSyncHandler.Handle(s)
+			Expect(listnerTestSyncHandler.dbMan.getDbVersion()).Should(BeEquivalentTo(s.SnapshotInfo))
 
-			handler.Handle(s)
+		})
 
-			//expectedDB, err := handler.dbMan.data.DBVersion(s.SnapshotInfo)
-			//Expect(err).NotTo(HaveOccurred())
-			//
-			//Expect(getDB() == expectedDB).Should(BeTrue())
-			//
-			////restore the db to the valid one
-			//setDB(saveDb)
+		It("should not change version for chang event", func() {
+
+			version := listnerTestSyncHandler.dbMan.getDbVersion()
+			s := &common.Change{
+				ChangeSequence: 12321,
+				Table:          "",
+			}
+			testSyncHandler.Handle(s)
+			Expect(listnerTestSyncHandler.dbMan.getDbVersion() == version).Should(BeTrue())
+
 		})
 
 	})
 })
-
-func addScopes(db apid.DB) {
-	txn, _ := db.Begin()
-	txn.Exec("INSERT INTO EDGEX_DATA_SCOPE (id, _change_selector, apid_cluster_id, scope, org, env) "+
-		"VALUES"+
-		"($1,$2,$3,$4,$5,$6)",
-		"ABCDE",
-		"some_cluster_id",
-		"some_cluster_id",
-		"tenant_id_xxxx",
-		"test_org0",
-		"Env_0",
-	)
-	txn.Exec("INSERT INTO EDGEX_DATA_SCOPE (id, _change_selector, apid_cluster_id, scope, org, env) "+
-		"VALUES"+
-		"($1,$2,$3,$4,$5,$6)",
-		"XYZ",
-		"test_org0",
-		"somecluster_id",
-		"tenant_id_0",
-		"test_org0",
-		"Env_0",
-	)
-	log.Info("Inserted EDGEX_DATA_SCOPE for test")
-	txn.Commit()
-}

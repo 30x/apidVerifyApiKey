@@ -22,9 +22,10 @@ import (
 )
 
 type dbManager struct {
-	data  apid.DataService
-	db    apid.DB
-	dbMux sync.RWMutex
+	data      apid.DataService
+	db        apid.DB
+	dbMux     sync.RWMutex
+	dbVersion string
 }
 
 func (dbc *dbManager) setDbVersion(version string) {
@@ -35,6 +36,8 @@ func (dbc *dbManager) setDbVersion(version string) {
 	dbc.dbMux.Lock()
 	dbc.db = db
 	dbc.dbMux.Unlock()
+	dbc.dbVersion = version
+	// TODO : check if we need to release old db here...
 }
 
 func (dbc *dbManager) getDb() apid.DB {
@@ -51,10 +54,15 @@ func (dbc *dbManager) initDb() error {
 	return nil
 }
 
+func (dbc *dbManager) getDbVersion() string {
+	return dbc.dbVersion
+}
+
 type dbManagerInterface interface {
 	setDbVersion(string)
 	initDb() error
 	getDb() apid.DB
+	getDbVersion() string
 	getKmsAttributes(tenantId string, entities ...string) map[string][]Attribute
 	getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) error
 }
@@ -94,7 +102,7 @@ func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 
 	db := dbc.db
 
-	err := db.QueryRow(sql_GET_API_KEY_DETAILS_SQL , dataWrapper.verifyApiKeyRequest.Key, dataWrapper.verifyApiKeyRequest.OrganizationName).
+	err := db.QueryRow(sql_GET_API_KEY_DETAILS_SQL, dataWrapper.verifyApiKeyRequest.Key, dataWrapper.verifyApiKeyRequest.OrganizationName).
 		Scan(
 			&dataWrapper.ctype,
 			&dataWrapper.tenant_id,

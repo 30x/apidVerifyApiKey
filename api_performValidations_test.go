@@ -18,339 +18,487 @@ import (
 	"encoding/json"
 	"github.com/30x/apid-core"
 	"github.com/30x/apid-core/factory"
-	"testing"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-var performValidationsTestData = []struct {
+type performValidationsTestDataStruct struct {
 	testDesc                           string
 	dataWrapper                        VerifyApiKeyRequestResponseDataWrapper
 	expectedResult                     string
 	expectedWhenValidateProxyEnvIsTrue string
-}{
-	{
-		testDesc:                           "happy-path",
-		expectedResult:                     "",
-		expectedWhenValidateProxyEnvIsTrue: "",
-		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
-			verifyApiKeyRequest: VerifyApiKeyRequest{
-				Key:              "test-key",
-				OrganizationName: "test-org",
-				UriPath:          "/test",
-				ApiProxyName:     "test-proxy-name",
-				EnvironmentName:  "test-env-name",
-			},
-			tempDeveloperDetails: DeveloperDetails{
-				Status: "ACTIVE",
-			},
-			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
-				ApiProduct: ApiProductDetails{
-					Id:           "test-api-product",
-					Resources:    []string{"/**"},
-					Apiproxies:   []string{"test-proxy-name"},
-					Environments: []string{"test-env-name"},
-					Status:       "APPROVED",
-				},
-				App: AppDetails{
-					Status: "APPROVED",
-				},
-				ClientId: ClientIdDetails{
-					Status: "APPROVED",
-				},
-			},
-		},
-	}, {
-		testDesc:                           "Inactive Developer",
-		expectedResult:                     "{\"response_code\":\"keymanagement.service.DeveloperStatusNotActive\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
-		expectedWhenValidateProxyEnvIsTrue: "{\"response_code\":\"keymanagement.service.DeveloperStatusNotActive\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
-		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
-			verifyApiKeyRequest: VerifyApiKeyRequest{
-				Key:              "test-key",
-				OrganizationName: "test-org",
-				UriPath:          "/test",
-				ApiProxyName:     "test-proxy-name",
-				EnvironmentName:  "test-env-name",
-			},
-			tempDeveloperDetails: DeveloperDetails{
-				Status: "INACTIVE",
-			},
-			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
-				ApiProduct: ApiProductDetails{
-					Id:           "test-api-product",
-					Resources:    []string{"/**"},
-					Apiproxies:   []string{"test-proxy-name"},
-					Environments: []string{"test-env-name"},
-					Status:       "APPROVED",
-				},
-				App: AppDetails{
-					Status: "APPROVED",
-				},
-				ClientId: ClientIdDetails{
-					Status: "APPROVED",
-				},
-			},
-		},
-	},
-	{
-		testDesc:                           "Revoked Client Id",
-		expectedResult:                     "{\"response_code\":\"oauth.v2.ApiKeyNotApproved\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
-		expectedWhenValidateProxyEnvIsTrue: "{\"response_code\":\"oauth.v2.ApiKeyNotApproved\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
-		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
-			verifyApiKeyRequest: VerifyApiKeyRequest{
-				Key:              "test-key",
-				OrganizationName: "test-org",
-				UriPath:          "/test",
-				ApiProxyName:     "test-proxy-name",
-				EnvironmentName:  "test-env-name",
-			},
-			tempDeveloperDetails: DeveloperDetails{
-				Status: "ACTIVE",
-			},
-			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
-				ApiProduct: ApiProductDetails{
-					Id:           "test-api-product",
-					Resources:    []string{"/**"},
-					Apiproxies:   []string{"test-proxy-name"},
-					Environments: []string{"test-env-name"},
-					Status:       "APPROVED",
-				},
-				App: AppDetails{
-					Status: "APPROVED",
-				},
-				ClientId: ClientIdDetails{
-					Status: "REVOKED",
-				},
-			},
-		},
-	},
-	{
-		testDesc:                           "Revoked App",
-		expectedResult:                     "{\"response_code\":\"keymanagement.service.invalid_client-app_not_approved\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
-		expectedWhenValidateProxyEnvIsTrue: "{\"response_code\":\"keymanagement.service.invalid_client-app_not_approved\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
-		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
-			verifyApiKeyRequest: VerifyApiKeyRequest{
-				Key:              "test-key",
-				OrganizationName: "test-org",
-				UriPath:          "/test",
-				ApiProxyName:     "test-proxy-name",
-				EnvironmentName:  "test-env-name",
-			},
-			tempDeveloperDetails: DeveloperDetails{
-				Status: "ACTIVE",
-			},
-			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
-				ApiProduct: ApiProductDetails{
-					Id:           "test-api-product",
-					Resources:    []string{"/**"},
-					Apiproxies:   []string{"test-proxy-name"},
-					Environments: []string{"test-env-name"},
-					Status:       "APPROVED",
-				},
-				App: AppDetails{
-					Status: "REVOKED",
-				},
-				ClientId: ClientIdDetails{
-					Status: "APPROVED",
-				},
-			},
-		},
-	},
-	{
-		testDesc:                           "Company Inactive",
-		expectedResult:                     "{\"response_code\":\"keymanagement.service.CompanyStatusNotActive\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
-		expectedWhenValidateProxyEnvIsTrue: "{\"response_code\":\"keymanagement.service.CompanyStatusNotActive\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
-		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
-			ctype: "company",
-			verifyApiKeyRequest: VerifyApiKeyRequest{
-				Key:              "test-key",
-				OrganizationName: "test-org",
-				UriPath:          "/test",
-				ApiProxyName:     "test-proxy-name",
-				EnvironmentName:  "test-env-name",
-			},
-			tempDeveloperDetails: DeveloperDetails{
-				Status: "INACTIVE",
-			},
-			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
-				ApiProduct: ApiProductDetails{
-					Id:           "test-api-product",
-					Resources:    []string{"/**"},
-					Apiproxies:   []string{"test-proxy-name"},
-					Environments: []string{"test-env-name"},
-					Status:       "APPROVED",
-				},
-				App: AppDetails{
-					Status: "APPROVED",
-				},
-				ClientId: ClientIdDetails{
-					Status: "APPROVED",
-				},
-			},
-		},
-	},
-	{
-		testDesc:                           "Product not resolved",
-		expectedResult:                     "{\"response_code\":\"oauth.v2.InvalidApiKeyForGivenResource\",\"response_message\":\"Path Validation Failed. Product not resolved\"}",
-		expectedWhenValidateProxyEnvIsTrue: "{\"response_code\":\"oauth.v2.InvalidApiKeyForGivenResource\",\"response_message\":\"Path Validation Failed. Product not resolved\"}",
-		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
-			verifyApiKeyRequest: VerifyApiKeyRequest{
-				Key:              "test-key",
-				OrganizationName: "test-org",
-				UriPath:          "/test",
-				ApiProxyName:     "test-proxy-name",
-				EnvironmentName:  "test-env-name",
-			},
-			tempDeveloperDetails: DeveloperDetails{
-				Status: "ACTIVE",
-			},
-			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
-				ApiProduct: ApiProductDetails{},
-				App: AppDetails{
-					Status: "APPROVED",
-				},
-				ClientId: ClientIdDetails{
-					Status: "APPROVED",
-				},
-			},
-		},
-	},
-	{
-		testDesc:                           "resources not configured in db",
-		expectedResult:                     "",
-		expectedWhenValidateProxyEnvIsTrue: "",
-		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
-			verifyApiKeyRequest: VerifyApiKeyRequest{
-				Key:              "test-key",
-				OrganizationName: "test-org",
-				UriPath:          "/test",
-				ApiProxyName:     "test-proxy-name",
-				EnvironmentName:  "test-env-name",
-			},
-			tempDeveloperDetails: DeveloperDetails{
-				Status: "ACTIVE",
-			},
-			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
-				ApiProduct: ApiProductDetails{
-					Id:           "test-api-product",
-					Resources:    []string{},
-					Apiproxies:   []string{"test-proxy-name"},
-					Environments: []string{"test-env-name"},
-					Status:       "APPROVED",
-				},
-				App: AppDetails{
-					Status: "APPROVED",
-				},
-				ClientId: ClientIdDetails{
-					Status: "APPROVED",
-				},
-			},
-		},
-	},
-	{
-		testDesc:                           "proxies not configured in db",
-		expectedResult:                     "",
-		expectedWhenValidateProxyEnvIsTrue: "",
-		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
-			verifyApiKeyRequest: VerifyApiKeyRequest{
-				Key:              "test-key",
-				OrganizationName: "test-org",
-				UriPath:          "/test",
-				ApiProxyName:     "test-proxy-name",
-				EnvironmentName:  "test-env-name",
-			},
-			tempDeveloperDetails: DeveloperDetails{
-				Status: "ACTIVE",
-			},
-			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
-				ApiProduct: ApiProductDetails{
-					Id:           "test-api-product",
-					Resources:    []string{"/test"},
-					Apiproxies:   []string{},
-					Environments: []string{"test-env-name"},
-					Status:       "APPROVED",
-				},
-				App: AppDetails{
-					Status: "APPROVED",
-				},
-				ClientId: ClientIdDetails{
-					Status: "APPROVED",
-				},
-			},
-		},
-	},
-	{
-		testDesc:                           "environments not configured in db",
-		expectedResult:                     "",
-		expectedWhenValidateProxyEnvIsTrue: "",
-		dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
-			verifyApiKeyRequest: VerifyApiKeyRequest{
-				Key:              "test-key",
-				OrganizationName: "test-org",
-				UriPath:          "/test",
-				ApiProxyName:     "test-proxy-name",
-				EnvironmentName:  "test-env-name",
-			},
-			tempDeveloperDetails: DeveloperDetails{
-				Status: "ACTIVE",
-			},
-			verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
-				ApiProduct: ApiProductDetails{
-					Id:           "test-api-product",
-					Resources:    []string{"/test"},
-					Apiproxies:   []string{"test-proxy-name"},
-					Environments: []string{},
-					Status:       "APPROVED",
-				},
-				App: AppDetails{
-					Status: "APPROVED",
-				},
-				ClientId: ClientIdDetails{
-					Status: "APPROVED",
-				},
-			},
-		},
-	},
 }
 
-func TestPerformValidation(t *testing.T) {
+var _ = Describe("performValidationsTest", func() {
 
-	// tODO : what is the right way to get this ?
 	apid.Initialize(factory.DefaultServicesFactory())
 	log = factory.DefaultServicesFactory().Log()
 	a := apiManager{}
-	for _, td := range performValidationsTestData {
-		actualObject := a.performValidations(td.dataWrapper)
-		var actual string
-		if actualObject != nil {
-			a, _ := json.Marshal(&actualObject)
-			actual = string(a)
-		} else {
-			actual = ""
-		}
-		if string(actual) != td.expectedResult {
-			t.Errorf("TestData (%s) ValidateProxyEnv (%t) : expected (%s), actual (%s)", td.testDesc, td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs, td.expectedResult, actual)
-		}
-	}
-}
 
-func TestPerformValidationValidateProxyEnv(t *testing.T) {
+	Context("performValidationsTest tests", func() {
+		It("happy-path", func() {
+			td := performValidationsTestDataStruct{
+				expectedResult:                     "",
+				expectedWhenValidateProxyEnvIsTrue: "",
+				dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+					verifyApiKeyRequest: VerifyApiKeyRequest{
+						Key:              "test-key",
+						OrganizationName: "test-org",
+						UriPath:          "/test",
+						ApiProxyName:     "test-proxy-name",
+						EnvironmentName:  "test-env-name",
+					},
+					tempDeveloperDetails: DeveloperDetails{
+						Status: "ACTIVE",
+					},
+					verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+						ApiProduct: ApiProductDetails{
+							Id:           "test-api-product",
+							Resources:    []string{"/**"},
+							Apiproxies:   []string{"test-proxy-name"},
+							Environments: []string{"test-env-name"},
+							Status:       "APPROVED",
+						},
+						App: AppDetails{
+							Status: "APPROVED",
+						},
+						ClientId: ClientIdDetails{
+							Status: "APPROVED",
+						},
+					},
+				},
+			}
+			actualObject := a.performValidations(td.dataWrapper)
+			var actual string
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
 
-	// tODO : what is the right way to get this ?
-	apid.Initialize(factory.DefaultServicesFactory())
-	log = factory.DefaultServicesFactory().Log()
-	a := apiManager{}
-	for _, td := range performValidationsTestData {
-		td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs = true
-		actualObject := a.performValidations(td.dataWrapper)
-		var actual string
-		if actualObject != nil {
-			a, _ := json.Marshal(&actualObject)
-			actual = string(a)
-		} else {
-			actual = ""
-		}
-		if string(actual) != td.expectedWhenValidateProxyEnvIsTrue {
+			td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs = true
+			actualObject = a.performValidations(td.dataWrapper)
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+		})
+		It("Inactive Developer", func() {
+			td := performValidationsTestDataStruct{
+				expectedResult:                     "{\"response_code\":\"keymanagement.service.DeveloperStatusNotActive\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
+				expectedWhenValidateProxyEnvIsTrue: "{\"response_code\":\"keymanagement.service.DeveloperStatusNotActive\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
+				dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+					verifyApiKeyRequest: VerifyApiKeyRequest{
+						Key:              "test-key",
+						OrganizationName: "test-org",
+						UriPath:          "/test",
+						ApiProxyName:     "test-proxy-name",
+						EnvironmentName:  "test-env-name",
+					},
+					tempDeveloperDetails: DeveloperDetails{
+						Status: "INACTIVE",
+					},
+					verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+						ApiProduct: ApiProductDetails{
+							Id:           "test-api-product",
+							Resources:    []string{"/**"},
+							Apiproxies:   []string{"test-proxy-name"},
+							Environments: []string{"test-env-name"},
+							Status:       "APPROVED",
+						},
+						App: AppDetails{
+							Status: "APPROVED",
+						},
+						ClientId: ClientIdDetails{
+							Status: "APPROVED",
+						},
+					},
+				},
+			}
+			actualObject := a.performValidations(td.dataWrapper)
+			var actual string
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
 
-			t.Errorf("TestData (%s) ValidateProxyEnv (%t) : expected (%s), actual (%s)", td.testDesc, td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs, td.expectedWhenValidateProxyEnvIsTrue, actual)
-		}
-	}
-}
+			td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs = true
+			actualObject = a.performValidations(td.dataWrapper)
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+		})
+		It("Revoked Client Id", func() {
+			td := performValidationsTestDataStruct{
+				expectedResult:                     "{\"response_code\":\"oauth.v2.ApiKeyNotApproved\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
+				expectedWhenValidateProxyEnvIsTrue: "{\"response_code\":\"oauth.v2.ApiKeyNotApproved\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
+				dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+					verifyApiKeyRequest: VerifyApiKeyRequest{
+						Key:              "test-key",
+						OrganizationName: "test-org",
+						UriPath:          "/test",
+						ApiProxyName:     "test-proxy-name",
+						EnvironmentName:  "test-env-name",
+					},
+					tempDeveloperDetails: DeveloperDetails{
+						Status: "ACTIVE",
+					},
+					verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+						ApiProduct: ApiProductDetails{
+							Id:           "test-api-product",
+							Resources:    []string{"/**"},
+							Apiproxies:   []string{"test-proxy-name"},
+							Environments: []string{"test-env-name"},
+							Status:       "APPROVED",
+						},
+						App: AppDetails{
+							Status: "APPROVED",
+						},
+						ClientId: ClientIdDetails{
+							Status: "REVOKED",
+						},
+					},
+				},
+			}
+			actualObject := a.performValidations(td.dataWrapper)
+			var actual string
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+
+			td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs = true
+			actualObject = a.performValidations(td.dataWrapper)
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+		})
+		It("Revoked App", func() {
+			td := performValidationsTestDataStruct{
+				expectedResult:                     "{\"response_code\":\"keymanagement.service.invalid_client-app_not_approved\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
+				expectedWhenValidateProxyEnvIsTrue: "{\"response_code\":\"keymanagement.service.invalid_client-app_not_approved\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
+				dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+					verifyApiKeyRequest: VerifyApiKeyRequest{
+						Key:              "test-key",
+						OrganizationName: "test-org",
+						UriPath:          "/test",
+						ApiProxyName:     "test-proxy-name",
+						EnvironmentName:  "test-env-name",
+					},
+					tempDeveloperDetails: DeveloperDetails{
+						Status: "ACTIVE",
+					},
+					verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+						ApiProduct: ApiProductDetails{
+							Id:           "test-api-product",
+							Resources:    []string{"/**"},
+							Apiproxies:   []string{"test-proxy-name"},
+							Environments: []string{"test-env-name"},
+							Status:       "APPROVED",
+						},
+						App: AppDetails{
+							Status: "REVOKED",
+						},
+						ClientId: ClientIdDetails{
+							Status: "APPROVED",
+						},
+					},
+				},
+			}
+			actualObject := a.performValidations(td.dataWrapper)
+			var actual string
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+
+			td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs = true
+			actualObject = a.performValidations(td.dataWrapper)
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+		})
+		It("Company Inactive", func() {
+			td := performValidationsTestDataStruct{
+				expectedResult:                     "{\"response_code\":\"keymanagement.service.CompanyStatusNotActive\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
+				expectedWhenValidateProxyEnvIsTrue: "{\"response_code\":\"keymanagement.service.CompanyStatusNotActive\",\"response_message\":\"API Key verify failed for (test-key, test-org)\"}",
+				dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+					ctype: "company",
+					verifyApiKeyRequest: VerifyApiKeyRequest{
+						Key:              "test-key",
+						OrganizationName: "test-org",
+						UriPath:          "/test",
+						ApiProxyName:     "test-proxy-name",
+						EnvironmentName:  "test-env-name",
+					},
+					tempDeveloperDetails: DeveloperDetails{
+						Status: "INACTIVE",
+					},
+					verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+						ApiProduct: ApiProductDetails{
+							Id:           "test-api-product",
+							Resources:    []string{"/**"},
+							Apiproxies:   []string{"test-proxy-name"},
+							Environments: []string{"test-env-name"},
+							Status:       "APPROVED",
+						},
+						App: AppDetails{
+							Status: "APPROVED",
+						},
+						ClientId: ClientIdDetails{
+							Status: "APPROVED",
+						},
+					},
+				},
+			}
+			actualObject := a.performValidations(td.dataWrapper)
+			var actual string
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+
+			td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs = true
+			actualObject = a.performValidations(td.dataWrapper)
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+		})
+		It("Product not resolved", func() {
+			td := performValidationsTestDataStruct{
+				expectedResult:                     "{\"response_code\":\"oauth.v2.InvalidApiKeyForGivenResource\",\"response_message\":\"Path Validation Failed. Product not resolved\"}",
+				expectedWhenValidateProxyEnvIsTrue: "{\"response_code\":\"oauth.v2.InvalidApiKeyForGivenResource\",\"response_message\":\"Path Validation Failed. Product not resolved\"}",
+				dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+					verifyApiKeyRequest: VerifyApiKeyRequest{
+						Key:              "test-key",
+						OrganizationName: "test-org",
+						UriPath:          "/test",
+						ApiProxyName:     "test-proxy-name",
+						EnvironmentName:  "test-env-name",
+					},
+					tempDeveloperDetails: DeveloperDetails{
+						Status: "ACTIVE",
+					},
+					verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+						ApiProduct: ApiProductDetails{},
+						App: AppDetails{
+							Status: "APPROVED",
+						},
+						ClientId: ClientIdDetails{
+							Status: "APPROVED",
+						},
+					},
+				},
+			}
+			actualObject := a.performValidations(td.dataWrapper)
+			var actual string
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+
+			td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs = true
+			actualObject = a.performValidations(td.dataWrapper)
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+		})
+		It("resources not configured in db", func() {
+			td := performValidationsTestDataStruct{
+				expectedResult:                     "",
+				expectedWhenValidateProxyEnvIsTrue: "",
+				dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+					verifyApiKeyRequest: VerifyApiKeyRequest{
+						Key:              "test-key",
+						OrganizationName: "test-org",
+						UriPath:          "/test",
+						ApiProxyName:     "test-proxy-name",
+						EnvironmentName:  "test-env-name",
+					},
+					tempDeveloperDetails: DeveloperDetails{
+						Status: "ACTIVE",
+					},
+					verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+						ApiProduct: ApiProductDetails{
+							Id:           "test-api-product",
+							Resources:    []string{},
+							Apiproxies:   []string{"test-proxy-name"},
+							Environments: []string{"test-env-name"},
+							Status:       "APPROVED",
+						},
+						App: AppDetails{
+							Status: "APPROVED",
+						},
+						ClientId: ClientIdDetails{
+							Status: "APPROVED",
+						},
+					},
+				},
+			}
+			actualObject := a.performValidations(td.dataWrapper)
+			var actual string
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+
+			td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs = true
+			actualObject = a.performValidations(td.dataWrapper)
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+		})
+		It("proxies not configured in db", func() {
+			td := performValidationsTestDataStruct{
+				expectedResult:                     "",
+				expectedWhenValidateProxyEnvIsTrue: "",
+				dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+					verifyApiKeyRequest: VerifyApiKeyRequest{
+						Key:              "test-key",
+						OrganizationName: "test-org",
+						UriPath:          "/test",
+						ApiProxyName:     "test-proxy-name",
+						EnvironmentName:  "test-env-name",
+					},
+					tempDeveloperDetails: DeveloperDetails{
+						Status: "ACTIVE",
+					},
+					verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+						ApiProduct: ApiProductDetails{
+							Id:           "test-api-product",
+							Resources:    []string{"/test"},
+							Apiproxies:   []string{},
+							Environments: []string{"test-env-name"},
+							Status:       "APPROVED",
+						},
+						App: AppDetails{
+							Status: "APPROVED",
+						},
+						ClientId: ClientIdDetails{
+							Status: "APPROVED",
+						},
+					},
+				},
+			}
+			actualObject := a.performValidations(td.dataWrapper)
+			var actual string
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+
+			td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs = true
+			actualObject = a.performValidations(td.dataWrapper)
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+		})
+		It("environments not configured in db", func() {
+			td := performValidationsTestDataStruct{
+				expectedResult:                     "",
+				expectedWhenValidateProxyEnvIsTrue: "",
+				dataWrapper: VerifyApiKeyRequestResponseDataWrapper{
+					verifyApiKeyRequest: VerifyApiKeyRequest{
+						Key:              "test-key",
+						OrganizationName: "test-org",
+						UriPath:          "/test",
+						ApiProxyName:     "test-proxy-name",
+						EnvironmentName:  "test-env-name",
+					},
+					tempDeveloperDetails: DeveloperDetails{
+						Status: "ACTIVE",
+					},
+					verifyApiKeySuccessResponse: VerifyApiKeySuccessResponse{
+						ApiProduct: ApiProductDetails{
+							Id:           "test-api-product",
+							Resources:    []string{"/test"},
+							Apiproxies:   []string{"test-proxy-name"},
+							Environments: []string{},
+							Status:       "APPROVED",
+						},
+						App: AppDetails{
+							Status: "APPROVED",
+						},
+						ClientId: ClientIdDetails{
+							Status: "APPROVED",
+						},
+					},
+				},
+			}
+			actualObject := a.performValidations(td.dataWrapper)
+			var actual string
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+
+			td.dataWrapper.verifyApiKeyRequest.ValidateAgainstApiProxiesAndEnvs = true
+			actualObject = a.performValidations(td.dataWrapper)
+			if actualObject != nil {
+				a, _ := json.Marshal(&actualObject)
+				actual = string(a)
+			} else {
+				actual = ""
+			}
+			Expect(actual).Should(Equal(td.expectedResult))
+		})
+
+	})
+})

@@ -26,7 +26,6 @@ const (
 type apigeeSyncHandler struct {
 	dbMan  dbManagerInterface
 	apiMan apiManager
-	closed bool
 }
 
 func (h *apigeeSyncHandler) initListener(services apid.Services) {

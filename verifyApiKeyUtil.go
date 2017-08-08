@@ -58,7 +58,7 @@ func validatePath(fs []string, requestBase string) bool {
 
 func jsonToStringArray(fjson string) []string {
 	var array []string
-	if err := json.Unmarshal([]byte(fjson), array); err == nil {
+	if err := json.Unmarshal([]byte(fjson), &array); err == nil {
 		return array
 	}
 	s := strings.TrimPrefix(fjson, "{")

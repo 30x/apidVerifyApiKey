@@ -252,3 +252,29 @@ CREATE TABLE edgex_data_scope (
 		log.Panic("Unable to initialize DB", err)
 	}
 }
+
+func addScopes(db apid.DB) {
+	txn, _ := db.Begin()
+	txn.Exec("INSERT INTO EDGEX_DATA_SCOPE (id, _change_selector, apid_cluster_id, scope, org, env) "+
+		"VALUES"+
+		"($1,$2,$3,$4,$5,$6)",
+		"ABCDE",
+		"some_cluster_id",
+		"some_cluster_id",
+		"tenant_id_xxxx",
+		"test_org0",
+		"Env_0",
+	)
+	txn.Exec("INSERT INTO EDGEX_DATA_SCOPE (id, _change_selector, apid_cluster_id, scope, org, env) "+
+		"VALUES"+
+		"($1,$2,$3,$4,$5,$6)",
+		"XYZ",
+		"test_org0",
+		"somecluster_id",
+		"tenant_id_0",
+		"test_org0",
+		"Env_0",
+	)
+	log.Info("Inserted EDGEX_DATA_SCOPE for test")
+	txn.Commit()
+}

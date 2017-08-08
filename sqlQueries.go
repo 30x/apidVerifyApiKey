@@ -109,7 +109,6 @@ const sql_GET_API_KEY_DETAILS_SQL = `
 				AND o.name = $2)
 		;`
 
-
 const sql_GET_API_PRODUCTS_FOR_KEY_SQL = `
 			SELECT
 				COALESCE(ap.id,"") as prod_id,
@@ -131,12 +130,13 @@ const sql_GET_API_PRODUCTS_FOR_KEY_SQL = `
 					ON mp.appcred_id = c.id
 				INNER JOIN KMS_API_PRODUCT as ap
 					ON ap.id = mp.apiprdt_id
-			WHERE 	(mp.apiprdt_id = ap.id
+			WHERE 	(
+				mp.apiprdt_id = ap.id
 				AND mp.appcred_id = c.id
+				AND mp.status = 'APPROVED'
 				AND c.id = $1
 				AND ap.tenant_id = $2
-				AND mp.status = 'APPROVED')
+				)
 		;`
-
 
 const sql_GET_KMS_ATTRIBUTES_FOR_TENANT = "select entity_id, name, value from kms_attributes where tenant_id = $1"

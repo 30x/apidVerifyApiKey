@@ -91,6 +91,7 @@ func validateRequest(requestBody io.ReadCloser, w http.ResponseWriter) (VerifyAp
 
 	// 2. verify params
 	// TODO : make this method of verifyApiKeyReq struct
+	// TODO : move validation to verifyApiKey struct validate method
 	if verifyApiKeyReq.Action == "" || verifyApiKeyReq.ApiProxyName == "" || verifyApiKeyReq.OrganizationName == "" || verifyApiKeyReq.EnvironmentName == "" || verifyApiKeyReq.Key == "" {
 		// TODO : set correct missing fields in error response
 		errorResponse, _ := json.Marshal(errorResponse("Bad_REQUEST", "Missing element", http.StatusBadRequest))
@@ -232,7 +233,6 @@ func (apiM apiManager) performValidations(dataWrapper VerifyApiKeyRequestRespons
 		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
 	}
 
-	// TODO : empty check
 	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && (len(apiProductDetails.Apiproxies) > 0 && !contains(apiProductDetails.Apiproxies, verifyApiKeyReq.ApiProxyName)) {
 		reason = "Proxy Validation Failed (" + strings.Join(apiProductDetails.Apiproxies, ", ") + " vs " + verifyApiKeyReq.ApiProxyName + ")"
 		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"

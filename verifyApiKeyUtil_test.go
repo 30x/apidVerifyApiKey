@@ -17,6 +17,7 @@ package apidVerifyApiKey
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"reflect"
 )
 
 var _ = Describe("Validate Env", func() {
@@ -37,4 +38,33 @@ var _ = Describe("Validate Env", func() {
 		s := contains([]string{}, "xxx")
 		Expect(s).Should(BeFalse())
 	})
+})
+
+var _ = Describe("Validate jsonToStringArray", func() {
+
+	It("should tranform simple valid json", func() {
+		array := jsonToStringArray("[\"test-1\", \"test-2\"]")
+		Expect(reflect.DeepEqual(array, []string{"test-1", "test-2"})).Should(BeTrue())
+	})
+	It("should tranform simple single valid json", func() {
+		array := jsonToStringArray("[\"test-1\"]")
+		Expect(reflect.DeepEqual(array, []string{"test-1"})).Should(BeTrue())
+	})
+	It("should tranform simple fake json", func() {
+		s := jsonToStringArray("{test-1,test-2}")
+		Expect(reflect.DeepEqual(s, []string{"test-1", "test-2"})).Should(BeTrue())
+	})
+	It("should tranform simple single valued fake json", func() {
+		s := jsonToStringArray("{test-1}")
+		Expect(reflect.DeepEqual(s, []string{"test-1"})).Should(BeTrue())
+	})
+	It("space between fields considered as valid char", func() {
+		s := jsonToStringArray("{test-1, test-2}")
+		Expect(reflect.DeepEqual(s, []string{"test-1", " test-2"})).Should(BeTrue())
+	})
+	It("remove only last braces", func() {
+		s := jsonToStringArray("{test-1,test-2}}")
+		Expect(reflect.DeepEqual(s, []string{"test-1", "test-2}"})).Should(BeTrue())
+	})
+
 })
