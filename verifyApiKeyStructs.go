@@ -1,5 +1,7 @@
 package apidVerifyApiKey
 
+import "errors"
+
 type ClientIdDetails struct {
 	ClientId     string   `json:"clientId,omitempty"`
 	ClientSecret string   `json:"clientSecret,omitempty"`
@@ -100,6 +102,38 @@ type VerifyApiKeyRequest struct {
 	ApiProxyName     string `json:"apiProxyName"`
 	// when this flag is false, authentication of key and authorization for uripath is done and authorization for apiproxies and environments is skipped. Default is true.
 	ValidateAgainstApiProxiesAndEnvs bool `json:"validateAgainstApiProxiesAndEnvs,omitempty"`
+}
+
+func (v *VerifyApiKeyRequest) validate() (bool, error) {
+	var validationMsg string
+
+	if v.Action == "" {
+		validationMsg += " action"
+	}
+
+	if v.Key == "" {
+		validationMsg += " key"
+	}
+	if v.OrganizationName == "" {
+		validationMsg += " organizationName"
+	}
+	if v.UriPath == "" {
+		validationMsg += " uriPath"
+	}
+	if v.ValidateAgainstApiProxiesAndEnvs {
+		if v.ApiProxyName == "" {
+			validationMsg += " apiProxyName"
+		}
+		if v.EnvironmentName == "" {
+			validationMsg += " environmentName"
+		}
+	}
+
+	if validationMsg != "" {
+		validationMsg = "Missing mandatory fields in the request :" + validationMsg
+		return false, errors.New(validationMsg)
+	}
+	return true, nil
 }
 
 type VerifyApiKeySuccessResponse struct {

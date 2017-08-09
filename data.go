@@ -135,7 +135,7 @@ func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 		)
 
 	if err != nil {
-		log.Error("error fetching verify apikey details ", err)
+		log.Debug("error fetching verify apikey details ", err)
 		return errors.New("InvalidApiKey")
 	}
 

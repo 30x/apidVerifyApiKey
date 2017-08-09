@@ -15,53 +15,185 @@ package apidVerifyApiKey
 
 import (
 	"github.com/30x/apid-core"
+	"github.com/30x/apid-core/factory"
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"io/ioutil"
+	"sync"
 )
 
-// TODO: sql tests
-// 1. get api key sql test.. verify all fields, json to array conversions
-// 2. get api - no row should return proper error
-// 3. get attributes query tests
-// 4. get attributes with all empty results returned
-// 5. get product with no results
-// 6. get product with status != approved
-// 7. get products happy path
+var _ = Describe("DataTest", func() {
 
-//initialize DB for tests
-func initTestDb(db apid.DB) {
-	_, err := db.Exec(`CREATE TABLE kms_organization (id text,name text,display_name text,type text,tenant_id text,customer_id text,description text,created_at blob,created_by text,updated_at blob,updated_by text,_change_selector text, primary key (id,tenant_id));`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`INSERT INTO "kms_organization" VALUES('85629786-37c5-4e8c-bb45-208f3360d005','apigee-mcrosrvc-client0001','apigee-mcrosrvc-client0001','trial','bc811169','2277ba6c-8991-4a38-a5fc-12d8d36e5812','','2017-07-03 19:21:09.388+00:00','defaultUser','2017-07-05 16:24:35.413+00:00','rajanish@apigee.com','bc811169');`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`CREATE TABLE kms_company (id text,tenant_id text,name text,display_name text,status text,created_at blob,created_by text,updated_at blob,updated_by text,_change_selector text, primary key (id,tenant_id));`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`INSERT INTO "kms_company" VALUES('7834c683-9453-4389-b816-34ca24dfccd9','bc811169','DevCompany','East India Company','ACTIVE','2017-08-05 19:54:12.359+00:00','defaultUser','2017-08-05 19:54:12.359+00:00','defaultUser','bc811169');`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(``)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`CREATE TABLE kms_app (id text,tenant_id text,name text,display_name text,access_type text,callback_url text,status text,app_family text,company_id text,developer_id text,parent_id text,type text,created_at blob,created_by text,updated_at blob,updated_by text,_change_selector text, primary key (id,tenant_id));`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`INSERT INTO "kms_app" VALUES('d371f05a-7c04-430c-b12d-26cf4e4d5d65','bc811169','CompApp2','','READ','www.apple.com','APPROVED','default','7834c683-9453-4389-b816-34ca24dfccd9','','7834c683-9453-4389-b816-34ca24dfccd9','COMPANY','2017-08-07 17:00:54.25+00:00','defaultUser','2017-08-07 17:09:08.259+00:00','defaultUser','bc811169');`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(``)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`CREATE TABLE kms_app_credential (id text,tenant_id text,consumer_secret text,app_id text,method_type text,status text,issued_at blob,expires_at blob,app_status text,scopes text,created_at blob,created_by text,updated_at blob,updated_by text,_change_selector text, primary key (id,tenant_id));`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`INSERT INTO "kms_app_credential" VALUES('63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0','bc811169','Ui8dcyGW3lA04YdX','d371f05a-7c04-430c-b12d-26cf4e4d5d65','','APPROVED','2017-08-07 17:00:54.258+00:00','','','{DELETE}','2017-08-07 17:00:54.258+00:00','-NA-','2017-08-07 17:06:06.242+00:00','-NA-','bc811169');`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(``)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`CREATE TABLE kms_app_credential_apiproduct_mapper (tenant_id text,appcred_id text,app_id text,apiprdt_id text,status text,_change_selector text, primary key (tenant_id,appcred_id,app_id,apiprdt_id));`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`INSERT INTO "kms_app_credential_apiproduct_mapper" VALUES('bc811169','63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0','d371f05a-7c04-430c-b12d-26cf4e4d5d65','b6c9fa49-35d6-48b2-b5f5-99dd3953bd18','APPROVED','bc811169');`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(``)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`CREATE TABLE kms_attributes (tenant_id text,entity_id text,cust_id text,org_id text,dev_id text,comp_id text,apiprdt_id text,app_id text,appcred_id text,name text,type text,value text,_change_selector text, primary key (tenant_id,entity_id,name,type));`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`INSERT INTO "kms_attributes" VALUES('bc811169','d371f05a-7c04-430c-b12d-26cf4e4d5d65','','','','','','d371f05a-7c04-430c-b12d-26cf4e4d5d65','','Company','APP','Apple','bc811169');`)
-	Expect(err).Should(Succeed())
-	_, err = db.Exec(`INSERT INTO "kms_attributes" VALUES('bc811169','7834c683-9453-4389-b816-34ca24dfccd9','','','','7834c683-9453-4389-b816-34ca24dfccd9','','','','country','COMPANY','england','bc811169');`)
-	Expect(err).Should(Succeed())
+	Context("query db to get api key details", func() {
+		var dataTestTempDir string
+		var dbMan *dbManager
+		var _ = BeforeEach(func() {
+			var err error
+			dataTestTempDir, err = ioutil.TempDir(testTempDirBase, "sqlite3")
 
-}
+			s := factory.DefaultServicesFactory()
+			apid.Initialize(s)
+			config := apid.Config()
+			config.Set("local_storage_path", dataTestTempDir)
+
+			Expect(err).NotTo(HaveOccurred())
+
+			dbMan = &dbManager{
+				data:  s.Data(),
+				dbMux: sync.RWMutex{},
+			}
+			dbMan.setDbVersion(dataTestTempDir)
+			dbMan.initDb()
+
+		})
+
+		It("should get compnay getApiKeyDetails for happy path", func() {
+			setupApikeyCompanyTestDb(dbMan.db)
+
+			dataWrapper := VerifyApiKeyRequestResponseDataWrapper{
+				verifyApiKeyRequest: VerifyApiKeyRequest{
+					OrganizationName: "apigee-mcrosrvc-client0001",
+					Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
+				},
+			}
+			err := dbMan.getApiKeyDetails(&dataWrapper)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(dataWrapper.ctype).Should(BeEquivalentTo("company"))
+			Expect(dataWrapper.tenant_id).Should(BeEquivalentTo("bc811169"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.ClientId.Status).Should(BeEquivalentTo("APPROVED"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientSecret).Should(BeEquivalentTo("Ui8dcyGW3lA04YdX"))
+
+			Expect(dataWrapper.tempDeveloperDetails.Id).Should(BeEquivalentTo("7834c683-9453-4389-b816-34ca24dfccd9"))
+			Expect(dataWrapper.tempDeveloperDetails.UserName).Should(BeEquivalentTo("East India Company"))
+			Expect(dataWrapper.tempDeveloperDetails.FirstName).Should(BeEquivalentTo("DevCompany"))
+			Expect(dataWrapper.tempDeveloperDetails.LastName).Should(BeEquivalentTo(""))
+			Expect(dataWrapper.tempDeveloperDetails.Email).Should(BeEquivalentTo(""))
+			Expect(dataWrapper.tempDeveloperDetails.Status).Should(BeEquivalentTo("ACTIVE"))
+			Expect(dataWrapper.tempDeveloperDetails.CreatedAt).Should(BeEquivalentTo("2017-08-05 19:54:12.359+00:00"))
+			Expect(dataWrapper.tempDeveloperDetails.CreatedBy).Should(BeEquivalentTo("defaultUser"))
+			Expect(dataWrapper.tempDeveloperDetails.LastmodifiedAt).Should(BeEquivalentTo("2017-08-05 19:54:12.359+00:00"))
+			Expect(dataWrapper.tempDeveloperDetails.LastmodifiedBy).Should(BeEquivalentTo("defaultUser"))
+
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.Id).Should(BeEquivalentTo("d371f05a-7c04-430c-b12d-26cf4e4d5d65"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.Name).Should(BeEquivalentTo("CompApp2"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.AccessType).Should(BeEquivalentTo("READ"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.CallbackUrl).Should(BeEquivalentTo("www.apple.com"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.DisplayName).Should(BeEquivalentTo(""))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.Status).Should(BeEquivalentTo("APPROVED"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.AppFamily).Should(BeEquivalentTo("default"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.Company).Should(BeEquivalentTo("7834c683-9453-4389-b816-34ca24dfccd9"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.CreatedAt).Should(BeEquivalentTo("2017-08-07 17:00:54.25+00:00"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.CreatedBy).Should(BeEquivalentTo("defaultUser"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.LastmodifiedAt).Should(BeEquivalentTo("2017-08-07 17:09:08.259+00:00"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.LastmodifiedBy).Should(BeEquivalentTo("defaultUser"))
+
+		})
+
+		It("should get developer ApiKeyDetails - happy path", func() {
+			setupApikeyDeveloperTestDb(dbMan.db)
+
+			dataWrapper := VerifyApiKeyRequestResponseDataWrapper{
+				verifyApiKeyRequest: VerifyApiKeyRequest{
+					OrganizationName: "apigee-mcrosrvc-client0001",
+					Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
+				},
+			}
+			err := dbMan.getApiKeyDetails(&dataWrapper)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(dataWrapper.ctype).Should(BeEquivalentTo("developer"))
+			Expect(dataWrapper.tenant_id).Should(BeEquivalentTo("bc811169"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.ClientId.Status).Should(BeEquivalentTo("APPROVED"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientSecret).Should(BeEquivalentTo("Ui8dcyGW3lA04YdX"))
+
+			Expect(dataWrapper.tempDeveloperDetails.Id).Should(BeEquivalentTo("209ffd18-37e9-4a67-9e30-a5c40a534b6c"))
+			Expect(dataWrapper.tempDeveloperDetails.UserName).Should(BeEquivalentTo("wilson"))
+			Expect(dataWrapper.tempDeveloperDetails.FirstName).Should(BeEquivalentTo("Woodre"))
+			Expect(dataWrapper.tempDeveloperDetails.LastName).Should(BeEquivalentTo("Wilson"))
+			Expect(dataWrapper.tempDeveloperDetails.Email).Should(BeEquivalentTo("developer@apigee.com"))
+			Expect(dataWrapper.tempDeveloperDetails.Status).Should(BeEquivalentTo("ACTIVE"))
+			Expect(dataWrapper.tempDeveloperDetails.CreatedAt).Should(BeEquivalentTo("2017-08-08 17:24:09.008+00:00"))
+			Expect(dataWrapper.tempDeveloperDetails.CreatedBy).Should(BeEquivalentTo("defaultUser"))
+			Expect(dataWrapper.tempDeveloperDetails.LastmodifiedAt).Should(BeEquivalentTo("2017-08-08 17:24:09.008+00:00"))
+			Expect(dataWrapper.tempDeveloperDetails.LastmodifiedBy).Should(BeEquivalentTo("defaultUser"))
+
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.Id).Should(BeEquivalentTo("d371f05a-7c04-430c-b12d-26cf4e4d5d65"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.Name).Should(BeEquivalentTo("DeveloperApp"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.AccessType).Should(BeEquivalentTo("READ"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.CallbackUrl).Should(BeEquivalentTo("www.apple.com"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.DisplayName).Should(BeEquivalentTo(""))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.Status).Should(BeEquivalentTo("APPROVED"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.AppFamily).Should(BeEquivalentTo("default"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.Company).Should(BeEquivalentTo(""))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.CreatedAt).Should(BeEquivalentTo("2017-08-07 17:00:54.25+00:00"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.CreatedBy).Should(BeEquivalentTo("defaultUser"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.LastmodifiedAt).Should(BeEquivalentTo("2017-08-07 17:09:08.259+00:00"))
+			Expect(dataWrapper.verifyApiKeySuccessResponse.App.LastmodifiedBy).Should(BeEquivalentTo("defaultUser"))
+
+		})
+
+		It("should throw error when apikey not found", func() {
+
+			setupApikeyCompanyTestDb(dbMan.db)
+			dataWrapper := VerifyApiKeyRequestResponseDataWrapper{
+				verifyApiKeyRequest: VerifyApiKeyRequest{
+					OrganizationName: "apigee-mcrosrvc-client0001",
+					Key:              "invalid-Jkcc6GENVWGT1Zw5gek7kVJ0",
+				},
+			}
+			err := dbMan.getApiKeyDetails(&dataWrapper)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(BeEquivalentTo("InvalidApiKey"))
+		})
+
+		It("should get api products ", func() {
+
+			setupApikeyCompanyTestDb(dbMan.db)
+
+			apiProducts := dbMan.getApiProductsForApiKey("63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0", "bc811169")
+			Expect(len(apiProducts)).Should(BeEquivalentTo(1))
+
+			Expect(apiProducts[0].Id).Should(BeEquivalentTo("24987a63-edb9-4d6b-9334-87e1d70df8e3"))
+			Expect(apiProducts[0].Name).Should(BeEquivalentTo("KeyProduct4"))
+			Expect(apiProducts[0].DisplayName).Should(BeEquivalentTo("Sandbox Diamond"))
+			Expect(apiProducts[0].Status).Should(BeEquivalentTo(""))
+			Expect(apiProducts[0].QuotaTimeunit).Should(BeEquivalentTo(""))
+			Expect(apiProducts[0].QuotaInterval).Should(BeEquivalentTo(0))
+			Expect(apiProducts[0].QuotaLimit).Should(BeEquivalentTo(""))
+
+			Expect(apiProducts[0].Resources).Should(BeEquivalentTo([]string{"/zoho", "/twitter", "/nike"}))
+			Expect(apiProducts[0].Apiproxies).Should(BeEquivalentTo([]string{"DevApplication", "KeysApplication"}))
+			Expect(apiProducts[0].Environments).Should(BeEquivalentTo([]string{"test"}))
+			Expect(apiProducts[0].Company).Should(BeEquivalentTo(""))
+			Expect(len(apiProducts[0].Attributes)).Should(BeEquivalentTo(0))
+
+			Expect(apiProducts[0].CreatedBy).Should(BeEquivalentTo("defaultUser"))
+			Expect(apiProducts[0].CreatedAt).Should(BeEquivalentTo("2017-08-08 02:53:32.726+00:00"))
+			Expect(apiProducts[0].LastmodifiedBy).Should(BeEquivalentTo("defaultUser"))
+			Expect(apiProducts[0].LastmodifiedAt).Should(BeEquivalentTo("2017-08-08 02:53:32.726+00:00"))
+
+		})
+
+		It("should return empty array when no api products found", func() {
+
+			setupApikeyCompanyTestDb(dbMan.db)
+			apiProducts := dbMan.getApiProductsForApiKey("invalid-LKJkcc6GENVWGT1Zw5gek7kVJ0", "bc811169")
+			Expect(len(apiProducts)).Should(BeEquivalentTo(0))
+
+		})
+
+		It("should get kms attributes", func() {
+
+			setupKmsAttributesdata(dbMan.db)
+			attributes := dbMan.getKmsAttributes("bc811169", "40753e12-a50a-429d-9121-e571eb4e43a9", "85629786-37c5-4e8c-bb45-208f3360d005", "50321842-d6ee-4e92-91b9-37234a7920c1", "test-invalid")
+			Expect(len(attributes)).Should(BeEquivalentTo(3))
+			Expect(len(attributes["40753e12-a50a-429d-9121-e571eb4e43a9"])).Should(BeEquivalentTo(1))
+			Expect(len(attributes["85629786-37c5-4e8c-bb45-208f3360d005"])).Should(BeEquivalentTo(2))
+			Expect(len(attributes["50321842-d6ee-4e92-91b9-37234a7920c1"])).Should(BeEquivalentTo(5))
+			Expect(len(attributes["test-invalid"])).Should(BeEquivalentTo(0))
+
+		})
+
+	})
+})

@@ -20,14 +20,13 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
 type apiManagerInterface interface {
 	InitAPI()
 	handleRequest(w http.ResponseWriter, r *http.Request)
-	verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error)
+	verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) (*VerifyApiKeySuccessResponse, *ErrorResponse)
 }
 
 type apiManager struct {
@@ -47,27 +46,32 @@ func (a *apiManager) InitAPI() {
 
 // handle client API
 func (a *apiManager) handleRequest(w http.ResponseWriter, r *http.Request) {
+
 	w.Header().Set("Content-Type", "application/json")
-	verifyApiKeyReq, err := validateRequest(r.Body, w)
-	if err != nil {
-		return
-	}
 
-	b, err := a.verifyAPIKey(verifyApiKeyReq)
+	var returnValue interface{}
 
-	if err != nil {
-		respStatusCode, atoierr := strconv.Atoi(err.Error())
-		if atoierr != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+	if verifyApiKeyReq, err := validateRequest(r.Body, w); err == nil {
+		verifyApiKeyResponse, errorResponse := a.verifyAPIKey(verifyApiKeyReq)
+
+		if errorResponse != nil {
+			setResponseHeader(errorResponse, w)
+			returnValue = errorResponse
 		} else {
-			w.WriteHeader(respStatusCode)
+			returnValue = verifyApiKeyResponse
 		}
+		b, _ := json.Marshal(returnValue)
+		log.Debugf("handleVerifyAPIKey result %s", b)
+		w.Write(b)
 	}
+}
 
-	log.Debugf("handleVerifyAPIKey result %s", b)
-
-	w.Write(b)
-	return
+func setResponseHeader(errorResponse *ErrorResponse, w http.ResponseWriter) {
+	if errorResponse.StatusCode != 0 {
+		w.WriteHeader(errorResponse.StatusCode)
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 func validateRequest(requestBody io.ReadCloser, w http.ResponseWriter) (VerifyApiKeyRequest, error) {
@@ -90,11 +94,8 @@ func validateRequest(requestBody io.ReadCloser, w http.ResponseWriter) (VerifyAp
 	log.Debug(verifyApiKeyReq)
 
 	// 2. verify params
-	// TODO : make this method of verifyApiKeyReq struct
-	// TODO : move validation to verifyApiKey struct validate method
-	if verifyApiKeyReq.Action == "" || verifyApiKeyReq.ApiProxyName == "" || verifyApiKeyReq.OrganizationName == "" || verifyApiKeyReq.EnvironmentName == "" || verifyApiKeyReq.Key == "" {
-		// TODO : set correct missing fields in error response
-		errorResponse, _ := json.Marshal(errorResponse("Bad_REQUEST", "Missing element", http.StatusBadRequest))
+	if isValid, err := verifyApiKeyReq.validate(); !isValid {
+		errorResponse, _ := json.Marshal(errorResponse("Bad_REQUEST", err.Error(), http.StatusBadRequest))
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write(errorResponse)
 		return verifyApiKeyReq, errors.New("Bad_REQUEST")
@@ -103,12 +104,13 @@ func validateRequest(requestBody io.ReadCloser, w http.ResponseWriter) (VerifyAp
 }
 
 // returns []byte to be written to client
-func (apiM apiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) ([]byte, error) {
+func (apiM apiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) (*VerifyApiKeySuccessResponse, *ErrorResponse) {
 
 	dataWrapper := VerifyApiKeyRequestResponseDataWrapper{
 		verifyApiKeyRequest: verifyApiKeyReq,
 	}
 	dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId = verifyApiKeyReq.Key
+	dataWrapper.verifyApiKeySuccessResponse.Environment = verifyApiKeyReq.EnvironmentName
 
 	err := apiM.dbMan.getApiKeyDetails(&dataWrapper)
 
@@ -117,13 +119,13 @@ func (apiM apiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) ([]byte
 		reason := "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
 		errorCode := "oauth.v2.InvalidApiKey"
 		errResponse := errorResponse(reason, errorCode, http.StatusOK)
-		return json.Marshal(errResponse)
+		return nil, &errResponse
 
 	case err != nil:
 		reason := err.Error()
 		errorCode := "SEARCH_INTERNAL_ERROR"
 		errResponse := errorResponse(reason, errorCode, http.StatusInternalServerError)
-		return json.Marshal(errResponse)
+		return nil, &errResponse
 	}
 
 	dataWrapper.verifyApiKeySuccessResponse.ApiProduct = shortListApiProduct(dataWrapper.apiProducts, verifyApiKeyReq)
@@ -132,16 +134,14 @@ func (apiM apiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) ([]byte
 	 */
 	errResponse := apiM.performValidations(dataWrapper)
 	if errResponse != nil {
-		return json.Marshal(&errResponse)
+		return nil, errResponse
 	}
 
 	apiM.enrichAttributes(&dataWrapper)
 
 	setDevOrCompanyInResponseBasedOnCtype(dataWrapper.ctype, dataWrapper.tempDeveloperDetails, &dataWrapper.verifyApiKeySuccessResponse)
 
-	resp := dataWrapper.verifyApiKeySuccessResponse
-
-	return json.Marshal(resp)
+	return &dataWrapper.verifyApiKeySuccessResponse, nil
 }
 
 func setDevOrCompanyInResponseBasedOnCtype(ctype string, tempDeveloperDetails DeveloperDetails, response *VerifyApiKeySuccessResponse) {
@@ -150,6 +150,7 @@ func setDevOrCompanyInResponseBasedOnCtype(ctype string, tempDeveloperDetails De
 	} else {
 		response.Company = CompanyDetails{
 			Id:             tempDeveloperDetails.Id,
+			Name:           tempDeveloperDetails.FirstName,
 			DisplayName:    tempDeveloperDetails.UserName,
 			Status:         tempDeveloperDetails.Status,
 			CreatedAt:      tempDeveloperDetails.CreatedAt,
@@ -207,11 +208,17 @@ func (apiM apiManager) performValidations(dataWrapper VerifyApiKeyRequestRespons
 	if !strings.EqualFold("APPROVED", clientIdDetails.Status) {
 		reason = "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
 		errorCode = "oauth.v2.ApiKeyNotApproved"
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
 	}
 
 	if !strings.EqualFold("APPROVED", appDetails.Status) {
 		reason = "API Key verify failed for (" + verifyApiKeyReq.Key + ", " + verifyApiKeyReq.OrganizationName + ")"
 		errorCode = "keymanagement.service.invalid_client-app_not_approved"
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
 	}
 
 	if !strings.EqualFold("ACTIVE", tempDeveloperDetails.Status) {
@@ -220,31 +227,39 @@ func (apiM apiManager) performValidations(dataWrapper VerifyApiKeyRequestRespons
 		if cType == "company" {
 			errorCode = "keymanagement.service.CompanyStatusNotActive"
 		}
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
 	}
 
 	if dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id == "" {
 		reason = "Path Validation Failed. Product not resolved"
 		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
 	}
 
 	result := len(apiProductDetails.Resources) == 0 || validatePath(apiProductDetails.Resources, verifyApiKeyReq.UriPath)
 	if !result {
 		reason = "Path Validation Failed (" + strings.Join(apiProductDetails.Resources, ", ") + " vs " + verifyApiKeyReq.UriPath + ")"
 		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
 	}
 
 	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && (len(apiProductDetails.Apiproxies) > 0 && !contains(apiProductDetails.Apiproxies, verifyApiKeyReq.ApiProxyName)) {
 		reason = "Proxy Validation Failed (" + strings.Join(apiProductDetails.Apiproxies, ", ") + " vs " + verifyApiKeyReq.ApiProxyName + ")"
 		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
+		log.Debug("Validation error occoured ", errorCode, " ", reason)
+		ee := errorResponse(reason, errorCode, http.StatusOK)
+		return &ee
 	}
 	/* Verify if the ENV matches */
 	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && (len(apiProductDetails.Environments) > 0 && !contains(apiProductDetails.Environments, verifyApiKeyReq.EnvironmentName)) {
 		reason = "ENV Validation Failed (" + strings.Join(apiProductDetails.Environments, ", ") + " vs " + verifyApiKeyReq.EnvironmentName + ")"
 		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
-
-	}
-
-	if errorCode != "" {
 		log.Debug("Validation error occoured ", errorCode, " ", reason)
 		ee := errorResponse(reason, errorCode, http.StatusOK)
 		return &ee

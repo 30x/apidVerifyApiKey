@@ -70,7 +70,7 @@ const sql_GET_API_KEY_DETAILS_SQL = `
 
 				COALESCE(ad.id,"") as dev_id,
 				COALESCE(ad.display_name,"") as dev_username,
-				COALESCE("","") as dev_first_name,
+				COALESCE(ad.name,"") as dev_first_name,
 				COALESCE("","") as dev_last_name,
 				COALESCE("","") as dev_email,
 				COALESCE(ad.status,"") as dev_status,
