@@ -46,21 +46,12 @@ func (dbc *dbManager) getDb() apid.DB {
 	return dbc.db
 }
 
-func (dbc *dbManager) initDb() error {
-	db := dbc.getDb()
-	if db == nil {
-		return errors.New("DB not initialized")
-	}
-	return nil
-}
-
 func (dbc *dbManager) getDbVersion() string {
 	return dbc.dbVersion
 }
 
 type dbManagerInterface interface {
 	setDbVersion(string)
-	initDb() error
 	getDb() apid.DB
 	getDbVersion() string
 	getKmsAttributes(tenantId string, entities ...string) map[string][]Attribute
@@ -70,12 +61,12 @@ type dbManagerInterface interface {
 func (dbc *dbManager) getKmsAttributes(tenantId string, entities ...string) map[string][]Attribute {
 
 	db := dbc.db
-	var attName, attValue sql.NullString
-	var entity_id string
+	var attName, attValue, entity_id sql.NullString
 	// TODO : is there no other better way to do in caluse???
 	sql := sql_GET_KMS_ATTRIBUTES_FOR_TENANT + ` and entity_id in ('` + strings.Join(entities, `','`) + `')`
 	mapOfAttributes := make(map[string][]Attribute)
 	attributes, err := db.Query(sql, tenantId)
+	defer attributes.Close()
 	if err != nil {
 		log.Error("Error while fetching attributes for tenant id : %s and entityId : %s", tenantId, err)
 		return mapOfAttributes
@@ -88,10 +79,13 @@ func (dbc *dbManager) getKmsAttributes(tenantId string, entities ...string) map[
 		)
 		if err != nil {
 			log.Error("error fetching attributes for entityid ", entities, err)
+			return nil
 		}
-		if attName.String != "" {
+		if attName.Valid && entity_id.Valid {
 			att := Attribute{Name: attName.String, Value: attValue.String}
-			mapOfAttributes[entity_id] = append(mapOfAttributes[entity_id], att)
+			mapOfAttributes[entity_id.String] = append(mapOfAttributes[entity_id.String], att)
+		} else {
+			log.Debugf("Not valid. AttName: %s Entity_id: %s", attName.String, entity_id.String)
 		}
 	}
 	log.Debug("attributes returned for query ", sql, " are ", mapOfAttributes)
@@ -157,7 +151,7 @@ func (dbc dbManager) getApiProductsForApiKey(key, tenantId string) []ApiProductD
 	var proxies, environments, resources string
 
 	rows, err := db.Query(sql_GET_API_PRODUCTS_FOR_KEY_SQL, key, tenantId)
-
+	defer rows.Close()
 	if err != nil {
 		log.Error("error fetching apiProduct details", err)
 		return allProducts

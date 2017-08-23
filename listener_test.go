@@ -48,7 +48,6 @@ var _ = Describe("listener", func() {
 			dbMux: sync.RWMutex{},
 			db:    db,
 		}
-		dbMan.initDb()
 
 		listnerTestSyncHandler = apigeeSyncHandler{
 			dbMan:  dbMan,

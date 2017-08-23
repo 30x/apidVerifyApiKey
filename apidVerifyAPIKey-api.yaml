@@ -17,7 +17,6 @@ swagger: "2.0"
 info:
   version: "0.0.1"
   title: Swagger API
-host: playground.apistudio.io
 basePath: /try/35cd6835-f2ed-4582-a1ae-d10ed29d062b
 schemes:
   - http
@@ -138,8 +137,7 @@ definitions:
     description: Error response returned
     properties:
       response_code:
-        type: integer
-        format: int32
+        type: string
       response_message:
         type: string
       kind:

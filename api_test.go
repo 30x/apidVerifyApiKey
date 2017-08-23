@@ -61,7 +61,6 @@ var _ = Describe("end to end tests", func() {
 			dbMux: sync.RWMutex{},
 		}
 		dbMan.setDbVersion(dataTestTempDir)
-		dbMan.initDb()
 
 		apiMan := apiManager{
 			dbMan:             dbMan,
