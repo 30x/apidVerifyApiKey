@@ -44,7 +44,6 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
 		data:  services.Data(),
 		dbMux: sync.RWMutex{},
 	}
-	dbMan.initDb()
 	apiMan := apiManager{
 		dbMan:             dbMan,
 		verifiersEndpoint: apiPath,

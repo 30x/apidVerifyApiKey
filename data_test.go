@@ -43,7 +43,6 @@ var _ = Describe("DataTest", func() {
 				dbMux: sync.RWMutex{},
 			}
 			dbMan.setDbVersion(dataTestTempDir)
-			dbMan.initDb()
 
 		})
 

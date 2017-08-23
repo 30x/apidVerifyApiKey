@@ -16,7 +16,6 @@ package apidVerifyApiKey
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -51,19 +50,30 @@ func (a *apiManager) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	var returnValue interface{}
 
-	if verifyApiKeyReq, err := validateRequest(r.Body, w); err == nil {
-		verifyApiKeyResponse, errorResponse := a.verifyAPIKey(verifyApiKeyReq)
-
-		if errorResponse != nil {
-			setResponseHeader(errorResponse, w)
-			returnValue = errorResponse
-		} else {
-			returnValue = verifyApiKeyResponse
+	verifyApiKeyReq, err := validateRequest(r.Body, w)
+	if err != nil {
+		errorResponse, jsonErr := json.Marshal(errorResponse("Bad_REQUEST", err.Error(), http.StatusBadRequest))
+		if jsonErr != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(jsonErr.Error()))
 		}
-		b, _ := json.Marshal(returnValue)
-		log.Debugf("handleVerifyAPIKey result %s", b)
-		w.Write(b)
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(errorResponse)
+		return
 	}
+
+	verifyApiKeyResponse, errorResponse := a.verifyAPIKey(verifyApiKeyReq)
+
+	if errorResponse != nil {
+		setResponseHeader(errorResponse, w)
+		returnValue = errorResponse
+	} else {
+		returnValue = verifyApiKeyResponse
+	}
+	b, _ := json.Marshal(returnValue)
+	log.Debugf("handleVerifyAPIKey result %s", b)
+	w.Write(b)
+
 }
 
 func setResponseHeader(errorResponse *ErrorResponse, w http.ResponseWriter) {
@@ -75,30 +85,24 @@ func setResponseHeader(errorResponse *ErrorResponse, w http.ResponseWriter) {
 }
 
 func validateRequest(requestBody io.ReadCloser, w http.ResponseWriter) (VerifyApiKeyRequest, error) {
+	defer requestBody.Close()
 	// 1. read request boby
 	var verifyApiKeyReq VerifyApiKeyRequest
 	body, err := ioutil.ReadAll(requestBody)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
-		return verifyApiKeyReq, errors.New("Bad_REQUEST")
+		return verifyApiKeyReq, err
 	}
-	log.Debug(string(body))
+	log.Debug("request body: ", string(body))
 	// 2. umarshall json to struct
 	err = json.Unmarshal(body, &verifyApiKeyReq)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
-		return verifyApiKeyReq, errors.New("Bad_REQUEST")
+		return verifyApiKeyReq, err
 	}
 	log.Debug(verifyApiKeyReq)
 
 	// 2. verify params
 	if isValid, err := verifyApiKeyReq.validate(); !isValid {
-		errorResponse, _ := json.Marshal(errorResponse("Bad_REQUEST", err.Error(), http.StatusBadRequest))
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write(errorResponse)
-		return verifyApiKeyReq, errors.New("Bad_REQUEST")
+		return verifyApiKeyReq, err
 	}
 	return verifyApiKeyReq, nil
 }
@@ -164,9 +168,7 @@ func setDevOrCompanyInResponseBasedOnCtype(ctype string, tempDeveloperDetails De
 
 func shortListApiProduct(details []ApiProductDetails, verifyApiKeyReq VerifyApiKeyRequest) ApiProductDetails {
 	var bestMathcedProduct ApiProductDetails
-	rankedProducts := make(map[int][]ApiProductDetails)
-	rankedProducts[2] = []ApiProductDetails{}
-	rankedProducts[3] = []ApiProductDetails{}
+	rankedProducts := make([][]ApiProductDetails, 2)
 
 	for _, apiProd := range details {
 		if len(apiProd.Resources) == 0 || validatePath(apiProd.Resources, verifyApiKeyReq.UriPath) {
@@ -177,19 +179,21 @@ func shortListApiProduct(details []ApiProductDetails, verifyApiKeyReq VerifyApiK
 					// set rank 1 or just return
 				} else {
 					// set rank to 2
-					rankedProducts[2] = append(rankedProducts[2], apiProd)
+					rankedProducts[0] = append(rankedProducts[0], apiProd)
 				}
 			} else {
 				// set rank to 3,
-				rankedProducts[3] = append(rankedProducts[3], apiProd)
+				rankedProducts[1] = append(rankedProducts[1], apiProd)
 			}
 		}
 	}
 
-	if len(rankedProducts[2]) > 0 {
-		return rankedProducts[2][0]
-	} else if len(rankedProducts[3]) > 0 {
-		return rankedProducts[3][0]
+	if len(rankedProducts[0]) > 0 {
+		return rankedProducts[0][0]
+	}
+
+	if len(rankedProducts[1]) > 0 {
+		return rankedProducts[1][0]
 	}
 
 	return bestMathcedProduct
