@@ -84,6 +84,8 @@ func (dbc *dbManager) getKmsAttributes(tenantId string, entities ...string) map[
 		if attName.Valid && entity_id.Valid {
 			att := Attribute{Name: attName.String, Value: attValue.String}
 			mapOfAttributes[entity_id.String] = append(mapOfAttributes[entity_id.String], att)
+		} else {
+			log.Debugf("Not valid. AttName: %s Entity_id: %s", attName.String, entity_id.String)
 		}
 	}
 	log.Debug("attributes returned for query ", sql, " are ", mapOfAttributes)
