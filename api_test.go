@@ -11,157 +11,289 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 package apidVerifyApiKey
+
+// TODO: end to end IT tests
+// 1. happy path for developer
+// 2. happy path for company
+// 3. error case for developer / company
+// 4. input request validation error case
+// 5. key not found case
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/30x/apid-core"
+	"github.com/30x/apid-core/factory"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 )
 
-var _ = Describe("api", func() {
+var (
+	testServer *httptest.Server
+)
 
-	Context("DB Inserts/Deletes verification", func() {
+var _ = Describe("end to end tests", func() {
+	var dataTestTempDir string
+	var dbMan *dbManager
 
-		It("should reject a bad key", func() {
-			v := url.Values{
-				"key":       []string{"credential_x"},
-				"uriPath":   []string{"/test"},
-				"scopeuuid": []string{"ABCDE"},
-				"action":    []string{"verify"},
+	var _ = BeforeEach(func() {
+		var err error
+		dataTestTempDir, err = ioutil.TempDir(testTempDirBase, "api_test_sqlite3")
+		serviceFactoryForTest := factory.DefaultServicesFactory()
+		apid.Initialize(serviceFactoryForTest)
+		config := apid.Config()
+		config.Set("data_path", testTempDir)
+		config.Set("log_level", "DEBUG")
+		serviceFactoryForTest.Config().Set("local_storage_path", dataTestTempDir)
+
+		Expect(err).NotTo(HaveOccurred())
+
+		dbMan = &dbManager{
+			data:  serviceFactoryForTest.Data(),
+			dbMux: sync.RWMutex{},
+		}
+		dbMan.setDbVersion(dataTestTempDir)
+
+		apiMan := apiManager{
+			dbMan:             dbMan,
+			verifiersEndpoint: apiPath,
+		}
+
+		testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.URL.Path == apiPath {
+				apiMan.handleRequest(w, req)
 			}
-			rsp, err := verifyAPIKey(v)
+		}))
+
+	})
+
+	Context("veriifyApiKey Api test ", func() {
+		It("should return validation error for missing input fields", func() {
+			var respObj ErrorResponse
+			reqInput := VerifyApiKeyRequest{
+				Key: "test",
+			}
+			jsonBody, _ := json.Marshal(reqInput)
+
+			responseBody, err := performTestOperation(string(jsonBody), 400)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			var respj kmsResponseFail
-			json.Unmarshal(rsp, &respj)
-			Expect(respj.Type).Should(Equal("ErrorResult"))
-			Expect(respj.ErrInfo.ErrorCode).Should(Equal("REQ_ENTRY_NOT_FOUND"))
-
+			json.Unmarshal(responseBody, &respObj)
+			Expect(respObj.ResponseMessage).Should(Equal("Bad_REQUEST"))
+			Expect(respObj.ResponseCode).Should(Equal("Missing mandatory fields in the request : action organizationName uriPath"))
 		})
+		It("should return validation error for inavlid key", func() {
+			var respObj ErrorResponse
+			reqInput := VerifyApiKeyRequest{
+				Key:              "invalid-key",
+				Action:           "verify",
+				OrganizationName: "apigee-mcrosrvc-client0001",
+				EnvironmentName:  "test",
+				ApiProxyName:     "DevApplication",
+				UriPath:          "/zoho",
 
-		It("should successfully verify good Developer keys", func() {
-			for i := 1; i < 10; i++ {
-				resulti := strconv.FormatInt(int64(i), 10)
-				v := url.Values{
-					"key":       []string{"app_credential_" + resulti},
-					"uriPath":   []string{"/test"},
-					"scopeuuid": []string{"ABCDE"},
-					"action":    []string{"verify"},
-				}
-				rsp, err := verifyAPIKey(v)
-				Expect(err).ShouldNot(HaveOccurred())
-
-				var respj kmsResponseSuccess
-				json.Unmarshal(rsp, &respj)
-				Expect(respj.Type).Should(Equal("APIKeyContext"))
-				Expect(respj.RspInfo.Type).Should(Equal("developer"))
-				Expect(respj.RspInfo.Key).Should(Equal("app_credential_" + resulti))
+				ValidateAgainstApiProxiesAndEnvs: true,
 			}
-		})
+			jsonBody, _ := json.Marshal(reqInput)
 
-		It("should successfully verify good Company keys", func() {
-			for i := 100; i < 110; i++ {
-				resulti := strconv.FormatInt(int64(i), 10)
-				v := url.Values{
-					"key":       []string{"app_credential_" + resulti},
-					"uriPath":   []string{"/test"},
-					"scopeuuid": []string{"ABCDE"},
-					"action":    []string{"verify"},
-				}
-				rsp, err := verifyAPIKey(v)
-				Expect(err).ShouldNot(HaveOccurred())
-
-				var respj kmsResponseSuccess
-				json.Unmarshal(rsp, &respj)
-				Expect(respj.Type).Should(Equal("APIKeyContext"))
-				Expect(respj.RspInfo.Type).Should(Equal("company"))
-				Expect(respj.RspInfo.Key).Should(Equal("app_credential_" + resulti))
-			}
-		})
-
-		It("should reject a bad key", func() {
-
-			uri, err := url.Parse(testServer.URL)
-			uri.Path = apiPath
-
-			v := url.Values{}
-			v.Add("key", "credential_x")
-			v.Add("scopeuuid", "ABCDE")
-			v.Add("uriPath", "/test")
-			v.Add("action", "verify")
-
-			client := &http.Client{}
-			req, err := http.NewRequest("POST", uri.String(), strings.NewReader(v.Encode()))
-			req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
-
-			res, err := client.Do(req)
-			defer res.Body.Close()
+			responseBody, err := performTestOperation(string(jsonBody), 200)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			var respj kmsResponseFail
-			body, err := ioutil.ReadAll(res.Body)
+			json.Unmarshal(responseBody, &respObj)
+			Expect(respObj.ResponseMessage).Should(Equal("API Key verify failed for (invalid-key, apigee-mcrosrvc-client0001)"))
+			Expect(respObj.ResponseCode).Should(Equal("oauth.v2.InvalidApiKey"))
+		})
+		It("should return validation error for inavlid env", func() {
+			setupApikeyDeveloperTestDb(dbMan.db)
+			var respObj ErrorResponse
+			reqInput := VerifyApiKeyRequest{
+				Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
+				Action:           "verify",
+				OrganizationName: "apigee-mcrosrvc-client0001",
+				EnvironmentName:  "prod",
+				ApiProxyName:     "DevApplication",
+				UriPath:          "/zoho",
+
+				ValidateAgainstApiProxiesAndEnvs: true,
+			}
+			jsonBody, _ := json.Marshal(reqInput)
+
+			responseBody, err := performTestOperation(string(jsonBody), 200)
 			Expect(err).ShouldNot(HaveOccurred())
-			json.Unmarshal(body, &respj)
-			Expect(respj.Type).Should(Equal("ErrorResult"))
-			Expect(respj.ErrInfo.ErrorCode).Should(Equal("REQ_ENTRY_NOT_FOUND"))
+
+			json.Unmarshal(responseBody, &respObj)
+			Expect(respObj.ResponseMessage).Should(Equal("ENV Validation Failed (test vs prod)"))
+			Expect(respObj.ResponseCode).Should(Equal("oauth.v2.InvalidApiKeyForGivenResource"))
 		})
+		It("should return validation error for inavlid resource", func() {
+			setupApikeyDeveloperTestDb(dbMan.db)
+			var respObj ErrorResponse
+			reqInput := VerifyApiKeyRequest{
+				Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
+				Action:           "verify",
+				OrganizationName: "apigee-mcrosrvc-client0001",
+				EnvironmentName:  "test",
+				ApiProxyName:     "DevApplication",
+				UriPath:          "/google",
 
-		It("should report error for no scopes", func() {
-			v := url.Values{
-				"key":       []string{"credential_x"},
-				"uriPath":   []string{"/test"},
-				"scopeuuid": []string{"ABCDE"},
-				"action":    []string{"verify"},
+				ValidateAgainstApiProxiesAndEnvs: true,
 			}
+			jsonBody, _ := json.Marshal(reqInput)
 
-			clearDataScopeTable(getDB())
-			rsp, err := verifyAPIKey(v)
+			responseBody, err := performTestOperation(string(jsonBody), 200)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			var respj kmsResponseFail
-			json.Unmarshal(rsp, &respj)
-			Expect(respj.Type).Should(Equal("ErrorResult"))
-			Expect(respj.ErrInfo.ErrorCode).Should(Equal("ENV_VALIDATION_FAILED"))
+			json.Unmarshal(responseBody, &respObj)
+			Expect(respObj.ResponseMessage).Should(Equal("Path Validation Failed. Product not resolved"))
+			Expect(respObj.ResponseCode).Should(Equal("oauth.v2.InvalidApiKeyForGivenResource"))
+		})
+		It("should return validation error for inavlid proxies", func() {
+			setupApikeyDeveloperTestDb(dbMan.db)
+			var respObj ErrorResponse
+			reqInput := VerifyApiKeyRequest{
+				Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
+				Action:           "verify",
+				OrganizationName: "apigee-mcrosrvc-client0001",
+				EnvironmentName:  "test",
+				ApiProxyName:     "Invalid-proxy",
+				UriPath:          "/zoho",
+
+				ValidateAgainstApiProxiesAndEnvs: true,
+			}
+			jsonBody, _ := json.Marshal(reqInput)
+
+			responseBody, err := performTestOperation(string(jsonBody), 200)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			json.Unmarshal(responseBody, &respObj)
+			Expect(respObj.ResponseMessage).Should(Equal("Proxy Validation Failed (DevApplication, KeysApplication vs Invalid-proxy)"))
+			Expect(respObj.ResponseCode).Should(Equal("oauth.v2.InvalidApiKeyForGivenResource"))
+		})
+		It("should peform verify api key for developer happy path", func() {
+			setupApikeyDeveloperTestDb(dbMan.db)
+			var respObj VerifyApiKeySuccessResponse
+
+			reqInput := VerifyApiKeyRequest{
+				Action:           "verify",
+				OrganizationName: "apigee-mcrosrvc-client0001",
+				Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
+				EnvironmentName:  "test",
+				ApiProxyName:     "DevApplication",
+				UriPath:          "/zoho",
+
+				ValidateAgainstApiProxiesAndEnvs: true,
+			}
+			jsonBody, _ := json.Marshal(reqInput)
+
+			responseBody, err := performTestOperation(string(jsonBody), 200)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			json.Unmarshal(responseBody, &respObj)
+			Expect(respObj.Developer.Id).Should(Equal("209ffd18-37e9-4a67-9e30-a5c40a534b6c"))
+			Expect(respObj.Developer.FirstName).Should(Equal("Woodre"))
+			Expect(respObj.Developer.CreatedAt).Should(Equal("2017-08-08 17:24:09.008+00:00"))
+			Expect(respObj.Developer.LastmodifiedAt).Should(Equal("2017-08-08 17:24:09.008+00:00"))
+			Expect(respObj.Developer.CreatedBy).Should(Equal("defaultUser"))
+			Expect(respObj.Developer.LastmodifiedBy).Should(Equal("defaultUser"))
+			Expect(len(respObj.Developer.Attributes)).Should(Equal(0))
+			Expect(respObj.Developer.Company).Should(Equal(""))
+			Expect(respObj.Developer.Status).Should(Equal("ACTIVE"))
+			Expect(respObj.Developer.UserName).Should(Equal("wilson"))
+			Expect(respObj.Developer.Email).Should(Equal("developer@apigee.com"))
+			Expect(respObj.Developer.LastName).Should(Equal("Wilson"))
+			Expect(len(respObj.Developer.Apps)).Should(Equal(0))
+
+			Expect(respObj.ClientId.ClientId).Should(Equal("63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0"))
+			Expect(respObj.ClientId.Status).Should(Equal("APPROVED"))
+			Expect(respObj.ClientId.Attributes[0].Name).Should(Equal("Device"))
+			Expect(respObj.ClientId.Attributes[0].Value).Should(Equal("ios"))
+			Expect(respObj.ClientId.ClientSecret).Should(Equal("Ui8dcyGW3lA04YdX"))
+			Expect(respObj.ClientId.RedirectURIs[0]).Should(Equal("www.apple.com"))
+
+			Expect(respObj.Company.Id).Should(Equal(""))
+
+			Expect(respObj.App.Id).Should(Equal("d371f05a-7c04-430c-b12d-26cf4e4d5d65"))
+
+			Expect(respObj.ApiProduct.Id).Should(Equal("24987a63-edb9-4d6b-9334-87e1d70df8e3"))
+
+			Expect(respObj.Environment).Should(Equal("test"))
 
 		})
 
-		It("should report error for invalid requests", func() {
-			v := url.Values{
-				"key":       []string{"credential_x"},
-				"uriPath":   []string{"/test"},
-				"scopeuuid": []string{"ABCDE"},
-				"action":    []string{"verify"},
+		It("should peform verify api key for company happy path", func() {
+			setupApikeyCompanyTestDb(dbMan.db)
+			var respObj VerifyApiKeySuccessResponse
+
+			reqInput := VerifyApiKeyRequest{
+				Action:           "verify",
+				OrganizationName: "apigee-mcrosrvc-client0001",
+				Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
+				EnvironmentName:  "test",
+				ApiProxyName:     "DevApplication",
+				UriPath:          "/zoho",
+
+				ValidateAgainstApiProxiesAndEnvs: true,
 			}
+			jsonBody, _ := json.Marshal(reqInput)
 
-			fields := []string{"key", "uriPath", "scopeuuid", "action"}
-			for _, field := range fields {
-				tmp := v.Get(field)
-				v.Del(field)
+			responseBody, err := performTestOperation(string(jsonBody), 200)
+			Expect(err).ShouldNot(HaveOccurred())
 
-				rsp, err := verifyAPIKey(v)
-				Expect(err).ShouldNot(HaveOccurred())
-				var respj kmsResponseFail
-				json.Unmarshal(rsp, &respj)
-				Expect(respj.Type).Should(Equal("ErrorResult"))
-				Expect(respj.ErrInfo.ErrorCode).Should(Equal("INCORRECT_USER_INPUT"))
+			json.Unmarshal(responseBody, &respObj)
+			Expect(respObj.Developer.Id).Should(Equal(""))
 
-				v.Set(field, tmp)
-			}
+			Expect(respObj.Company.Id).Should(Equal("7834c683-9453-4389-b816-34ca24dfccd9"))
+			Expect(respObj.Company.Name).Should(Equal("DevCompany"))
+			Expect(respObj.Company.CreatedAt).Should(Equal("2017-08-05 19:54:12.359+00:00"))
+			Expect(respObj.Company.LastmodifiedAt).Should(Equal("2017-08-05 19:54:12.359+00:00"))
+			Expect(respObj.Company.CreatedBy).Should(Equal("defaultUser"))
+			Expect(respObj.Company.LastmodifiedBy).Should(Equal("defaultUser"))
+			Expect(len(respObj.Company.Attributes)).Should(Equal(1))
+			Expect(respObj.Company.Attributes[0].Name).Should(Equal("country"))
+			Expect(respObj.Company.Attributes[0].Value).Should(Equal("england"))
+			Expect(respObj.Company.DisplayName).Should(Equal("East India Company"))
+			Expect(respObj.Company.Status).Should(Equal("ACTIVE"))
+			Expect(len(respObj.Developer.Apps)).Should(Equal(0))
+
+			Expect(respObj.ClientId.ClientId).Should(Equal("63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0"))
+			Expect(respObj.ClientId.Status).Should(Equal("APPROVED"))
+			Expect(len(respObj.ClientId.Attributes)).Should(Equal(0))
+			Expect(respObj.ClientId.ClientSecret).Should(Equal("Ui8dcyGW3lA04YdX"))
+			Expect(respObj.ClientId.RedirectURIs[0]).Should(Equal("www.apple.com"))
+
+			Expect(respObj.Company.Id).Should(Equal("7834c683-9453-4389-b816-34ca24dfccd9"))
+
+			Expect(respObj.App.Id).Should(Equal("d371f05a-7c04-430c-b12d-26cf4e4d5d65"))
+
+			Expect(respObj.ApiProduct.Id).Should(Equal("24987a63-edb9-4d6b-9334-87e1d70df8e3"))
+
+			Expect(respObj.Environment).Should(Equal("test"))
 		})
+
 	})
 })
 
-func clearDataScopeTable(db apid.DB) {
-	txn, _ := db.Begin()
-	txn.Exec("DELETE FROM EDGEX_DATA_SCOPE")
-	log.Info("clear EDGEX_DATA_SCOPE for test")
-	txn.Commit()
+func performTestOperation(jsonBody string, expectedResponseCode int) ([]byte, error) {
+	uri, err := url.Parse(testServer.URL)
+	uri.Path = apiPath
+	client := &http.Client{}
+	httpReq, err := http.NewRequest("POST", uri.String(), strings.NewReader(string(jsonBody)))
+	httpReq.Header.Set("Content-Type", "application/json")
+	res, err := client.Do(httpReq)
+	defer res.Body.Close()
+	responseBody, err := ioutil.ReadAll(res.Body)
+
+	if res.StatusCode != expectedResponseCode {
+		err = errors.New("expected response status code does not match. Expected : " + strconv.Itoa(expectedResponseCode) + " ,actual : " + strconv.Itoa(res.StatusCode))
+	}
+
+	return responseBody, err
 }

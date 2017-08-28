@@ -13,46 +13,38 @@
 # limitations under the License.
 
 host: playground.apistudio.io
-swagger: '2.0'
+swagger: "2.0"
 info:
-  version: 0.0.1
-  title: Edge X Verify API Key
-  contact:
-    name: Apigee, Inc.
-    url: http://www.apigee.com/
-    email: sales@apigee.com
-  license:
-    name: Apache 2.0
-    url: https://www.apache.org/licenses/LICENSE-2.0
-basePath: /verifiers
+  version: "0.0.1"
+  title: Swagger API
+basePath: /try/35cd6835-f2ed-4582-a1ae-d10ed29d062b
 schemes:
   - http
+  - https
 consumes:
   - application/json
 produces:
   - application/json
 paths:
-  /:
-    get:
-      description: List verifiers
-      responses:
-        '200':
-          description: OK
-          schema:
-            type: array
-            items:
-              type: string
-              enum:
-                - "apikey"
   /apikey:
     post:
-      description: Verify API key valid and return message context
+      tags:
+        - VerifyApiKey
+      summary: Validates the consumer key and returns the attributes associated with apikey,developer,app and apiproduct. Http method is POST but it doesnt mutates any data. POST is used for sending content in the http request.
+      description: 'Verify api key '
+      produces:
+        - application/json
+      consumes:
+        - application/json
       parameters:
         - name: Authorization
+          description: credentials to authenticate with apid
           in: header
           required: true
           type: string
-          description: authCode from /deployments/current
+        - name: gateway
+          in: header
+          type: string
         - name: _
           in: body
           required: true
@@ -60,133 +52,278 @@ paths:
             $ref: '#/definitions/VerifyAPIKeyRequest'
       responses:
         '200':
-          description: The result of the request
+          description: Success. ApiKey was verified successfully.
           schema:
-            type: object
-            enum:
-              - $ref: '#/definitions/VerifyAPIKeyResponseSuccess'
-              - $ref: '#/definitions/VerifyAPIKeyResponseFailed'
-          examples:
-            application/json:
-              responseType: APIKeyContext
-              resultCode: "SUCCESS"
-              result:
-                key: abc123
-                expiresAt: 1234567890
-                issuedAt: 1234567890
-                status: abc123
-                redirectionURIs: abc123
-                appName: abc123
-                appId: abc123
-                cType: "developer"
+            $ref: '#/definitions/VerifyApiKeySuccessResponse'
+        '401':
+          description: Either clientId,app or developer or company is not valid or status is not approved  or entity is not found
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '403':
+          description: ClientId is not authorized to access the resourceUri,environment or proxy.
+          schema:
+            $ref: '#/definitions/ErrorResponse'
         default:
-          description: 4xx or 5xx errors
+          description: Unexpected error.
           schema:
             $ref: '#/definitions/ErrorResponse'
 
 definitions:
-
-  ErrorResult:
-    type: object
-    required:
-      - errorCode
-      - reason
-    properties:
-      errorCode:
-        type: number
-      reason:
-        type: string
-
   VerifyAPIKeyRequest:
     type: object
     required:
       - action
       - key
       - uriPath
-      - scopeuuid
+      - organizationName
+      - environmentName
+      - apiProxyName
     properties:
       action:
-        enum:
-          - "verify"
+        type: string
       key:
         type: string
       uriPath:
         type: string
-      scopeuuid:
+      organizationName:
         type: string
-
-  VerifyAPIKeyResponse:
+      environmentName:
+        type: string
+      apiProxyName:
+        type: string
+      validateAgainstApiProxiesAndEnvs:
+        type: boolean
+        description: when this flag is false, authentication of key and authorization for uripath is done and authorization for apiproxies and environments is skipped. Default is true.
+  VerifyApiKeySuccessResponse:
     type: object
-    required:
-      - type
+    description: 'Response object for the verification of apikey. Verification of apikey response contains details such as developer-id,developer-email-id, other fields and attributes ; app-id,app-name, other fields and attributes;  apiproduct-name, fields and attributes ; '
     properties:
-      type:
+      self:
         type: string
-      result:
-        description: present if type is NOT ErrorResult, override me
+      organization:
+        description: Organization Identifier/Name
+        type: string
+      environment:
+        description: Environment Identifier/Name
+        type: string
+      clientId:
+        description: fields and attributes related to clientId
         type: object
-      error:
-        description: present if type is ErrorResult, override me
+        $ref: '#/definitions/ClientIdDetails'
+      developer:
+        description: fields and attributes related to developer
         type: object
+        $ref: '#/definitions/DeveloperDetails'
+      company:
+        description: fields and attributes related to company
+        type: object
+        $ref: '#/definitions/CompanyDetails'
+      app:
+        description: fields and attributes related to app
+        type: object
+        $ref: '#/definitions/AppDetails'
+      apiProduct:
+        description: fields and attributes related to apiProduct
+        type: object
+        $ref: '#/definitions/ApiProductDetails'
 
-  VerifyAPIKeyResponseSuccess:
-    allOf:
-      - $ref: '#/definitions/VerifyAPIKeyResponse'
-      - type: object
-        properties:
-          result:
-            type: object
-            properties:
-              key:
-                type: string
-              expiresAt:
-                type: integer
-              issuedAt:
-                type: integer
-              status:
-                type: string
-              redirectionURIs:
-                type: string
-              appName:
-                type: string
-              appId:
-                type: string
-              cType:
-                type: string
-    example:
-      type: "APIKeyContext"
-      result:
-        key: "abc123"
-        expiresAt: 1234567890
-        issuedAt: 1234567890
-        status: "abc123"
-        redirectionURIs: "abc123"
-        appName: "abc123"
-        appId: "abc123"
-        cType: "company OR developer"
-
-  VerifyAPIKeyResponseFailed:
-    allOf:
-      - $ref: '#/definitions/VerifyAPIKeyResponse'
-      - type: object
-        properties:
-          error:
-            $ref: '#/definitions/ErrorResult'
-    example:
-      type: "ErrorResult"
-      error:
-        errorCode: 606
-        reason: "APIKey expired"
-
+      identifier:
+        description: Identifier of the authorization code. This will be unique for each request.
+        type: string
+      kind:
+        type: string
   ErrorResponse:
-    required:
-      - errorCode
-      - reason
+    type: object
+    description: Error response returned
     properties:
-      errorCode:
-        type: number
-      reason:
+      response_code:
         type: string
-    example:
-      errorCode: 607
-      reason: "Something wrong!"
+      response_message:
+        type: string
+      kind:
+        type: string
+  Attribute:
+    type: object
+    description: Attribute details
+    properties:
+      Name:
+        type: string
+      Value:
+        type: string
+      kind:
+        type: string
+  ClientIdDetails:
+    type: object
+    description: Fields related to consumer key
+    properties:
+      clientId:
+        type: string
+      clientSecret:
+        type: string
+      redirectURIs:
+        type: array
+        items:
+          type: string
+      status:
+        type: string
+      attributes:
+        description: Attributes associated with the client Id.
+        type: array
+        items:
+          $ref: '#/definitions/Attribute'
+  DeveloperDetails:
+    type: object
+    description: Fields related to developer
+    properties:
+      id:
+        type: string
+      userName:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+      email:
+        type: string
+      status:
+        type: string
+      apps:
+        type: array
+        items:
+          type: string
+      created_at:
+        type: integer
+        format: int64
+      created_by:
+        type: string
+      lastmodified_at:
+        type: integer
+        format: int64
+      lastmodified_by:
+        type: string
+      company:
+        type: string
+      attributes:
+        description: Attributes associated with the developer.
+        type: array
+        items:
+          $ref: '#/definitions/Attribute'
+  CompanyDetails:
+    type: object
+    description: Fields related to company
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      displayName:
+        type: string
+      status:
+        type: string
+      apps:
+        type: array
+        items:
+          type: string
+      created_at:
+        type: integer
+        format: int64
+      created_by:
+        type: string
+      lastmodified_at:
+        type: integer
+        format: int64
+      lastmodified_by:
+        type: string
+      attributes:
+        description: Attributes associated with the company.
+        type: array
+        items:
+          $ref: '#/definitions/Attribute'
+  AppDetails:
+    type: object
+    description: Fields related to app
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      accessType:
+        type: string
+      callbackUrl:
+        type: string
+      displayName:
+        type: string
+      status:
+        type: string
+      apiproducts:
+        type: array
+        items:
+          type: string
+      appFamily:
+        type: string
+      created_at:
+        type: integer
+        format: int64
+      created_by:
+        type: string
+      lastmodified_at:
+        type: integer
+        format: int64
+      lastmodified_by:
+        type: string
+      company:
+        type: string
+      attributes:
+        description: Attributes associated with the app.
+        type: array
+        items:
+          $ref: '#/definitions/Attribute'
+  ApiProductDetails:
+    type: object
+    description: Fields related to app
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      displayName:
+        type: string
+      quota.limit:
+        type: integer
+        format: int64
+      quota.interval:
+        type: integer
+        format: int64
+      quota.timeunit:
+        type: integer
+        format: int64
+      status:
+        type: string
+      created_at:
+        type: integer
+        format: int64
+      created_by:
+        type: string
+      lastmodified_at:
+        type: integer
+        format: int64
+      lastmodified_by:
+        type: string
+      company:
+        type: string
+      environments:
+        type: array
+        items:
+         type: string
+      apiproxies:
+        type: array
+        items:
+          type: string
+      attributes:
+        description: Attributes associated with the apiproduct.
+        type: array
+        items:
+          $ref: '#/definitions/Attribute'
+
+
+
