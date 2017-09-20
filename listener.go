@@ -15,7 +15,7 @@
 package apidVerifyApiKey
 
 import (
-	"github.com/30x/apid-core"
+	"github.com/apid/apid-core"
 	"github.com/apigee-labs/transicator/common"
 )
 
