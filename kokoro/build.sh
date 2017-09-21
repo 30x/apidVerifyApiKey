@@ -1,22 +1,26 @@
 #!/bin/bash
 set -ex
 
-cd git
-export GOPATH=$(pwd)
-echo "GOPATH=$GOPATH"
-mkdir -p ${GOPATH}/bin
-mkdir -p ${GOPATH}/lib
-mkdir -p ${GOPATH}/src
+BUILDROOT=${BUILDROOT:-github/apidVerifyApiKey}
+export BUILDROOT
 
-go version
+# Make a temporary GOPATH to build in
+gobase=`mktemp -d`
+base=${gobase}/src/github.com/apid/apidVerifyApiKey
+GOPATH=${gobase}
+export GOPATH
 
-mv ./apidVerifyApiKey ./src
-cd ./src/apidVerifyApiKey
+base=${GOPATH}/src/github.com/apid/apidVerifyApiKey
+mkdir -p ${base}
+(cd ${BUILDROOT}; tar cf - .) | (cd ${base}; tar xf -)
+cd ${base}
 
 
 echo "Getting glide"
 go get github.com/Masterminds/glide
 echo "Install dependencies for tests"
 time ${GOPATH}/bin/glide up -v
+
+go version
 
 go test $(glide novendor)
