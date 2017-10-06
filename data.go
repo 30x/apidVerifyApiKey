@@ -16,7 +16,7 @@ package apidVerifyApiKey
 import (
 	"database/sql"
 	"errors"
-	"github.com/30x/apid-core"
+	"github.com/apid/apid-core"
 	"strings"
 	"sync"
 )
