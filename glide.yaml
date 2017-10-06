@@ -14,9 +14,9 @@
 
 package: github.com/apid/apidVerifyAPIKey
 import:
-- package: github.com/30x/apid-core
+- package: github.com/apid/apid-core
   version: Release_170815-EdgeX-EAP
-- package: github.com/30x/apidApigeeSync
+- package: github.com/apid/apidApigeeSync
   version: Release_170815-EdgeX-EAP
 testImport:
 - package: github.com/onsi/ginkgo/ginkgo
