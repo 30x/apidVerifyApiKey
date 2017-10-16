@@ -192,13 +192,15 @@ definitions:
         items:
           type: string
       created_at:
-        type: integer
-        format: int64
+        type: string
+        format: date-time
+        description: "ISO-8601 timestamp"
       created_by:
         type: string
       lastmodified_at:
-        type: integer
-        format: int64
+        type: string
+        format: date-time
+        description: "ISO-8601 timestamp"
       lastmodified_by:
         type: string
       company:
@@ -225,13 +227,15 @@ definitions:
         items:
           type: string
       created_at:
-        type: integer
-        format: int64
+        type: string
+        format: date-time
+        description: "ISO-8601 timestamp"
       created_by:
         type: string
       lastmodified_at:
-        type: integer
-        format: int64
+        type: string
+        format: date-time
+        description: "ISO-8601 timestamp"
       lastmodified_by:
         type: string
       attributes:
@@ -262,13 +266,15 @@ definitions:
       appFamily:
         type: string
       created_at:
-        type: integer
-        format: int64
+        type: string
+        format: date-time
+        description: "ISO-8601 timestamp"
       created_by:
         type: string
       lastmodified_at:
-        type: integer
-        format: int64
+        type: string
+        format: date-time
+        description: "ISO-8601 timestamp"
       lastmodified_by:
         type: string
       company:
@@ -300,13 +306,15 @@ definitions:
       status:
         type: string
       created_at:
-        type: integer
-        format: int64
+        type: string
+        format: date-time
+        description: "ISO-8601 timestamp"
       created_by:
         type: string
       lastmodified_at:
-        type: integer
-        format: int64
+        type: string
+        format: date-time
+        description: "ISO-8601 timestamp"
       lastmodified_by:
         type: string
       company:
