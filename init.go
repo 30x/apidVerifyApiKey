@@ -15,13 +15,9 @@
 package apidVerifyApiKey
 
 import (
-	"sync"
-
 	"github.com/apid/apid-core"
-)
-
-const (
-	apiPath = "/verifiers/apikey"
+	"github.com/apid/apidVerifyApiKey/verifyApiKey"
+	"sync"
 )
 
 var (
@@ -35,23 +31,23 @@ func init() {
 
 func initPlugin(s apid.Services) (apid.PluginData, error) {
 	services = s
-
-	log = services.Log().ForModule("apidVerifyAPIKey")
+	log = services.Log().ForModule("apidApiMetadata")
+	verifyApiKey.SetApidServices(services, log)
 	log.Debug("start init")
 
 	log = services.Log()
-	dbMan := &dbManager{
-		data:  services.Data(),
-		dbMux: sync.RWMutex{},
+	verifyDbMan := &verifyApiKey.DbManager{
+		Data:  services.Data(),
+		DbMux: sync.RWMutex{},
 	}
-	apiMan := apiManager{
-		dbMan:             dbMan,
-		verifiersEndpoint: apiPath,
+	verifyApiMan := &verifyApiKey.ApiManager{
+		DbMan:             verifyDbMan,
+		VerifiersEndpoint: verifyApiKey.ApiPath,
 	}
 
 	syncHandler := apigeeSyncHandler{
-		dbMan:  dbMan,
-		apiMan: apiMan,
+		dbMans:  []DbManagerInterface{verifyDbMan},
+		apiMans: []ApiManagerInterface{verifyApiMan},
 	}
 
 	syncHandler.initListener(services)

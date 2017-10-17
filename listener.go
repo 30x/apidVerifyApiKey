@@ -24,8 +24,8 @@ const (
 )
 
 type apigeeSyncHandler struct {
-	dbMan  dbManagerInterface
-	apiMan apiManager
+	dbMans  []DbManagerInterface
+	apiMans []ApiManagerInterface
 }
 
 func (h *apigeeSyncHandler) initListener(services apid.Services) {
@@ -38,8 +38,14 @@ func (h *apigeeSyncHandler) String() string {
 
 func (h *apigeeSyncHandler) processSnapshot(snapshot *common.Snapshot) {
 	log.Debugf("Snapshot received. Switching to DB version: %s", snapshot.SnapshotInfo)
-	h.dbMan.setDbVersion(snapshot.SnapshotInfo)
-	h.apiMan.InitAPI()
+	// set db version for all packages
+	for _, dbMan := range h.dbMans {
+		dbMan.SetDbVersion(snapshot.SnapshotInfo)
+	}
+	// idempotent init api for all packages
+	for _, apiMan := range h.apiMans {
+		apiMan.InitAPI()
+	}
 	log.Debug("Snapshot processed")
 }
 

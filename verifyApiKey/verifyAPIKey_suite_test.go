@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package apidVerifyApiKey
+package verifyApiKey
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -26,8 +26,7 @@ import (
 const testTempDirBase = "./tmp/"
 
 var (
-	testTempDir     string
-	testSyncHandler apigeeSyncHandler
+	testTempDir string
 )
 
 var _ = BeforeSuite(func() {

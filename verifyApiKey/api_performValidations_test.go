@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package apidVerifyApiKey
+package verifyApiKey
 
 import (
 	"encoding/json"
@@ -33,7 +33,7 @@ var _ = Describe("performValidationsTest", func() {
 
 	apid.Initialize(factory.DefaultServicesFactory())
 	log = factory.DefaultServicesFactory().Log()
-	a := apiManager{}
+	a := ApiManager{}
 
 	Context("performValidationsTest tests", func() {
 		It("happy-path", func() {
@@ -343,7 +343,7 @@ var _ = Describe("performValidationsTest", func() {
 			}
 			Expect(actual).Should(Equal(td.expectedResult))
 		})
-		It("resources not configured in db", func() {
+		It("resources not configured in Db", func() {
 			td := performValidationsTestDataStruct{
 				expectedResult:                     "",
 				expectedWhenValidateProxyEnvIsTrue: "",
@@ -395,7 +395,7 @@ var _ = Describe("performValidationsTest", func() {
 			}
 			Expect(actual).Should(Equal(td.expectedResult))
 		})
-		It("proxies not configured in db", func() {
+		It("proxies not configured in Db", func() {
 			td := performValidationsTestDataStruct{
 				expectedResult:                     "",
 				expectedWhenValidateProxyEnvIsTrue: "",
@@ -447,7 +447,7 @@ var _ = Describe("performValidationsTest", func() {
 			}
 			Expect(actual).Should(Equal(td.expectedResult))
 		})
-		It("environments not configured in db", func() {
+		It("environments not configured in Db", func() {
 			td := performValidationsTestDataStruct{
 				expectedResult:                     "",
 				expectedWhenValidateProxyEnvIsTrue: "",

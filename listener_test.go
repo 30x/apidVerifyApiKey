@@ -17,6 +17,7 @@ package apidVerifyApiKey
 import (
 	"github.com/apid/apid-core"
 	"github.com/apid/apid-core/factory"
+	"github.com/apid/apidVerifyApiKey/verifyApiKey"
 	"github.com/apigee-labs/transicator/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -43,15 +44,15 @@ var _ = Describe("listener", func() {
 		db, err := apid.Data().DB()
 		Expect(err).NotTo(HaveOccurred())
 
-		dbMan := &dbManager{
-			data:  s.Data(),
-			dbMux: sync.RWMutex{},
-			db:    db,
+		dbMan := &verifyApiKey.DbManager{
+			Data:  s.Data(),
+			DbMux: sync.RWMutex{},
+			Db:    db,
 		}
 
 		listnerTestSyncHandler = apigeeSyncHandler{
-			dbMan:  dbMan,
-			apiMan: apiManager{},
+			dbMans:  []DbManagerInterface{dbMan},
+			apiMans: []ApiManagerInterface{&verifyApiKey.ApiManager{}},
 		}
 
 		listnerTestSyncHandler.initListener(s)
@@ -69,19 +70,23 @@ var _ = Describe("listener", func() {
 				Tables:       []common.Table{},
 			}
 			listnerTestSyncHandler.Handle(s)
-			Expect(listnerTestSyncHandler.dbMan.getDbVersion()).Should(BeEquivalentTo(s.SnapshotInfo))
+			for _, dbMan := range listnerTestSyncHandler.dbMans {
+				Expect(dbMan.GetDbVersion()).Should(BeEquivalentTo(s.SnapshotInfo))
+			}
 
 		})
 
 		It("should not change version for chang event", func() {
 
-			version := listnerTestSyncHandler.dbMan.getDbVersion()
+			version := listnerTestSyncHandler.dbMans[0].GetDbVersion()
 			s := &common.Change{
 				ChangeSequence: 12321,
 				Table:          "",
 			}
-			testSyncHandler.Handle(s)
-			Expect(listnerTestSyncHandler.dbMan.getDbVersion() == version).Should(BeTrue())
+			listnerTestSyncHandler.Handle(s)
+			for _, dbMan := range listnerTestSyncHandler.dbMans {
+				Expect(dbMan.GetDbVersion() == version).Should(BeTrue())
+			}
 
 		})
 

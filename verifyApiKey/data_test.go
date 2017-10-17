@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package apidVerifyApiKey
+package verifyApiKey
 
 import (
 	"github.com/apid/apid-core"
@@ -24,9 +24,9 @@ import (
 
 var _ = Describe("DataTest", func() {
 
-	Context("query db to get api key details", func() {
+	Context("query Db to get api key details", func() {
 		var dataTestTempDir string
-		var dbMan *dbManager
+		var dbMan *DbManager
 		var _ = BeforeEach(func() {
 			var err error
 			dataTestTempDir, err = ioutil.TempDir(testTempDirBase, "sqlite3")
@@ -38,16 +38,16 @@ var _ = Describe("DataTest", func() {
 
 			Expect(err).NotTo(HaveOccurred())
 
-			dbMan = &dbManager{
-				data:  s.Data(),
-				dbMux: sync.RWMutex{},
+			dbMan = &DbManager{
+				Data:  s.Data(),
+				DbMux: sync.RWMutex{},
 			}
-			dbMan.setDbVersion(dataTestTempDir)
+			dbMan.SetDbVersion(dataTestTempDir)
 
 		})
 
 		It("should get compnay getApiKeyDetails for happy path", func() {
-			setupApikeyCompanyTestDb(dbMan.db)
+			setupApikeyCompanyTestDb(dbMan.Db)
 
 			dataWrapper := VerifyApiKeyRequestResponseDataWrapper{
 				verifyApiKeyRequest: VerifyApiKeyRequest{
@@ -90,7 +90,7 @@ var _ = Describe("DataTest", func() {
 		})
 
 		It("should get developer ApiKeyDetails - happy path", func() {
-			setupApikeyDeveloperTestDb(dbMan.db)
+			setupApikeyDeveloperTestDb(dbMan.Db)
 
 			dataWrapper := VerifyApiKeyRequestResponseDataWrapper{
 				verifyApiKeyRequest: VerifyApiKeyRequest{
@@ -134,7 +134,7 @@ var _ = Describe("DataTest", func() {
 
 		It("should throw error when apikey not found", func() {
 
-			setupApikeyCompanyTestDb(dbMan.db)
+			setupApikeyCompanyTestDb(dbMan.Db)
 			dataWrapper := VerifyApiKeyRequestResponseDataWrapper{
 				verifyApiKeyRequest: VerifyApiKeyRequest{
 					OrganizationName: "apigee-mcrosrvc-client0001",
@@ -148,7 +148,7 @@ var _ = Describe("DataTest", func() {
 
 		It("should get api products ", func() {
 
-			setupApikeyCompanyTestDb(dbMan.db)
+			setupApikeyCompanyTestDb(dbMan.Db)
 
 			apiProducts := dbMan.getApiProductsForApiKey("63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0", "bc811169")
 			Expect(len(apiProducts)).Should(BeEquivalentTo(1))
@@ -176,7 +176,7 @@ var _ = Describe("DataTest", func() {
 
 		It("should return empty array when no api products found", func() {
 
-			setupApikeyCompanyTestDb(dbMan.db)
+			setupApikeyCompanyTestDb(dbMan.Db)
 			apiProducts := dbMan.getApiProductsForApiKey("invalid-LKJkcc6GENVWGT1Zw5gek7kVJ0", "bc811169")
 			Expect(len(apiProducts)).Should(BeEquivalentTo(0))
 
@@ -184,7 +184,7 @@ var _ = Describe("DataTest", func() {
 
 		It("should get kms attributes", func() {
 
-			setupKmsAttributesdata(dbMan.db)
+			setupKmsAttributesdata(dbMan.Db)
 			attributes := dbMan.getKmsAttributes("bc811169", "40753e12-a50a-429d-9121-e571eb4e43a9", "85629786-37c5-4e8c-bb45-208f3360d005", "50321842-d6ee-4e92-91b9-37234a7920c1", "test-invalid")
 			Expect(len(attributes)).Should(BeEquivalentTo(3))
 			Expect(len(attributes["40753e12-a50a-429d-9121-e571eb4e43a9"])).Should(BeEquivalentTo(1))
