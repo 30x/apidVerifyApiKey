@@ -16,6 +16,7 @@ package verifyApiKey
 import (
 	"github.com/apid/apid-core"
 	"github.com/apid/apid-core/factory"
+	"github.com/apid/apidVerifyApiKey/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
@@ -30,17 +31,18 @@ var _ = Describe("DataTest", func() {
 		var _ = BeforeEach(func() {
 			var err error
 			dataTestTempDir, err = ioutil.TempDir(testTempDirBase, "sqlite3")
-
+			Expect(err).NotTo(HaveOccurred())
 			s := factory.DefaultServicesFactory()
 			apid.Initialize(s)
 			config := apid.Config()
 			config.Set("local_storage_path", dataTestTempDir)
-
-			Expect(err).NotTo(HaveOccurred())
+			common.SetApidServices(s, s.Log())
 
 			dbMan = &DbManager{
-				Data:  s.Data(),
-				DbMux: sync.RWMutex{},
+				DbManager: common.DbManager{
+					Data:  s.Data(),
+					DbMux: sync.RWMutex{},
+				},
 			}
 			dbMan.SetDbVersion(dataTestTempDir)
 
@@ -185,7 +187,7 @@ var _ = Describe("DataTest", func() {
 		It("should get kms attributes", func() {
 
 			setupKmsAttributesdata(dbMan.Db)
-			attributes := dbMan.getKmsAttributes("bc811169", "40753e12-a50a-429d-9121-e571eb4e43a9", "85629786-37c5-4e8c-bb45-208f3360d005", "50321842-d6ee-4e92-91b9-37234a7920c1", "test-invalid")
+			attributes := dbMan.GetKmsAttributes("bc811169", "40753e12-a50a-429d-9121-e571eb4e43a9", "85629786-37c5-4e8c-bb45-208f3360d005", "50321842-d6ee-4e92-91b9-37234a7920c1", "test-invalid")
 			Expect(len(attributes)).Should(BeEquivalentTo(3))
 			Expect(len(attributes["40753e12-a50a-429d-9121-e571eb4e43a9"])).Should(BeEquivalentTo(1))
 			Expect(len(attributes["85629786-37c5-4e8c-bb45-208f3360d005"])).Should(BeEquivalentTo(2))

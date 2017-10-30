@@ -16,6 +16,7 @@ package verifyApiKey
 
 import (
 	"encoding/json"
+	"github.com/apid/apidVerifyApiKey/common"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -25,7 +26,7 @@ import (
 type ApiManagerInterface interface {
 	InitAPI()
 	HandleRequest(w http.ResponseWriter, r *http.Request)
-	verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) (*VerifyApiKeySuccessResponse, *ErrorResponse)
+	verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) (*VerifyApiKeySuccessResponse, *common.ErrorResponse)
 }
 
 type ApiManager struct {
@@ -76,7 +77,7 @@ func (a *ApiManager) HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func setResponseHeader(errorResponse *ErrorResponse, w http.ResponseWriter) {
+func setResponseHeader(errorResponse *common.ErrorResponse, w http.ResponseWriter) {
 	if errorResponse.StatusCode != 0 {
 		w.WriteHeader(errorResponse.StatusCode)
 	} else {
@@ -108,7 +109,7 @@ func validateRequest(requestBody io.ReadCloser, w http.ResponseWriter) (VerifyAp
 }
 
 // returns []byte to be written to client
-func (apiM ApiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) (*VerifyApiKeySuccessResponse, *ErrorResponse) {
+func (apiM ApiManager) verifyAPIKey(verifyApiKeyReq VerifyApiKeyRequest) (*VerifyApiKeySuccessResponse, *common.ErrorResponse) {
 
 	dataWrapper := VerifyApiKeyRequestResponseDataWrapper{
 		verifyApiKeyRequest: verifyApiKeyReq,
@@ -200,7 +201,7 @@ func shortListApiProduct(details []ApiProductDetails, verifyApiKeyReq VerifyApiK
 
 }
 
-func (apiM ApiManager) performValidations(dataWrapper VerifyApiKeyRequestResponseDataWrapper) *ErrorResponse {
+func (apiM ApiManager) performValidations(dataWrapper VerifyApiKeyRequestResponseDataWrapper) *common.ErrorResponse {
 	clientIdDetails := dataWrapper.verifyApiKeySuccessResponse.ClientId
 	verifyApiKeyReq := dataWrapper.verifyApiKeyRequest
 	appDetails := dataWrapper.verifyApiKeySuccessResponse.App
@@ -275,7 +276,7 @@ func (apiM ApiManager) performValidations(dataWrapper VerifyApiKeyRequestRespons
 
 func (a *ApiManager) enrichAttributes(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) {
 
-	attributeMap := a.DbMan.getKmsAttributes(dataWrapper.tenant_id, dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId, dataWrapper.tempDeveloperDetails.Id, dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id, dataWrapper.verifyApiKeySuccessResponse.App.Id)
+	attributeMap := a.DbMan.GetKmsAttributes(dataWrapper.tenant_id, dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId, dataWrapper.tempDeveloperDetails.Id, dataWrapper.verifyApiKeySuccessResponse.ApiProduct.Id, dataWrapper.verifyApiKeySuccessResponse.App.Id)
 
 	clientIdAttributes := attributeMap[dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientId]
 	developerAttributes := attributeMap[dataWrapper.tempDeveloperDetails.Id]
@@ -288,13 +289,13 @@ func (a *ApiManager) enrichAttributes(dataWrapper *VerifyApiKeyRequestResponseDa
 	dataWrapper.tempDeveloperDetails.Attributes = developerAttributes
 }
 
-func errorResponse(reason, errorCode string, statusCode int) ErrorResponse {
+func errorResponse(reason, errorCode string, statusCode int) common.ErrorResponse {
 	if errorCode == "SEARCH_INTERNAL_ERROR" {
 		log.Error(reason)
 	} else {
 		log.Debug(reason)
 	}
-	resp := ErrorResponse{
+	resp := common.ErrorResponse{
 		ResponseCode:    errorCode,
 		ResponseMessage: reason,
 		StatusCode:      statusCode,

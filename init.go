@@ -16,6 +16,8 @@ package apidVerifyApiKey
 
 import (
 	"github.com/apid/apid-core"
+	"github.com/apid/apidVerifyApiKey/accessEntity"
+	"github.com/apid/apidVerifyApiKey/common"
 	"github.com/apid/apidVerifyApiKey/verifyApiKey"
 	"sync"
 )
@@ -33,12 +35,15 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
 	services = s
 	log = services.Log().ForModule("apidApiMetadata")
 	verifyApiKey.SetApidServices(services, log)
+	accessEntity.SetApidServices(services, log)
+	common.SetApidServices(services, log)
 	log.Debug("start init")
 
-	log = services.Log()
 	verifyDbMan := &verifyApiKey.DbManager{
-		Data:  services.Data(),
-		DbMux: sync.RWMutex{},
+		DbManager: common.DbManager{
+			Data:  services.Data(),
+			DbMux: sync.RWMutex{},
+		},
 	}
 	verifyApiMan := &verifyApiKey.ApiManager{
 		DbMan:             verifyDbMan,

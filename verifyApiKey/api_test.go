@@ -25,6 +25,7 @@ import (
 	"errors"
 	"github.com/apid/apid-core"
 	"github.com/apid/apid-core/factory"
+	"github.com/apid/apidVerifyApiKey/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
@@ -47,18 +48,20 @@ var _ = Describe("end to end tests", func() {
 	var _ = BeforeEach(func() {
 		var err error
 		dataTestTempDir, err = ioutil.TempDir(testTempDirBase, "api_test_sqlite3")
+		Expect(err).NotTo(HaveOccurred())
 		serviceFactoryForTest := factory.DefaultServicesFactory()
 		apid.Initialize(serviceFactoryForTest)
 		config := apid.Config()
 		config.Set("data_path", testTempDir)
 		config.Set("log_level", "DEBUG")
 		serviceFactoryForTest.Config().Set("local_storage_path", dataTestTempDir)
-
-		Expect(err).NotTo(HaveOccurred())
+		common.SetApidServices(serviceFactoryForTest, serviceFactoryForTest.Log())
 
 		dbMan = &DbManager{
-			Data:  serviceFactoryForTest.Data(),
-			DbMux: sync.RWMutex{},
+			DbManager: common.DbManager{
+				Data:  serviceFactoryForTest.Data(),
+				DbMux: sync.RWMutex{},
+			},
 		}
 		dbMan.SetDbVersion(dataTestTempDir)
 
@@ -77,7 +80,7 @@ var _ = Describe("end to end tests", func() {
 
 	Context("veriifyApiKey Api test ", func() {
 		It("should return validation error for missing input fields", func() {
-			var respObj ErrorResponse
+			var respObj common.ErrorResponse
 			reqInput := VerifyApiKeyRequest{
 				Key: "test",
 			}
@@ -91,7 +94,7 @@ var _ = Describe("end to end tests", func() {
 			Expect(respObj.ResponseCode).Should(Equal("Missing mandatory fields in the request : action organizationName uriPath"))
 		})
 		It("should return validation error for inavlid key", func() {
-			var respObj ErrorResponse
+			var respObj common.ErrorResponse
 			reqInput := VerifyApiKeyRequest{
 				Key:              "invalid-key",
 				Action:           "verify",
@@ -113,7 +116,7 @@ var _ = Describe("end to end tests", func() {
 		})
 		It("should return validation error for inavlid env", func() {
 			setupApikeyDeveloperTestDb(dbMan.Db)
-			var respObj ErrorResponse
+			var respObj common.ErrorResponse
 			reqInput := VerifyApiKeyRequest{
 				Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
 				Action:           "verify",
@@ -135,7 +138,7 @@ var _ = Describe("end to end tests", func() {
 		})
 		It("should return validation error for inavlid resource", func() {
 			setupApikeyDeveloperTestDb(dbMan.Db)
-			var respObj ErrorResponse
+			var respObj common.ErrorResponse
 			reqInput := VerifyApiKeyRequest{
 				Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
 				Action:           "verify",
@@ -157,7 +160,7 @@ var _ = Describe("end to end tests", func() {
 		})
 		It("should return validation error for inavlid proxies", func() {
 			setupApikeyDeveloperTestDb(dbMan.Db)
-			var respObj ErrorResponse
+			var respObj common.ErrorResponse
 			reqInput := VerifyApiKeyRequest{
 				Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
 				Action:           "verify",
