@@ -226,7 +226,7 @@ func setResIdentifiers(a *ApiProductDetails, priKey, priVal, secKey, secVal stri
 	a.PrimaryIdentifierType = priKey
 	a.PrimaryIdentifierValue = priVal
 	a.SecondaryIdentifierType = secKey
-	a.PrimaryIdentifierValue = secVal
+	a.SecondaryIdentifierValue = secVal
 }
 
 func parseIdentifiers(endpoint string, ids map[string]string) (valid bool, keyVals []string) {
