@@ -15,15 +15,11 @@ package verifyApiKey
 
 import (
 	"errors"
-	"github.com/apid/apid-core"
 	"github.com/apid/apidVerifyApiKey/common"
 )
 
 type DbManagerInterface interface {
-	SetDbVersion(string)
-	GetDb() apid.DB
-	GetDbVersion() string
-	GetKmsAttributes(tenantId string, entities ...string) map[string][]common.Attribute
+	common.DbManagerInterface
 	getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) error
 }
 
@@ -113,9 +109,9 @@ func (dbc DbManager) getApiProductsForApiKey(key, tenantId string) []ApiProductD
 			&environments,
 			&resources,
 		)
-		apiProductDetais.Apiproxies = jsonToStringArray(proxies)
-		apiProductDetais.Environments = jsonToStringArray(environments)
-		apiProductDetais.Resources = jsonToStringArray(resources)
+		apiProductDetais.Apiproxies = common.JsonToStringArray(proxies)
+		apiProductDetais.Environments = common.JsonToStringArray(environments)
+		apiProductDetais.Resources = common.JsonToStringArray(resources)
 
 		allProducts = append(allProducts, apiProductDetais)
 	}

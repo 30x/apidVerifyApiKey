@@ -47,6 +47,7 @@ type ApiProduct struct {
 	CreatedBy     string `db:"created_by"`
 	UpdatedAt     string `db:"updated_at"`
 	UpdatedBy     string `db:"updated_by"`
+	TenantId      string `db:"tenant_id"`
 }
 
 type App struct {

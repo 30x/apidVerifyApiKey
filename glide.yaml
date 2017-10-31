@@ -15,7 +15,7 @@
 package: github.com/apid/apidVerifyApiKey
 import:
 - package: github.com/apid/apid-core
-  version: master
+  version: ISSUE-68272561
 - package: github.com/apid/apidApigeeSync
   version: master
 testImport:

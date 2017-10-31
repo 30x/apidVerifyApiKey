@@ -38,7 +38,13 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
 	accessEntity.SetApidServices(services, log)
 	common.SetApidServices(services, log)
 	log.Debug("start init")
+	initManagers(services)
+	log.Debug("end init")
 
+	return pluginData, nil
+}
+
+func initManagers(services apid.Services) apigeeSyncHandler {
 	verifyDbMan := &verifyApiKey.DbManager{
 		DbManager: common.DbManager{
 			Data:  services.Data(),
@@ -50,14 +56,22 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
 		VerifiersEndpoint: verifyApiKey.ApiPath,
 	}
 
-	syncHandler := apigeeSyncHandler{
-		dbMans:  []DbManagerInterface{verifyDbMan},
-		apiMans: []ApiManagerInterface{verifyApiMan},
+	entityDbMan := &accessEntity.DbManager{
+		DbManager: common.DbManager{
+			Data:  services.Data(),
+			DbMux: sync.RWMutex{},
+		},
 	}
 
+	entityApiMan := &accessEntity.ApiManager{
+		DbMan:            entityDbMan,
+		AccessEntityPath: accessEntity.AccessEntityPath,
+	}
+
+	syncHandler := apigeeSyncHandler{
+		dbMans:  []common.DbManagerInterface{verifyDbMan, entityDbMan},
+		apiMans: []common.ApiManagerInterface{verifyApiMan, entityApiMan},
+	}
 	syncHandler.initListener(services)
-
-	log.Debug("end init")
-
-	return pluginData, nil
+	return syncHandler
 }

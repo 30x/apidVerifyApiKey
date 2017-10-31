@@ -14,15 +14,36 @@
 package accessEntity
 
 import (
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+
 	"github.com/apid/apid-core"
+	"github.com/apid/apid-core/factory"
+	"github.com/apid/apidVerifyApiKey/common"
+	"os"
+	"testing"
 )
+
+const testTempDirBase = "./tmp/"
 
 var (
-	services apid.Services
-	log      apid.LogService
+	testTempDir string
 )
 
-func SetApidServices(s apid.Services, l apid.LogService) {
-	services = s
-	log = l
+var _ = BeforeSuite(func() {
+	_ = os.MkdirAll(testTempDirBase, os.ModePerm)
+	s := factory.DefaultServicesFactory()
+	apid.Initialize(s)
+	SetApidServices(s, apid.Log())
+	common.SetApidServices(s, s.Log())
+})
+
+var _ = AfterSuite(func() {
+	apid.Events().Close()
+	os.RemoveAll(testTempDirBase)
+})
+
+func TestVerifyAPIKey(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "VerifyAPIKey Suite")
 }

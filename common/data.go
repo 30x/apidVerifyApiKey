@@ -2,9 +2,11 @@ package common
 
 import (
 	"database/sql"
+	"encoding/json"
 	"github.com/apid/apid-core"
 	"strings"
 	"sync"
+	"unicode/utf8"
 )
 
 type DbManager struct {
@@ -81,4 +83,18 @@ func (dbc *DbManager) GetKmsAttributes(tenantId string, entities ...string) map[
 	}
 	log.Debug("attributes returned for query ", sql, " are ", mapOfAttributes)
 	return mapOfAttributes
+}
+
+func JsonToStringArray(fjson string) []string {
+	var array []string
+	if err := json.Unmarshal([]byte(fjson), &array); err == nil {
+		return array
+	}
+	s := strings.TrimPrefix(fjson, "{")
+	s = strings.TrimSuffix(s, "}")
+	if utf8.RuneCountInString(s) > 0 {
+		array = strings.Split(s, ",")
+	}
+	log.Debug("unmarshall error for string, performing custom unmarshal ", fjson, " and result is : ", array)
+	return array
 }

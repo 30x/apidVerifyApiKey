@@ -17,13 +17,11 @@ package apidVerifyApiKey
 import (
 	"github.com/apid/apid-core"
 	"github.com/apid/apid-core/factory"
-	"github.com/apid/apidVerifyApiKey/verifyApiKey"
-	"github.com/apigee-labs/transicator/common"
+	tran "github.com/apigee-labs/transicator/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
 	"os"
-	"sync"
 )
 
 var _ = Describe("listener", func() {
@@ -40,22 +38,7 @@ var _ = Describe("listener", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		apid.InitializePlugins("")
-
-		db, err := apid.Data().DB()
-		Expect(err).NotTo(HaveOccurred())
-
-		dbMan := &verifyApiKey.DbManager{
-			Data:  s.Data(),
-			DbMux: sync.RWMutex{},
-			Db:    db,
-		}
-
-		listnerTestSyncHandler = apigeeSyncHandler{
-			dbMans:  []DbManagerInterface{dbMan},
-			apiMans: []ApiManagerInterface{&verifyApiKey.ApiManager{}},
-		}
-
-		listnerTestSyncHandler.initListener(s)
+		listnerTestSyncHandler = initManagers(s)
 	})
 
 	var _ = AfterEach(func() {
@@ -65,9 +48,9 @@ var _ = Describe("listener", func() {
 	Context("Apigee Sync Event Processing", func() {
 
 		It("should set DB to appropriate version", func() {
-			s := &common.Snapshot{
+			s := &tran.Snapshot{
 				SnapshotInfo: "test_snapshot",
-				Tables:       []common.Table{},
+				Tables:       []tran.Table{},
 			}
 			listnerTestSyncHandler.Handle(s)
 			for _, dbMan := range listnerTestSyncHandler.dbMans {
@@ -79,7 +62,7 @@ var _ = Describe("listener", func() {
 		It("should not change version for chang event", func() {
 
 			version := listnerTestSyncHandler.dbMans[0].GetDbVersion()
-			s := &common.Change{
+			s := &tran.Change{
 				ChangeSequence: 12321,
 				Table:          "",
 			}

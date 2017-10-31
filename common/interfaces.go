@@ -11,20 +11,19 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package apidVerifyApiKey
+package common
 
 import (
 	"github.com/apid/apid-core"
-	"net/http"
 )
 
 type ApiManagerInterface interface {
 	InitAPI()
-	HandleRequest(w http.ResponseWriter, r *http.Request)
 }
 
 type DbManagerInterface interface {
 	SetDbVersion(string)
 	GetDb() apid.DB
 	GetDbVersion() string
+	GetKmsAttributes(tenantId string, entities ...string) map[string][]Attribute
 }
