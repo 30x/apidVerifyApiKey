@@ -132,6 +132,7 @@ func (a *ApiManager) HandleApps(w http.ResponseWriter, r *http.Request) {
 	}
 	res, errRes := a.getApp(org, ids)
 	if errRes != nil {
+		w.WriteHeader(errRes.StatusCode)
 		writeJson(errRes, w, r)
 		return
 	}

@@ -425,8 +425,8 @@ func (d *DbManager) getAppByAppName(appName, devEmail, devId, comName, org strin
 		)
 	}
 	query += " AND a.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getAppByAppName: %v", query, org)
-	err = d.GetDb().QueryStructs(&apps, query)
+	log.Debugf("getAppByAppName: %v", query)
+	err = d.GetDb().QueryStructs(&apps, query, org)
 	return
 }
 
@@ -449,7 +449,7 @@ func (d *DbManager) getAppCredentialByConsumerKey(consumerKey, org string) (appC
 	query := selectAppCredentialByConsumerKey(
 		"'"+consumerKey+"'",
 		cols...,
-	) + " AND a.tenant_id IN " + sql_select_tenant_org
+	) + " AND ac.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getAppCredentialByConsumerKey: %v", query)
 	err = d.GetDb().QueryStructs(&appCredentials, query, org)
 	return
