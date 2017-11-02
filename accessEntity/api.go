@@ -194,7 +194,17 @@ func (a *ApiManager) HandleDevelopers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *ApiManager) HandleAppCredentials(w http.ResponseWriter, r *http.Request) {
-
+	ids, org, err := extractIdentifiers(r.URL.Query())
+	if err != nil {
+		common.WriteError(w, err.Error(), INVALID_PARAMETERS, http.StatusBadRequest)
+	}
+	details, errRes := a.getAppCredential(org, ids)
+	if errRes != nil {
+		w.WriteHeader(errRes.StatusCode)
+		writeJson(errRes, w, r)
+		return
+	}
+	writeJson(details, w, r)
 }
 
 func extractIdentifiers(pars map[string][]string) (map[string]string, string, error) {
@@ -266,7 +276,7 @@ func (a *ApiManager) getDeveloper(org string, ids map[string]string) (*Developer
 
 	devs, err := a.DbMan.GetDevelopers(priKey, priVal, secKey, secVal)
 	if err != nil {
-		log.Errorf("getApiProduct: %v", err)
+		log.Errorf("getDeveloper: %v", err)
 		return nil, newDbError(err)
 	}
 
@@ -281,12 +291,12 @@ func (a *ApiManager) getDeveloper(org string, ids map[string]string) (*Developer
 	attrs := a.DbMan.GetKmsAttributes(dev.TenantId, dev.Id)[dev.Id]
 	comNames, err := a.DbMan.GetComNamesByDevId(dev.Id)
 	if err != nil {
-		log.Errorf("getApiProduct: %v", err)
+		log.Errorf("getDeveloper: %v", err)
 		return nil, newDbError(err)
 	}
 	appNames, err := a.DbMan.GetAppNamesByDevId(dev.Id)
 	if err != nil {
-		log.Errorf("getApiProduct: %v", err)
+		log.Errorf("getDeveloper: %v", err)
 		return nil, newDbError(err)
 	}
 	details := makeDevDetails(dev, appNames, comNames, attrs, priKey, priVal)
@@ -305,7 +315,7 @@ func (a *ApiManager) getCompany(org string, ids map[string]string) (*CompanySucc
 
 	coms, err := a.DbMan.GetCompanies(priKey, priVal, secKey, secVal)
 	if err != nil {
-		log.Errorf("getApiProduct: %v", err)
+		log.Errorf("getCompany: %v", err)
 		return nil, newDbError(err)
 	}
 
@@ -320,7 +330,7 @@ func (a *ApiManager) getCompany(org string, ids map[string]string) (*CompanySucc
 	attrs := a.DbMan.GetKmsAttributes(com.TenantId, com.Id)[com.Id]
 	appNames, err := a.DbMan.GetAppNamesByComId(com.Id)
 	if err != nil {
-		log.Errorf("getApiProduct: %v", err)
+		log.Errorf("getCompany: %v", err)
 		return nil, newDbError(err)
 	}
 	details := makeCompanyDetails(com, appNames, attrs, priKey, priVal)
@@ -505,10 +515,15 @@ func makeAppCredentialDetails(ac *common.AppCredential, cks *ConsumerKeyStatusDe
 func makeApiProductDetails(prod *common.ApiProduct, attrs []common.Attribute, priKey, priVal, secKey, secVal string) (*ApiProductDetails, *common.ErrorResponse) {
 	var a *ApiProductDetails
 	if prod != nil {
-		quotaLimit, err := strconv.Atoi(prod.Quota)
-		if err != nil {
-			return nil, newDataError(err)
+		var quotaLimit int
+		var err error
+		if prod.Quota != "" {
+			quotaLimit, err = strconv.Atoi(prod.Quota)
+			if err != nil {
+				return nil, newDataError(err)
+			}
 		}
+
 		a = &ApiProductDetails{
 			ApiProxies:               common.JsonToStringArray(prod.Proxies),
 			ApiResources:             common.JsonToStringArray(prod.ApiResources),
