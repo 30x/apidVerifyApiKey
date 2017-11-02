@@ -209,10 +209,11 @@ func (a *ApiManager) HandleAppCredentials(w http.ResponseWriter, r *http.Request
 
 func extractIdentifiers(pars map[string][]string) (map[string]string, string, error) {
 	m := make(map[string]string)
-	org := ""
-	if orgs := pars["organization"]; len(orgs) > 0 {
-		org = orgs[0]
+	orgs := pars["organization"]
+	if len(orgs) == 0 {
+		return nil, "", fmt.Errorf("no org specified")
 	}
+	org := orgs[0]
 	for k, v := range pars {
 		k = strings.ToLower(k)
 		if Identifiers[k] {
@@ -233,7 +234,7 @@ func (a *ApiManager) getCompanyDeveloper(org string, ids map[string]string) (*Co
 	}
 	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
 
-	devs, err := a.DbMan.GetCompanyDevelopers(priKey, priVal, secKey, secVal)
+	devs, err := a.DbMan.GetCompanyDevelopers(org, priKey, priVal, secKey, secVal)
 	if err != nil {
 		log.Errorf("getCompanyDeveloper: %v", err)
 		return nil, newDbError(err)
@@ -274,7 +275,7 @@ func (a *ApiManager) getDeveloper(org string, ids map[string]string) (*Developer
 	}
 	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
 
-	devs, err := a.DbMan.GetDevelopers(priKey, priVal, secKey, secVal)
+	devs, err := a.DbMan.GetDevelopers(org, priKey, priVal, secKey, secVal)
 	if err != nil {
 		log.Errorf("getDeveloper: %v", err)
 		return nil, newDbError(err)
@@ -313,7 +314,7 @@ func (a *ApiManager) getCompany(org string, ids map[string]string) (*CompanySucc
 	}
 	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
 
-	coms, err := a.DbMan.GetCompanies(priKey, priVal, secKey, secVal)
+	coms, err := a.DbMan.GetCompanies(org, priKey, priVal, secKey, secVal)
 	if err != nil {
 		log.Errorf("getCompany: %v", err)
 		return nil, newDbError(err)
@@ -347,7 +348,7 @@ func (a *ApiManager) getApiProduct(org string, ids map[string]string) (*ApiProdu
 	}
 	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
 
-	prods, err := a.DbMan.GetApiProducts(priKey, priVal, secKey, secVal)
+	prods, err := a.DbMan.GetApiProducts(org, priKey, priVal, secKey, secVal)
 	if err != nil {
 		log.Errorf("getApiProduct: %v", err)
 		return nil, newDbError(err)
@@ -380,7 +381,7 @@ func (a *ApiManager) getAppCredential(org string, ids map[string]string) (*AppCr
 	}
 	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
 
-	appCreds, err := a.DbMan.GetAppCredentials(priKey, priVal, secKey, secVal)
+	appCreds, err := a.DbMan.GetAppCredentials(org, priKey, priVal, secKey, secVal)
 	if err != nil {
 		log.Errorf("getAppCredential: %v", err)
 		return nil, newDbError(err)
@@ -394,7 +395,7 @@ func (a *ApiManager) getAppCredential(org string, ids map[string]string) (*AppCr
 	}
 	appCred := &appCreds[0]
 	attrs := a.DbMan.GetKmsAttributes(appCred.TenantId, appCred.Id)[appCred.Id]
-	apps, err := a.DbMan.GetApps(IdentifierAppId, appCred.AppId, "", "")
+	apps, err := a.DbMan.GetApps(org, IdentifierAppId, appCred.AppId, "", "")
 	if err != nil {
 		log.Errorf("getAppCredential: %v", err)
 		return nil, newDbError(err)
@@ -434,7 +435,7 @@ func (a *ApiManager) getApp(org string, ids map[string]string) (*AppSuccessRespo
 	}
 	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
 
-	apps, err := a.DbMan.GetApps(priKey, priVal, secKey, secVal)
+	apps, err := a.DbMan.GetApps(org, priKey, priVal, secKey, secVal)
 	if err != nil {
 		log.Errorf("getApp: %v", err)
 		return nil, newDbError(err)
@@ -462,7 +463,7 @@ func (a *ApiManager) getApp(org string, ids map[string]string) (*AppSuccessRespo
 		log.Errorf("getApp error getting parent status: %v", err)
 		return nil, newDbError(err)
 	}
-	creds, err := a.DbMan.GetAppCredentials(IdentifierAppId, app.Id, "", "")
+	creds, err := a.DbMan.GetAppCredentials(org, IdentifierAppId, app.Id, "", "")
 	if err != nil {
 		log.Errorf("getApp error getting parent status: %v", err)
 		return nil, newDbError(err)

@@ -48,6 +48,7 @@ var _ = Describe("DataTest", func() {
 
 		It("should get apiProducts", func() {
 			setupTestDb(dbMan.GetDb())
+			org := "edgex01"
 			testData := [][]string{
 				//positive tests
 				{IdentifierApiProductName, "apstest", "", ""},
@@ -118,7 +119,7 @@ var _ = Describe("DataTest", func() {
 
 			for i, data := range testData {
 				priKey, priVal, secKey, secVal := data[0], data[1], data[2], data[3]
-				prods, err := dbMan.GetApiProducts(priKey, priVal, secKey, secVal)
+				prods, err := dbMan.GetApiProducts(org, priKey, priVal, secKey, secVal)
 				Expect(err).Should(Succeed())
 				if len(results[i]) > 0 {
 					Expect(prods).Should(Equal(results[i]))

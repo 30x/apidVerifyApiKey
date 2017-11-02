@@ -22,6 +22,7 @@ import (
 const (
 	sql_select_api_product = `SELECT * FROM kms_api_product AS ap `
 	sql_select_org         = `SELECT * FROM kms_organization AS o WHERE o.tenant_id=$1 LIMIT 1;`
+	sql_select_tenant_org  = ` (SELECT o.tenant_id FROM kms_organization AS o WHERE o.name=?)`
 )
 
 type DbManager struct {
@@ -191,35 +192,35 @@ func (d *DbManager) GetStatus(id, t string) (string, error) {
 	return status.String, nil
 }
 
-func (d *DbManager) GetApiProducts(priKey, priVal, secKey, secVal string) (apiProducts []common.ApiProduct, err error) {
+func (d *DbManager) GetApiProducts(org, priKey, priVal, secKey, secVal string) (apiProducts []common.ApiProduct, err error) {
 	if priKey == IdentifierAppId {
-		apiProducts, err = d.getApiProductsByAppId(priVal)
+		apiProducts, err = d.getApiProductsByAppId(priVal, org)
 		if err != nil {
 			return
 		}
 	} else if priKey == IdentifierApiProductName {
-		apiProducts, err = d.getApiProductsByName(priVal)
+		apiProducts, err = d.getApiProductsByName(priVal, org)
 		if err != nil {
 			return
 		}
 	} else if priKey == IdentifierAppName {
 		switch secKey {
 		case IdentifierDeveloperEmail:
-			apiProducts, err = d.getApiProductsByAppName(priVal, secVal, "", "")
+			apiProducts, err = d.getApiProductsByAppName(priVal, secVal, "", "", org)
 		case IdentifierDeveloperId:
-			apiProducts, err = d.getApiProductsByAppName(priVal, "", secVal, "")
+			apiProducts, err = d.getApiProductsByAppName(priVal, "", secVal, "", org)
 		case IdentifierCompanyName:
-			apiProducts, err = d.getApiProductsByAppName(priVal, "", "", secVal)
+			apiProducts, err = d.getApiProductsByAppName(priVal, "", "", secVal, org)
 		case IdentifierApiResource:
 			fallthrough
 		case "":
-			apiProducts, err = d.getApiProductsByAppName(priVal, "", "", "")
+			apiProducts, err = d.getApiProductsByAppName(priVal, "", "", "", org)
 		}
 		if err != nil {
 			return
 		}
 	} else if priKey == IdentifierConsumerKey {
-		apiProducts, err = d.getApiProductsByConsumerKey(priVal)
+		apiProducts, err = d.getApiProductsByConsumerKey(priVal, org)
 		if err != nil {
 			return
 		}
@@ -231,76 +232,79 @@ func (d *DbManager) GetApiProducts(priKey, priVal, secKey, secVal string) (apiPr
 	return
 }
 
-func (d *DbManager) GetApps(priKey, priVal, secKey, secVal string) (apps []common.App, err error) {
+func (d *DbManager) GetApps(org, priKey, priVal, secKey, secVal string) (apps []common.App, err error) {
 	switch priKey {
 	case IdentifierAppId:
-		return d.getAppByAppId(priVal)
+		return d.getAppByAppId(priVal, org)
 	case IdentifierAppName:
 		switch secKey {
 		case IdentifierDeveloperEmail:
-			return d.getAppByAppName(priVal, secVal, "", "")
+			return d.getAppByAppName(priVal, secVal, "", "", org)
 		case IdentifierDeveloperId:
-			return d.getAppByAppName(priVal, "", secVal, "")
+			return d.getAppByAppName(priVal, "", secVal, "", org)
 		case IdentifierCompanyName:
-			return d.getAppByAppName(priVal, "", "", secVal)
+			return d.getAppByAppName(priVal, "", "", secVal, org)
 		case "":
-			return d.getAppByAppName(priVal, "", "", "")
+			return d.getAppByAppName(priVal, "", "", "", org)
 		}
 	case IdentifierConsumerKey:
-		return d.getAppByConsumerKey(priVal)
+		return d.getAppByConsumerKey(priVal, org)
 	}
 	return
 }
 
-func (d *DbManager) GetCompanies(priKey, priVal, secKey, secVal string) (companies []common.Company, err error) {
+func (d *DbManager) GetCompanies(org, priKey, priVal, secKey, secVal string) (companies []common.Company, err error) {
 	switch priKey {
 	case IdentifierAppId:
-		return d.getCompanyByAppId(priVal)
+		return d.getCompanyByAppId(priVal, org)
 	case IdentifierCompanyName:
-		return d.getCompanyByName(priVal)
+		return d.getCompanyByName(priVal, org)
 	case IdentifierConsumerKey:
-		return d.getCompanyByConsumerKey(priVal)
+		return d.getCompanyByConsumerKey(priVal, org)
 	}
 	return
 }
 
-func (d *DbManager) GetCompanyDevelopers(priKey, priVal, secKey, secVal string) (companyDevelopers []common.CompanyDeveloper, err error) {
+func (d *DbManager) GetCompanyDevelopers(org, priKey, priVal, secKey, secVal string) (companyDevelopers []common.CompanyDeveloper, err error) {
 	if priKey == IdentifierCompanyName {
-		return d.getCompanyDeveloperByComName(priVal)
+		return d.getCompanyDeveloperByComName(priVal, org)
 	}
 	return
 }
 
-func (d *DbManager) GetAppCredentials(priKey, priVal, secKey, secVal string) (appCredentials []common.AppCredential, err error) {
+func (d *DbManager) GetAppCredentials(org, priKey, priVal, secKey, secVal string) (appCredentials []common.AppCredential, err error) {
 	if priKey == IdentifierConsumerKey {
-		return d.getAppCredentialByConsumerKey(priVal)
+		return d.getAppCredentialByConsumerKey(priVal, org)
 	}
 	return
 }
 
-func (d *DbManager) GetDevelopers(priKey, priVal, secKey, secVal string) (developers []common.Developer, err error) {
+func (d *DbManager) GetDevelopers(org, priKey, priVal, secKey, secVal string) (developers []common.Developer, err error) {
 	switch priKey {
 	case IdentifierAppId:
-		return d.getDeveloperByAppId(priVal)
+		return d.getDeveloperByAppId(priVal, org)
 	case IdentifierDeveloperEmail:
-		return d.getDeveloperByEmail(priVal)
+		return d.getDeveloperByEmail(priVal, org)
 	case IdentifierConsumerKey:
-		return d.getDeveloperByConsumerKey(priVal)
+		return d.getDeveloperByConsumerKey(priVal, org)
 	case IdentifierDeveloperId:
-		return d.getDeveloperById(priVal)
+		return d.getDeveloperById(priVal, org)
 	}
 	return
 }
 
-func (d *DbManager) getApiProductsByName(apiProdName string) (apiProducts []common.ApiProduct, err error) {
+func (d *DbManager) getApiProductsByName(apiProdName string, org string) (apiProducts []common.ApiProduct, err error) {
 	err = d.GetDb().QueryStructs(&apiProducts,
-		sql_select_api_product+`WHERE ap.name = $1;`,
+		sql_select_api_product+
+			`WHERE ap.name = ? AND ap.tenant_id IN `+
+			sql_select_tenant_org,
 		apiProdName,
+		org,
 	)
 	return
 }
 
-func (d *DbManager) getApiProductsByAppId(appId string) (apiProducts []common.ApiProduct, err error) {
+func (d *DbManager) getApiProductsByAppId(appId string, org string) (apiProducts []common.ApiProduct, err error) {
 	cols := []string{"*"}
 	query := selectApiProductsById(
 		selectAppCredentialMapperByAppId(
@@ -308,13 +312,13 @@ func (d *DbManager) getApiProductsByAppId(appId string) (apiProducts []common.Ap
 			"apiprdt_id",
 		),
 		cols...,
-	)
+	) + " AND ap.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getApiProductsByAppId: %v", query)
-	err = d.GetDb().QueryStructs(&apiProducts, query)
+	err = d.GetDb().QueryStructs(&apiProducts, query, org)
 	return
 }
 
-func (d *DbManager) getApiProductsByConsumerKey(consumerKey string) (apiProducts []common.ApiProduct, err error) {
+func (d *DbManager) getApiProductsByConsumerKey(consumerKey string, org string) (apiProducts []common.ApiProduct, err error) {
 	cols := []string{"*"}
 	query := selectApiProductsById(
 		selectAppCredentialMapperByConsumerKey(
@@ -322,13 +326,13 @@ func (d *DbManager) getApiProductsByConsumerKey(consumerKey string) (apiProducts
 			"apiprdt_id",
 		),
 		cols...,
-	)
+	) + " AND ap.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getApiProductsByConsumerKey: %v", query)
-	err = d.GetDb().QueryStructs(&apiProducts, query)
+	err = d.GetDb().QueryStructs(&apiProducts, query, org)
 	return
 }
 
-func (d *DbManager) getApiProductsByAppName(appName, devEmail, devId, comName string) (apiProducts []common.ApiProduct, err error) {
+func (d *DbManager) getApiProductsByAppName(appName, devEmail, devId, comName, org string) (apiProducts []common.ApiProduct, err error) {
 	cols := []string{"*"}
 	var appQuery string
 	switch {
@@ -369,24 +373,24 @@ func (d *DbManager) getApiProductsByAppName(appName, devEmail, devId, comName st
 			"apiprdt_id",
 		),
 		cols...,
-	)
+	) + " AND ap.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getApiProductsByAppName: %v", query)
-	err = d.GetDb().QueryStructs(&apiProducts, query)
+	err = d.GetDb().QueryStructs(&apiProducts, query, org)
 	return
 }
 
-func (d *DbManager) getAppByAppId(id string) (apps []common.App, err error) {
+func (d *DbManager) getAppByAppId(id, org string) (apps []common.App, err error) {
 	cols := []string{"*"}
 	query := selectAppById(
 		"'"+id+"'",
 		cols...,
-	)
+	) + " AND a.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getAppByAppId: %v", query)
-	err = d.GetDb().QueryStructs(&apps, query)
+	err = d.GetDb().QueryStructs(&apps, query, org)
 	return
 }
 
-func (d *DbManager) getAppByAppName(appName, devEmail, devId, comName string) (apps []common.App, err error) {
+func (d *DbManager) getAppByAppName(appName, devEmail, devId, comName, org string) (apps []common.App, err error) {
 	cols := []string{"*"}
 	var query string
 	switch {
@@ -420,12 +424,13 @@ func (d *DbManager) getAppByAppName(appName, devEmail, devId, comName string) (a
 			cols...,
 		)
 	}
-	log.Debugf("getAppByAppName: %v", query)
+	query += " AND a.tenant_id IN " + sql_select_tenant_org
+	log.Debugf("getAppByAppName: %v", query, org)
 	err = d.GetDb().QueryStructs(&apps, query)
 	return
 }
 
-func (d *DbManager) getAppByConsumerKey(consumerKey string) (apps []common.App, err error) {
+func (d *DbManager) getAppByConsumerKey(consumerKey, org string) (apps []common.App, err error) {
 	cols := []string{"*"}
 	query := selectAppById(
 		selectAppCredentialMapperByConsumerKey(
@@ -433,24 +438,24 @@ func (d *DbManager) getAppByConsumerKey(consumerKey string) (apps []common.App, 
 			"app_id",
 		),
 		cols...,
-	)
+	) + " AND a.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getAppByConsumerKey: %v", query)
-	err = d.GetDb().QueryStructs(&apps, query)
+	err = d.GetDb().QueryStructs(&apps, query, org)
 	return
 }
 
-func (d *DbManager) getAppCredentialByConsumerKey(consumerKey string) (appCredentials []common.AppCredential, err error) {
+func (d *DbManager) getAppCredentialByConsumerKey(consumerKey, org string) (appCredentials []common.AppCredential, err error) {
 	cols := []string{"*"}
 	query := selectAppCredentialByConsumerKey(
 		"'"+consumerKey+"'",
 		cols...,
-	)
+	) + " AND a.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getAppCredentialByConsumerKey: %v", query)
-	err = d.GetDb().QueryStructs(&appCredentials, query)
+	err = d.GetDb().QueryStructs(&appCredentials, query, org)
 	return
 }
 
-func (d *DbManager) getCompanyByAppId(appId string) (companies []common.Company, err error) {
+func (d *DbManager) getCompanyByAppId(appId, org string) (companies []common.Company, err error) {
 	cols := []string{"*"}
 	query := selectCompanyByComId(
 		selectAppById(
@@ -458,24 +463,24 @@ func (d *DbManager) getCompanyByAppId(appId string) (companies []common.Company,
 			"company_id",
 		),
 		cols...,
-	)
+	) + " AND com.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getCompanyByAppId: %v", query)
-	err = d.GetDb().QueryStructs(&companies, query)
+	err = d.GetDb().QueryStructs(&companies, query, org)
 	return
 }
 
-func (d *DbManager) getCompanyByName(name string) (companies []common.Company, err error) {
+func (d *DbManager) getCompanyByName(name, org string) (companies []common.Company, err error) {
 	cols := []string{"*"}
 	query := selectCompanyByName(
 		"'"+name+"'",
 		cols...,
-	)
+	) + " AND com.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getCompanyByName: %v", query)
-	err = d.GetDb().QueryStructs(&companies, query)
+	err = d.GetDb().QueryStructs(&companies, query, org)
 	return
 }
 
-func (d *DbManager) getCompanyByConsumerKey(consumerKey string) (companies []common.Company, err error) {
+func (d *DbManager) getCompanyByConsumerKey(consumerKey, org string) (companies []common.Company, err error) {
 	cols := []string{"*"}
 	query := selectCompanyByComId(
 		selectAppById(
@@ -486,13 +491,13 @@ func (d *DbManager) getCompanyByConsumerKey(consumerKey string) (companies []com
 			"company_id",
 		),
 		cols...,
-	)
+	) + " AND com.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getCompanyByConsumerKey: %v", query)
-	err = d.GetDb().QueryStructs(&companies, query)
+	err = d.GetDb().QueryStructs(&companies, query, org)
 	return
 }
 
-func (d *DbManager) getCompanyDeveloperByComName(comName string) (companyDevelopers []common.CompanyDeveloper, err error) {
+func (d *DbManager) getCompanyDeveloperByComName(comName, org string) (companyDevelopers []common.CompanyDeveloper, err error) {
 	cols := []string{"*"}
 	query := selectCompanyDeveloperByComId(
 		selectCompanyByName(
@@ -500,13 +505,13 @@ func (d *DbManager) getCompanyDeveloperByComName(comName string) (companyDevelop
 			"id",
 		),
 		cols...,
-	)
+	) + " AND cd.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getCompanyDeveloperByComName: %v", query)
-	err = d.GetDb().QueryStructs(&companyDevelopers, query)
+	err = d.GetDb().QueryStructs(&companyDevelopers, query, org)
 	return
 }
 
-func (d *DbManager) getDeveloperByAppId(appId string) (developers []common.Developer, err error) {
+func (d *DbManager) getDeveloperByAppId(appId, org string) (developers []common.Developer, err error) {
 	cols := []string{"*"}
 	query := selectDeveloperById(
 		selectAppById(
@@ -514,13 +519,13 @@ func (d *DbManager) getDeveloperByAppId(appId string) (developers []common.Devel
 			"developer_id",
 		),
 		cols...,
-	)
+	) + " AND dev.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getDeveloperByAppId: %v", query)
-	err = d.GetDb().QueryStructs(&developers, query)
+	err = d.GetDb().QueryStructs(&developers, query, org)
 	return
 }
 
-func (d *DbManager) getDeveloperByConsumerKey(consumerKey string) (developers []common.Developer, err error) {
+func (d *DbManager) getDeveloperByConsumerKey(consumerKey, org string) (developers []common.Developer, err error) {
 	cols := []string{"*"}
 	query := selectDeveloperById(
 		selectAppById(
@@ -531,31 +536,31 @@ func (d *DbManager) getDeveloperByConsumerKey(consumerKey string) (developers []
 			"developer_id",
 		),
 		cols...,
-	)
+	) + " AND dev.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getDeveloperByConsumerKey: %v", query)
-	err = d.GetDb().QueryStructs(&developers, query)
+	err = d.GetDb().QueryStructs(&developers, query, org)
 	return
 }
 
-func (d *DbManager) getDeveloperByEmail(email string) (developers []common.Developer, err error) {
+func (d *DbManager) getDeveloperByEmail(email, org string) (developers []common.Developer, err error) {
 	cols := []string{"*"}
 	query := selectDeveloperByEmail(
 		"'"+email+"'",
 		cols...,
-	)
+	) + " AND dev.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getDeveloperByEmail: %v", query)
-	err = d.GetDb().QueryStructs(&developers, query)
+	err = d.GetDb().QueryStructs(&developers, query, org)
 	return
 }
 
-func (d *DbManager) getDeveloperById(id string) (developers []common.Developer, err error) {
+func (d *DbManager) getDeveloperById(id, org string) (developers []common.Developer, err error) {
 	cols := []string{"*"}
 	query := selectDeveloperById(
 		"'"+id+"'",
 		cols...,
-	)
+	) + " AND dev.tenant_id IN " + sql_select_tenant_org
 	log.Debugf("getDeveloperById: %v", query)
-	err = d.GetDb().QueryStructs(&developers, query)
+	err = d.GetDb().QueryStructs(&developers, query, org)
 	return
 }
 
