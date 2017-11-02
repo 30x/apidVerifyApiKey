@@ -32,6 +32,7 @@ func (e *ErrorResponse) Error() string {
 
 type ApiProduct struct {
 	Id            string `db:"id"`
+	TenantId      string `db:"tenant_id"`
 	Name          string `db:"name"`
 	DisplayName   string `db:"display_name"`
 	Description   string `db:"description"`
@@ -47,11 +48,11 @@ type ApiProduct struct {
 	CreatedBy     string `db:"created_by"`
 	UpdatedAt     string `db:"updated_at"`
 	UpdatedBy     string `db:"updated_by"`
-	TenantId      string `db:"tenant_id"`
 }
 
 type App struct {
 	Id          string `db:"id"`
+	TenantId    string `db:"tenant_id"`
 	Name        string `db:"name"`
 	DisplayName string `db:"display_name"`
 	AccessType  string `db:"access_type"`
@@ -62,6 +63,63 @@ type App struct {
 	DeveloperId string `db:"developer_id"`
 	ParentId    string `db:"parent_id"`
 	Type        string `db:"type"`
+	CreatedAt   string `db:"created_at"`
+	CreatedBy   string `db:"created_by"`
+	UpdatedAt   string `db:"updated_at"`
+	UpdatedBy   string `db:"updated_by"`
+}
+
+type AppCredential struct {
+	Id             string `db:"id"`
+	TenantId       string `db:"tenant_id"`
+	ConsumerSecret string `db:"consumer_secret"`
+	AppId          string `db:"app_id"`
+	MethodType     string `db:"method_type"`
+	Status         string `db:"status"`
+	IssuedAt       string `db:"issued_at"`
+	ExpiresAt      string `db:"expires_at"`
+	AppStatus      string `db:"app_status"`
+	Scopes         string `db:"scopes"`
+	CreatedAt      string `db:"created_at"`
+	CreatedBy      string `db:"created_by"`
+	UpdatedAt      string `db:"updated_at"`
+	UpdatedBy      string `db:"updated_by"`
+}
+
+type Company struct {
+	Id          string `db:"id"`
+	TenantId    string `db:"tenant_id"`
+	Name        string `db:"name"`
+	DisplayName string `db:"display_name"`
+	Status      string `db:"status"`
+	CreatedAt   string `db:"created_at"`
+	CreatedBy   string `db:"created_by"`
+	UpdatedAt   string `db:"updated_at"`
+	UpdatedBy   string `db:"updated_by"`
+}
+
+type Developer struct {
+	Id                string `db:"id"`
+	TenantId          string `db:"tenant_id"`
+	UserName          string `db:"username"`
+	FirstName         string `db:"first_name"`
+	LastName          string `db:"last_name"`
+	Password          string `db:"password"`
+	Email             string `db:"email"`
+	Status            string `db:"status"`
+	EncryptedPassword string `db:"encrypted_password"`
+	Salt              string `db:"salt"`
+	CreatedAt         string `db:"created_at"`
+	CreatedBy         string `db:"created_by"`
+	UpdatedAt         string `db:"updated_at"`
+	UpdatedBy         string `db:"updated_by"`
+}
+
+type CompanyDeveloper struct {
+	TenantId    string `db:"tenant_id"`
+	CompanyId   string `db:"company_id"`
+	DeveloperId string `db:"developer_id"`
+	Roles       string `db:"roles"`
 	CreatedAt   string `db:"created_at"`
 	CreatedBy   string `db:"created_by"`
 	UpdatedAt   string `db:"updated_at"`
