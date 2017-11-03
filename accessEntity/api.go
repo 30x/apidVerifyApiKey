@@ -260,12 +260,14 @@ func (a *ApiManager) getCompanyDeveloper(org string, ids map[string]string) (*Co
 			log.Errorf("getCompanyDeveloper: %v", err)
 			return nil, newDbError(err)
 		}
-		detail := makeComDevDetails(&dev, comName, email, priKey, priVal)
+		detail := makeComDevDetails(&dev, comName, email)
 		details = append(details, detail)
 	}
 	return &CompanyDevelopersSuccessResponse{
-		CompanyDevelopers: details,
-		Organization:      org,
+		CompanyDevelopers:      details,
+		Organization:           org,
+		PrimaryIdentifierType:  priKey,
+		PrimaryIdentifierValue: priVal,
 	}, nil
 }
 
@@ -301,10 +303,12 @@ func (a *ApiManager) getDeveloper(org string, ids map[string]string) (*Developer
 		log.Errorf("getDeveloper: %v", err)
 		return nil, newDbError(err)
 	}
-	details := makeDevDetails(dev, appNames, comNames, attrs, priKey, priVal)
+	details := makeDevDetails(dev, appNames, comNames, attrs)
 	return &DeveloperSuccessResponse{
-		Developer:    details,
-		Organization: org,
+		Developer:              details,
+		Organization:           org,
+		PrimaryIdentifierType:  priKey,
+		PrimaryIdentifierValue: priVal,
 	}, nil
 }
 
@@ -335,10 +339,12 @@ func (a *ApiManager) getCompany(org string, ids map[string]string) (*CompanySucc
 		log.Errorf("getCompany: %v", err)
 		return nil, newDbError(err)
 	}
-	details := makeCompanyDetails(com, appNames, attrs, priKey, priVal)
+	details := makeCompanyDetails(com, appNames, attrs)
 	return &CompanySuccessResponse{
-		Company:      details,
-		Organization: org,
+		Company:                details,
+		Organization:           org,
+		PrimaryIdentifierType:  priKey,
+		PrimaryIdentifierValue: priVal,
 	}, nil
 }
 
@@ -364,14 +370,18 @@ func (a *ApiManager) getApiProduct(org string, ids map[string]string) (*ApiProdu
 	}
 	prod := &prods[0]
 	attrs = a.DbMan.GetKmsAttributes(prod.TenantId, prod.Id)[prod.Id]
-	details, errRes := makeApiProductDetails(prod, attrs, priKey, priVal, secKey, secVal)
+	details, errRes := makeApiProductDetails(prod, attrs)
 	if errRes != nil {
 		return nil, errRes
 	}
 
 	return &ApiProductSuccessResponse{
-		ApiProduct:   details,
-		Organization: org,
+		ApiProduct:               details,
+		Organization:             org,
+		PrimaryIdentifierType:    priKey,
+		PrimaryIdentifierValue:   priVal,
+		SecondaryIdentifierType:  secKey,
+		SecondaryIdentifierValue: secVal,
 	}, nil
 }
 
@@ -422,10 +432,12 @@ func (a *ApiManager) getAppCredential(org string, ids map[string]string) (*AppCr
 	//TODO: isValidKey
 	cks := makeConsumerKeyStatusDetails(app, cd, devStatus, "")
 	//TODO: redirectUris
-	details := makeAppCredentialDetails(appCred, cks, []string{}, attrs, priKey, priVal)
+	details := makeAppCredentialDetails(appCred, cks, []string{}, attrs)
 	return &AppCredentialSuccessResponse{
-		AppCredential: details,
-		Organization:  org,
+		AppCredential:          details,
+		Organization:           org,
+		PrimaryIdentifierType:  priKey,
+		PrimaryIdentifierValue: priVal,
 	}, nil
 }
 
@@ -474,13 +486,17 @@ func (a *ApiManager) getApp(org string, ids map[string]string) (*AppSuccessRespo
 		credDetails = append(credDetails, a.getCredDetails(&cred, app.Status))
 	}
 
-	details, errRes := makeAppDetails(app, parStatus, prods, credDetails, attrs, priKey, priVal, secKey, secVal)
+	details, errRes := makeAppDetails(app, parStatus, prods, credDetails, attrs)
 	if errRes != nil {
 		return nil, errRes
 	}
 	return &AppSuccessResponse{
-		App:          details,
-		Organization: org,
+		App:                      details,
+		Organization:             org,
+		PrimaryIdentifierType:    priKey,
+		PrimaryIdentifierValue:   priVal,
+		SecondaryIdentifierType:  secKey,
+		SecondaryIdentifierValue: secVal,
 	}, nil
 }
 
@@ -497,24 +513,22 @@ func makeConsumerKeyStatusDetails(app *common.App, c *CredentialDetails, devStat
 	}
 }
 
-func makeAppCredentialDetails(ac *common.AppCredential, cks *ConsumerKeyStatusDetails, redirectUrl []string, attrs []common.Attribute, priKey, priVal string) *AppCredentialDetails {
+func makeAppCredentialDetails(ac *common.AppCredential, cks *ConsumerKeyStatusDetails, redirectUrl []string, attrs []common.Attribute) *AppCredentialDetails {
 	return &AppCredentialDetails{
-		AppID:                  ac.AppId,
-		AppName:                cks.AppName,
-		Attributes:             attrs,
-		ConsumerKey:            ac.Id,
-		ConsumerKeyStatus:      cks,
-		ConsumerSecret:         ac.ConsumerSecret,
-		DeveloperID:            cks.DeveloperID,
-		PrimaryIdentifierType:  priKey,
-		PrimaryIdentifierValue: priVal,
-		RedirectUris:           redirectUrl, //TODO
-		Scopes:                 common.JsonToStringArray(ac.Scopes),
-		Status:                 ac.Status,
+		AppID:             ac.AppId,
+		AppName:           cks.AppName,
+		Attributes:        attrs,
+		ConsumerKey:       ac.Id,
+		ConsumerKeyStatus: cks,
+		ConsumerSecret:    ac.ConsumerSecret,
+		DeveloperID:       cks.DeveloperID,
+		RedirectUris:      redirectUrl, //TODO
+		Scopes:            common.JsonToStringArray(ac.Scopes),
+		Status:            ac.Status,
 	}
 }
 
-func makeApiProductDetails(prod *common.ApiProduct, attrs []common.Attribute, priKey, priVal, secKey, secVal string) (*ApiProductDetails, *common.ErrorResponse) {
+func makeApiProductDetails(prod *common.ApiProduct, attrs []common.Attribute) (*ApiProductDetails, *common.ErrorResponse) {
 	var a *ApiProductDetails
 	if prod != nil {
 		var quotaLimit int
@@ -527,27 +541,23 @@ func makeApiProductDetails(prod *common.ApiProduct, attrs []common.Attribute, pr
 		}
 
 		a = &ApiProductDetails{
-			ApiProxies:               common.JsonToStringArray(prod.Proxies),
-			ApiResources:             common.JsonToStringArray(prod.ApiResources),
-			ApprovalType:             prod.ApprovalType,
-			Attributes:               attrs,
-			CreatedAt:                prod.CreatedAt,
-			CreatedBy:                prod.CreatedBy,
-			Description:              prod.Description,
-			DisplayName:              prod.DisplayName,
-			Environments:             common.JsonToStringArray(prod.Environments),
-			ID:                       prod.Id,
-			LastModifiedAt:           prod.UpdatedAt,
-			LastModifiedBy:           prod.UpdatedBy,
-			Name:                     prod.Name,
-			QuotaInterval:            prod.QuotaInterval,
-			QuotaLimit:               int64(quotaLimit),
-			QuotaTimeUnit:            prod.QuotaTimeUnit,
-			Scopes:                   common.JsonToStringArray(prod.Scopes),
-			PrimaryIdentifierType:    priKey,
-			PrimaryIdentifierValue:   priVal,
-			SecondaryIdentifierType:  secKey,
-			SecondaryIdentifierValue: secVal,
+			ApiProxies:     common.JsonToStringArray(prod.Proxies),
+			ApiResources:   common.JsonToStringArray(prod.ApiResources),
+			ApprovalType:   prod.ApprovalType,
+			Attributes:     attrs,
+			CreatedAt:      prod.CreatedAt,
+			CreatedBy:      prod.CreatedBy,
+			Description:    prod.Description,
+			DisplayName:    prod.DisplayName,
+			Environments:   common.JsonToStringArray(prod.Environments),
+			ID:             prod.Id,
+			LastModifiedAt: prod.UpdatedAt,
+			LastModifiedBy: prod.UpdatedBy,
+			Name:           prod.Name,
+			QuotaInterval:  prod.QuotaInterval,
+			QuotaLimit:     int64(quotaLimit),
+			QuotaTimeUnit:  prod.QuotaTimeUnit,
+			Scopes:         common.JsonToStringArray(prod.Scopes),
 		}
 	} else {
 		a = new(ApiProductDetails)
@@ -555,33 +565,29 @@ func makeApiProductDetails(prod *common.ApiProduct, attrs []common.Attribute, pr
 	return a, nil
 }
 
-func makeAppDetails(app *common.App, parentStatus string, prods []string, creds []*CredentialDetails, attrs []common.Attribute, priKey, priVal, secKey, secVal string) (*AppDetails, *common.ErrorResponse) {
+func makeAppDetails(app *common.App, parentStatus string, prods []string, creds []*CredentialDetails, attrs []common.Attribute) (*AppDetails, *common.ErrorResponse) {
 	var a *AppDetails
 	if app != nil {
 		a = &AppDetails{
-			AccessType:               app.AccessType,
-			ApiProducts:              prods,
-			AppCredentials:           creds,
-			AppFamily:                app.AppFamily,
-			AppParentID:              app.ParentId,
-			AppParentStatus:          parentStatus,
-			AppType:                  app.Type,
-			Attributes:               attrs,
-			CallbackUrl:              app.CallbackUrl,
-			CreatedAt:                app.CreatedAt,
-			CreatedBy:                app.CreatedBy,
-			DisplayName:              app.DisplayName,
-			Id:                       app.Id,
-			KeyExpiresIn:             "", //TODO
-			LastModifiedAt:           app.UpdatedAt,
-			LastModifiedBy:           app.UpdatedBy,
-			Name:                     app.Name,
-			Scopes:                   []string{}, //TODO
-			Status:                   app.Status,
-			PrimaryIdentifierType:    priKey,
-			PrimaryIdentifierValue:   priVal,
-			SecondaryIdentifierType:  secKey,
-			SecondaryIdentifierValue: secVal,
+			AccessType:      app.AccessType,
+			ApiProducts:     prods,
+			AppCredentials:  creds,
+			AppFamily:       app.AppFamily,
+			AppParentID:     app.ParentId,
+			AppParentStatus: parentStatus,
+			AppType:         app.Type,
+			Attributes:      attrs,
+			CallbackUrl:     app.CallbackUrl,
+			CreatedAt:       app.CreatedAt,
+			CreatedBy:       app.CreatedBy,
+			DisplayName:     app.DisplayName,
+			Id:              app.Id,
+			KeyExpiresIn:    "", //TODO
+			LastModifiedAt:  app.UpdatedAt,
+			LastModifiedBy:  app.UpdatedBy,
+			Name:            app.Name,
+			Scopes:          []string{}, //TODO
+			Status:          app.Status,
 		}
 	} else {
 		a = new(AppDetails)
@@ -589,7 +595,7 @@ func makeAppDetails(app *common.App, parentStatus string, prods []string, creds 
 	return a, nil
 }
 
-func makeCompanyDetails(com *common.Company, appNames []string, attrs []common.Attribute, priKey, priVal string) *CompanyDetails {
+func makeCompanyDetails(com *common.Company, appNames []string, attrs []common.Attribute) *CompanyDetails {
 	return &CompanyDetails{
 		Apps:           appNames,
 		Attributes:     attrs,
@@ -600,44 +606,38 @@ func makeCompanyDetails(com *common.Company, appNames []string, attrs []common.A
 		LastModifiedAt: com.UpdatedAt,
 		LastModifiedBy: com.UpdatedBy,
 		Name:           com.Name,
-		PrimaryIdentifierType:  priKey,
-		PrimaryIdentifierValue: priVal,
-		Status:                 com.Status,
+		Status:         com.Status,
 	}
 }
 
-func makeDevDetails(dev *common.Developer, appNames []string, comNames []string, attrs []common.Attribute, priKey, priVal string) *DeveloperDetails {
+func makeDevDetails(dev *common.Developer, appNames []string, comNames []string, attrs []common.Attribute) *DeveloperDetails {
 	return &DeveloperDetails{
-		Apps:                   appNames,
-		Attributes:             attrs,
-		Companies:              comNames,
-		CreatedAt:              dev.CreatedAt,
-		CreatedBy:              dev.CreatedBy,
-		Email:                  dev.Email,
-		FirstName:              dev.FirstName,
-		ID:                     dev.Id,
-		LastModifiedAt:         dev.UpdatedAt,
-		LastModifiedBy:         dev.UpdatedBy,
-		LastName:               dev.LastName,
-		Password:               dev.Password,
-		PrimaryIdentifierType:  priKey,
-		PrimaryIdentifierValue: priVal,
-		Status:                 dev.Status,
-		UserName:               dev.UserName,
+		Apps:           appNames,
+		Attributes:     attrs,
+		Companies:      comNames,
+		CreatedAt:      dev.CreatedAt,
+		CreatedBy:      dev.CreatedBy,
+		Email:          dev.Email,
+		FirstName:      dev.FirstName,
+		ID:             dev.Id,
+		LastModifiedAt: dev.UpdatedAt,
+		LastModifiedBy: dev.UpdatedBy,
+		LastName:       dev.LastName,
+		Password:       dev.Password,
+		Status:         dev.Status,
+		UserName:       dev.UserName,
 	}
 }
 
-func makeComDevDetails(comDev *common.CompanyDeveloper, comName, devEmail, priKey, priVal string) *CompanyDeveloperDetails {
+func makeComDevDetails(comDev *common.CompanyDeveloper, comName, devEmail string) *CompanyDeveloperDetails {
 	return &CompanyDeveloperDetails{
-		CompanyName:            comName,
-		CreatedAt:              comDev.CreatedAt,
-		CreatedBy:              comDev.CreatedBy,
-		DeveloperEmail:         devEmail,
-		LastModifiedAt:         comDev.UpdatedAt,
-		LastModifiedBy:         comDev.UpdatedBy,
-		PrimaryIdentifierType:  priKey,
-		PrimaryIdentifierValue: priVal,
-		Roles: common.JsonToStringArray(comDev.Roles),
+		CompanyName:    comName,
+		CreatedAt:      comDev.CreatedAt,
+		CreatedBy:      comDev.CreatedBy,
+		DeveloperEmail: devEmail,
+		LastModifiedAt: comDev.UpdatedAt,
+		LastModifiedBy: comDev.UpdatedBy,
+		Roles:          common.JsonToStringArray(comDev.Roles),
 	}
 }
 

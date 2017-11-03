@@ -7,6 +7,14 @@ type ApiProductSuccessResponse struct {
 	ApiProduct *ApiProductDetails `json:"apiProduct,omitempty"`
 	// Organization Identifier/Name
 	Organization string `json:"organization,omitempty"`
+	// primary identifier type
+	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
+	// primary identifier value
+	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
+	// secondary identifier type
+	SecondaryIdentifierType string `json:"secondaryIdentifierType,omitempty"`
+	// secondary identifier value
+	SecondaryIdentifierValue string `json:"secondaryIdentifierValue,omitempty"`
 }
 
 type AppCredentialSuccessResponse struct {
@@ -14,6 +22,10 @@ type AppCredentialSuccessResponse struct {
 	AppCredential *AppCredentialDetails `json:"appCredential,omitempty"`
 	// Organization Identifier/Name
 	Organization string `json:"organization,omitempty"`
+	// primary identifier type
+	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
+	// primary identifier value
+	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
 }
 
 type AppSuccessResponse struct {
@@ -21,6 +33,14 @@ type AppSuccessResponse struct {
 	App *AppDetails `json:"app,omitempty"`
 	// Organization Identifier/Name
 	Organization string `json:"organization,omitempty"`
+	// primary identifier type
+	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
+	// primary identifier value
+	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
+	// secondary identifier type
+	SecondaryIdentifierType string `json:"secondaryIdentifierType,omitempty"`
+	// secondary identifier value
+	SecondaryIdentifierValue string `json:"secondaryIdentifierValue,omitempty"`
 }
 
 type CompanyDevelopersSuccessResponse struct {
@@ -28,6 +48,10 @@ type CompanyDevelopersSuccessResponse struct {
 	CompanyDevelopers []*CompanyDeveloperDetails `json:"companyDevelopers"`
 	// Organization Identifier/Name
 	Organization string `json:"organization,omitempty"`
+	// primary identifier type
+	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
+	// primary identifier value
+	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
 }
 
 type CompanySuccessResponse struct {
@@ -35,6 +59,10 @@ type CompanySuccessResponse struct {
 	Company *CompanyDetails `json:"company,omitempty"`
 	// Organization Identifier/Name
 	Organization string `json:"organization,omitempty"`
+	// primary identifier type
+	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
+	// primary identifier value
+	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
 }
 
 type DeveloperSuccessResponse struct {
@@ -42,71 +70,47 @@ type DeveloperSuccessResponse struct {
 	Developer *DeveloperDetails `json:"developer,omitempty"`
 	// Organization Identifier/Name
 	Organization string `json:"organization,omitempty"`
+	// primary identifier type
+	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
+	// primary identifier value
+	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
 }
 
 type ApiProductDetails struct {
 	// api proxies
 	ApiProxies []string `json:"apiProxies,omitempty"`
-
 	// api resources
 	ApiResources []string `json:"apiResources,omitempty"`
-
 	// approval type
 	ApprovalType string `json:"approvalType,omitempty"`
-
 	// Attributes associated with the apiproduct.
 	Attributes []common.Attribute `json:"attributes,omitempty"`
-
 	// ISO-8601
 	CreatedAt string `json:"createdAt,omitempty"`
-
 	// created by
 	CreatedBy string `json:"createdBy,omitempty"`
-
 	// description
 	Description string `json:"description,omitempty"`
-
 	// display name
 	DisplayName string `json:"displayName,omitempty"`
-
 	// environments
 	Environments []string `json:"environments,omitempty"`
-
 	// id
 	ID string `json:"id,omitempty"`
-
 	// ISO-8601
 	LastModifiedAt string `json:"lastModifiedAt,omitempty"`
-
 	// last modified by
 	LastModifiedBy string `json:"lastModifiedBy,omitempty"`
-
 	// name
 	Name string `json:"name,omitempty"`
-
-	// primary identifier type
-	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
-
-	// primary identifier value
-	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
-
 	// quota interval
 	QuotaInterval int64 `json:"quotaInterval,omitempty"`
-
 	// quota limit
 	QuotaLimit int64 `json:"quotaLimit,omitempty"`
-
 	// quota time unit
 	QuotaTimeUnit string `json:"quotaTimeUnit,omitempty"`
-
 	// scopes
 	Scopes []string `json:"scopes,omitempty"`
-
-	// secondary identifier type
-	SecondaryIdentifierType string `json:"secondaryIdentifierType,omitempty"`
-
-	// secondary identifier value
-	SecondaryIdentifierValue string `json:"secondaryIdentifierValue,omitempty"`
 }
 
 type AppDetails struct {
@@ -145,16 +149,8 @@ type AppDetails struct {
 	LastModifiedBy string `json:"lastModifiedBy,omitempty"`
 	// name
 	Name string `json:"name,omitempty"`
-	// primary identifier type
-	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
-	// primary identifier value
-	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
 	// scopes
 	Scopes []string `json:"scopes"`
-	// secondary identifier type
-	SecondaryIdentifierType string `json:"secondaryIdentifierType,omitempty"`
-	// secondary identifier value
-	SecondaryIdentifierValue string `json:"secondaryIdentifierValue,omitempty"`
 	// status
 	Status string `json:"status,omitempty"`
 }
@@ -199,45 +195,29 @@ type AppCredentialDetails struct {
 	ConsumerSecret string `json:"consumerSecret,omitempty"`
 	// developer Id
 	DeveloperID string `json:"developerId,omitempty"`
-	// primary identifier type
-	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
-	// primary identifier value
-	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
 	// redirect uris
 	RedirectUris []string `json:"redirectURIs"`
 	// scopes
 	Scopes []string `json:"scopes"`
-	// TODO: no secondary identifier type
-	SecondaryIdentifierType string `json:"secondaryIdentifierType,omitempty"`
-	// TODO: no secondary identifier value
-	SecondaryIdentifierValue string `json:"secondaryIdentifierValue,omitempty"`
 	// status
 	Status string `json:"status,omitempty"`
 }
 
 type ConsumerKeyStatusDetails struct {
-
 	// app credential
 	AppCredential *CredentialDetails `json:"appCredential,omitempty"`
-
 	// app Id
 	AppID string `json:"appId,omitempty"`
-
 	// app name
 	AppName string `json:"appName,omitempty"`
-
 	// app status
 	AppStatus string `json:"appStatus,omitempty"`
-
 	// app type
 	AppType string `json:"appType,omitempty"`
-
 	// developer Id
 	DeveloperID string `json:"developerId,omitempty"`
-
 	// developer status
 	DeveloperStatus string `json:"developerStatus,omitempty"`
-
 	// is valid key
 	IsValidKey string `json:"isValidKey,omitempty"`
 }
@@ -262,10 +242,6 @@ type CompanyDetails struct {
 	LastModifiedBy string `json:"lastModifiedBy,omitempty"`
 	// name
 	Name string `json:"name,omitempty"`
-	// primary identifier type
-	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
-	// primary identifier value
-	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
 	// status
 	Status string `json:"status,omitempty"`
 }
@@ -283,10 +259,6 @@ type CompanyDeveloperDetails struct {
 	LastModifiedAt string `json:"lastModifiedAt,omitempty"`
 	// last modified by
 	LastModifiedBy string `json:"lastModifiedBy,omitempty"`
-	// primary identifier type
-	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
-	// primary identifier value
-	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
 	// roles
 	Roles []string `json:"roles"`
 }
@@ -316,10 +288,6 @@ type DeveloperDetails struct {
 	LastName string `json:"lastName,omitempty"`
 	// password
 	Password string `json:"password,omitempty"`
-	// primary identifier type
-	PrimaryIdentifierType string `json:"primaryIdentifierType,omitempty"`
-	// primary identifier value
-	PrimaryIdentifierValue string `json:"primaryIdentifierValue,omitempty"`
 	// status
 	Status string `json:"status,omitempty"`
 	// user name

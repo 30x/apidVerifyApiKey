@@ -18,6 +18,7 @@ type DbManagerInterface interface {
 	GetCompanyDevelopers(org, priKey, priVal, secKey, secVal string) (companyDevelopers []common.CompanyDeveloper, err error)
 	GetAppCredentials(org, priKey, priVal, secKey, secVal string) (appCredentials []common.AppCredential, err error)
 	GetDevelopers(org, priKey, priVal, secKey, secVal string) (developers []common.Developer, err error)
+	// utils
 	GetApiProductNamesByAppId(appId string) ([]string, error)
 	GetAppNamesByComId(comId string) ([]string, error)
 	GetComNamesByDevId(devId string) ([]string, error)

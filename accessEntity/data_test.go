@@ -48,33 +48,33 @@ var _ = Describe("DataTest", func() {
 
 		It("should get apiProducts", func() {
 			setupTestDb(dbMan.GetDb())
-			org := "edgex01"
 			testData := [][]string{
 				//positive tests
-				{IdentifierApiProductName, "apstest", "", ""},
-				{IdentifierAppId, "408ad853-3fa0-402f-90ee-103de98d71a5", "", ""},
-				{IdentifierAppId, "408ad853-3fa0-402f-90ee-103de98d71a5", IdentifierApiResource, "/**"},
-				{IdentifierAppName, "apstest", "", ""},
-				{IdentifierConsumerKey, "abcd", "", ""},
-				{IdentifierConsumerKey, "abcd", IdentifierApiResource, "/**"},
-				{IdentifierAppName, "apstest", IdentifierDeveloperId, "e41f04e8-9d3f-470a-8bfd-c7939945896c"},
-				{IdentifierAppName, "apstest", IdentifierDeveloperEmail, "bar@google.com"},
-				{IdentifierAppName, "apstest", IdentifierCompanyName, "DevCompany"},
-				{IdentifierAppName, "apstest", IdentifierApiResource, "/**"},
+				{IdentifierApiProductName, "apstest", "", "", "apid-haoming"},
+				{IdentifierAppId, "408ad853-3fa0-402f-90ee-103de98d71a5", "", "", "apid-haoming"},
+				{IdentifierAppId, "408ad853-3fa0-402f-90ee-103de98d71a5", IdentifierApiResource, "/**", "apid-haoming"},
+				{IdentifierAppName, "apstest", "", "", "apid-haoming"},
+				{IdentifierConsumerKey, "abcd", "", "", "apid-haoming"},
+				{IdentifierConsumerKey, "abcd", IdentifierApiResource, "/**", "apid-haoming"},
+				{IdentifierAppName, "apstest", IdentifierDeveloperId, "e41f04e8-9d3f-470a-8bfd-c7939945896c", "apid-haoming"},
+				{IdentifierAppName, "apstest", IdentifierDeveloperEmail, "bar@google.com", "apid-haoming"},
+				{IdentifierAppName, "testappahhis", IdentifierCompanyName, "testcompanyhflxv", "apid-haoming"},
+				{IdentifierAppName, "apstest", IdentifierApiResource, "/**", "apid-haoming"},
 				// negative tests
-				{IdentifierApiProductName, "non-existent", "", ""},
-				{IdentifierAppId, "non-existent", "", ""},
-				{IdentifierAppId, "non-existent", IdentifierApiResource, "non-existent"},
-				{IdentifierAppName, "non-existent", "", ""},
-				{IdentifierConsumerKey, "non-existent", "", ""},
-				{IdentifierConsumerKey, "non-existent", IdentifierApiResource, "non-existent"},
-				{IdentifierAppName, "non-existent", IdentifierDeveloperId, "non-existent"},
-				{IdentifierAppName, "non-existent", IdentifierDeveloperEmail, "non-existent"},
-				{IdentifierAppName, "non-existent", IdentifierCompanyName, "non-existent"},
-				{IdentifierAppName, "non-existent", IdentifierApiResource, "non-existent"},
+				{IdentifierApiProductName, "apstest", "", "", "non-existent"},
+				{IdentifierApiProductName, "non-existent", "", "", "apid-haoming"},
+				{IdentifierAppId, "non-existent", "", "", "apid-haoming"},
+				{IdentifierAppId, "non-existent", IdentifierApiResource, "non-existent", "apid-haoming"},
+				{IdentifierAppName, "non-existent", "", "", "apid-haoming"},
+				{IdentifierConsumerKey, "non-existent", "", "", "apid-haoming"},
+				{IdentifierConsumerKey, "non-existent", IdentifierApiResource, "non-existent", "apid-haoming"},
+				{IdentifierAppName, "non-existent", IdentifierDeveloperId, "non-existent", "apid-haoming"},
+				{IdentifierAppName, "non-existent", IdentifierDeveloperEmail, "non-existent", "apid-haoming"},
+				{IdentifierAppName, "non-existent", IdentifierCompanyName, "non-existent", "apid-haoming"},
+				{IdentifierAppName, "non-existent", IdentifierApiResource, "non-existent", "apid-haoming"},
 			}
 
-			var expectedApiProd = common.ApiProduct{
+			var expectedDevApiProd = common.ApiProduct{
 				Id:            "b7e0970c-4677-4b05-8105-5ea59fdcf4e7",
 				Name:          "apstest",
 				DisplayName:   "apstest",
@@ -94,17 +94,38 @@ var _ = Describe("DataTest", func() {
 				TenantId:      "515211e9",
 			}
 
+			var expectedComApiProd = common.ApiProduct{
+				Id:            "fea8a6d5-8d34-477f-ac82-c397eaec06af",
+				Name:          "testproductsdljnkpt",
+				DisplayName:   "testproductsdljnkpt",
+				Description:   "",
+				ApiResources:  "{/res1}",
+				ApprovalType:  "AUTO",
+				Scopes:        `{}`,
+				Proxies:       `{}`,
+				Environments:  `{test}`,
+				Quota:         "",
+				QuotaTimeUnit: "",
+				QuotaInterval: 0,
+				CreatedAt:     "2017-11-02 16:00:15.608+00:00",
+				CreatedBy:     "haoming@apid.git",
+				UpdatedAt:     "2017-11-02 16:00:18.125+00:00",
+				UpdatedBy:     "haoming@apid.git",
+				TenantId:      "515211e9",
+			}
+
 			results := [][]common.ApiProduct{
-				{expectedApiProd},
-				{expectedApiProd},
-				{expectedApiProd},
-				{expectedApiProd},
-				{expectedApiProd},
-				{expectedApiProd},
-				{expectedApiProd},
-				{expectedApiProd},
-				{expectedApiProd},
-				{expectedApiProd},
+				{expectedDevApiProd},
+				{expectedDevApiProd},
+				{expectedDevApiProd},
+				{expectedDevApiProd},
+				{expectedDevApiProd},
+				{expectedDevApiProd},
+				{expectedDevApiProd},
+				{expectedDevApiProd},
+				{expectedComApiProd},
+				{expectedDevApiProd},
+				nil,
 				nil,
 				nil,
 				nil,
@@ -118,7 +139,7 @@ var _ = Describe("DataTest", func() {
 			}
 
 			for i, data := range testData {
-				priKey, priVal, secKey, secVal := data[0], data[1], data[2], data[3]
+				priKey, priVal, secKey, secVal, org := data[0], data[1], data[2], data[3], data[4]
 				prods, err := dbMan.GetApiProducts(org, priKey, priVal, secKey, secVal)
 				Expect(err).Should(Succeed())
 				if len(results[i]) > 0 {
@@ -128,6 +149,245 @@ var _ = Describe("DataTest", func() {
 				}
 			}
 		})
+
+		It("should get apps", func() {
+			setupTestDb(dbMan.GetDb())
+			testData := [][]string{
+				//positive tests
+				{IdentifierAppId, "408ad853-3fa0-402f-90ee-103de98d71a5", "", "", "apid-haoming"},
+				{IdentifierAppName, "apstest", "", "", "apid-haoming"},
+				{IdentifierAppName, "apstest", IdentifierDeveloperId, "e41f04e8-9d3f-470a-8bfd-c7939945896c", "apid-haoming"},
+				{IdentifierAppName, "apstest", IdentifierDeveloperEmail, "bar@google.com", "apid-haoming"},
+				{IdentifierAppName, "testappahhis", IdentifierCompanyName, "testcompanyhflxv", "apid-haoming"},
+				{IdentifierConsumerKey, "abcd", "", "", "apid-haoming"},
+				// negative tests
+				{IdentifierAppId, "408ad853-3fa0-402f-90ee-103de98d71a5", "", "", "non-existent"},
+				{IdentifierAppId, "non-existent", "", "", "apid-haoming"},
+				{IdentifierAppName, "non-existent", "", "", "apid-haoming"},
+				{IdentifierAppName, "non-existent", IdentifierDeveloperId, "non-existent", "apid-haoming"},
+				{IdentifierAppName, "non-existent", IdentifierDeveloperEmail, "non-existent", "apid-haoming"},
+				{IdentifierAppName, "non-existent", IdentifierCompanyName, "non-existent", "apid-haoming"},
+				{IdentifierConsumerKey, "non-existent", "", "", "apid-haoming"},
+			}
+
+			var expectedDevApp = common.App{
+				Id:          "408ad853-3fa0-402f-90ee-103de98d71a5",
+				TenantId:    "515211e9",
+				Name:        "apstest",
+				DisplayName: "apstest",
+				AccessType:  "READ",
+				CallbackUrl: "https://www.google.com",
+				Status:      "APPROVED",
+				AppFamily:   "default",
+				CompanyId:   "",
+				DeveloperId: "e41f04e8-9d3f-470a-8bfd-c7939945896c",
+				ParentId:    "e41f04e8-9d3f-470a-8bfd-c7939945896c",
+				Type:        "DEVELOPER",
+				CreatedAt:   "2017-08-18 22:13:18.325+00:00",
+				CreatedBy:   "haoming@apid.git",
+				UpdatedAt:   "2017-08-18 22:13:18.325+00:00",
+				UpdatedBy:   "haoming@apid.git",
+			}
+
+			var expectedComApp = common.App{
+				Id:          "35608afe-2715-4064-bb4d-3cbb4e82c474",
+				TenantId:    "515211e9",
+				Name:        "testappahhis",
+				DisplayName: "testappahhis",
+				AccessType:  "READ",
+				CallbackUrl: "",
+				Status:      "APPROVED",
+				AppFamily:   "default",
+				CompanyId:   "a94f75e2-69b0-44af-8776-155df7c7d22e",
+				DeveloperId: "",
+				ParentId:    "a94f75e2-69b0-44af-8776-155df7c7d22e",
+				Type:        "COMPANY",
+				CreatedAt:   "2017-11-02 16:00:16.504+00:00",
+				CreatedBy:   "haoming@apid.git",
+				UpdatedAt:   "2017-11-02 16:00:16.504+00:00",
+				UpdatedBy:   "haoming@apid.git",
+			}
+
+			results := [][]common.App{
+				{expectedDevApp},
+				{expectedDevApp},
+				{expectedDevApp},
+				{expectedDevApp},
+				{expectedComApp},
+				{expectedDevApp},
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+			}
+
+			for i, data := range testData {
+				priKey, priVal, secKey, secVal, org := data[0], data[1], data[2], data[3], data[4]
+				apps, err := dbMan.GetApps(org, priKey, priVal, secKey, secVal)
+				Expect(err).Should(Succeed())
+				if len(results[i]) > 0 {
+					Expect(apps).Should(Equal(results[i]))
+				} else {
+					Expect(apps).Should(BeZero())
+				}
+			}
+		})
+
+		It("should get Companies", func() {
+			setupTestDb(dbMan.GetDb())
+			testData := [][]string{
+				//positive tests
+				{IdentifierAppId, "35608afe-2715-4064-bb4d-3cbb4e82c474", "", "", "apid-haoming"},
+				{IdentifierCompanyName, "testcompanyhflxv", "", "", "apid-haoming"},
+				{IdentifierConsumerKey, "wxyz", "", "", "apid-haoming"},
+				// negative tests
+				{IdentifierAppId, "35608afe-2715-4064-bb4d-3cbb4e82c474", "", "", "non-existent"},
+				{IdentifierAppId, "non-existent", "", "", "apid-haoming"},
+				{IdentifierCompanyName, "non-existent", "", "", "apid-haoming"},
+				{IdentifierConsumerKey, "non-existent", "", "", "apid-haoming"},
+			}
+
+			var expectedCom = common.Company{
+				Id:          "a94f75e2-69b0-44af-8776-155df7c7d22e",
+				TenantId:    "515211e9",
+				Name:        "testcompanyhflxv",
+				DisplayName: "testcompanyhflxv",
+				Status:      "ACTIVE",
+				CreatedAt:   "2017-11-02 16:00:16.287+00:00",
+				CreatedBy:   "haoming@apid.git",
+				UpdatedAt:   "2017-11-02 16:00:16.287+00:00",
+				UpdatedBy:   "haoming@apid.git",
+			}
+
+			results := [][]common.Company{
+				{expectedCom},
+				{expectedCom},
+				{expectedCom},
+				nil,
+				nil,
+				nil,
+				nil,
+			}
+
+			for i, data := range testData {
+				priKey, priVal, secKey, secVal, org := data[0], data[1], data[2], data[3], data[4]
+				apps, err := dbMan.GetCompanies(org, priKey, priVal, secKey, secVal)
+				Expect(err).Should(Succeed())
+				if len(results[i]) > 0 {
+					Expect(apps).Should(Equal(results[i]))
+				} else {
+					Expect(apps).Should(BeZero())
+				}
+			}
+		})
+
+		It("should get developers", func() {
+			setupTestDb(dbMan.GetDb())
+			testData := [][]string{
+				//positive tests
+				{IdentifierAppId, "408ad853-3fa0-402f-90ee-103de98d71a5", "", "", "apid-haoming"},
+				{IdentifierConsumerKey, "abcd", "", "", "apid-haoming"},
+				{IdentifierDeveloperEmail, "bar@google.com", "", "", "apid-haoming"},
+				{IdentifierDeveloperId, "e41f04e8-9d3f-470a-8bfd-c7939945896c", "", "", "apid-haoming"},
+
+				// negative tests
+				{IdentifierAppId, "408ad853-3fa0-402f-90ee-103de98d71a5", "", "", "non-existent"},
+				{IdentifierAppId, "non-existent", "", "", "apid-haoming"},
+				{IdentifierConsumerKey, "non-existent", "", "", "apid-haoming"},
+				{IdentifierDeveloperEmail, "non-existent", "", "", "apid-haoming"},
+				{IdentifierDeveloperId, "non-existent", "", "", "apid-haoming"},
+			}
+
+			var expectedDev = common.Developer{
+				Id:                "e41f04e8-9d3f-470a-8bfd-c7939945896c",
+				TenantId:          "515211e9",
+				UserName:          "haoming",
+				FirstName:         "haoming",
+				LastName:          "zhang",
+				Password:          "",
+				Email:             "bar@google.com",
+				Status:            "ACTIVE",
+				EncryptedPassword: "",
+				Salt:              "",
+				CreatedAt:         "2017-08-16 22:39:46.669+00:00",
+				CreatedBy:         "foo@google.com",
+				UpdatedAt:         "2017-08-16 22:39:46.669+00:00",
+				UpdatedBy:         "foo@google.com",
+			}
+
+			results := [][]common.Developer{
+				{expectedDev},
+				{expectedDev},
+				{expectedDev},
+				{expectedDev},
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+			}
+
+			for i, data := range testData {
+				priKey, priVal, secKey, secVal, org := data[0], data[1], data[2], data[3], data[4]
+				prods, err := dbMan.GetDevelopers(org, priKey, priVal, secKey, secVal)
+				Expect(err).Should(Succeed())
+				if len(results[i]) > 0 {
+					Expect(prods).Should(Equal(results[i]))
+				} else {
+					Expect(prods).Should(BeZero())
+				}
+			}
+		})
+
+		It("should get appCredentials", func() {
+			setupTestDb(dbMan.GetDb())
+			testData := [][]string{
+				// positive tests
+				{IdentifierConsumerKey, "abcd", "", "", "apid-haoming"},
+
+				// negative tests
+				{IdentifierConsumerKey, "abcd", "", "", "non-existent"},
+				{IdentifierConsumerKey, "non-existent", "", "", "apid-haoming"},
+			}
+
+			var expectedCred = common.AppCredential{
+				Id:             "abcd",
+				TenantId:       "515211e9",
+				ConsumerSecret: "secret1",
+				AppId:          "408ad853-3fa0-402f-90ee-103de98d71a5",
+				MethodType:     "",
+				Status:         "APPROVED",
+				IssuedAt:       "2017-08-18 22:13:18.35+00:00",
+				ExpiresAt:      "",
+				AppStatus:      "",
+				Scopes:         "{}",
+				CreatedAt:      "2017-08-18 22:13:18.35+00:00",
+				CreatedBy:      "-NA-",
+				UpdatedAt:      "2017-08-18 22:13:18.352+00:00",
+				UpdatedBy:      "-NA-",
+			}
+
+			results := [][]common.AppCredential{
+				{expectedCred},
+				nil,
+				nil,
+			}
+
+			for i, data := range testData {
+				priKey, priVal, secKey, secVal, org := data[0], data[1], data[2], data[3], data[4]
+				prods, err := dbMan.GetAppCredentials(org, priKey, priVal, secKey, secVal)
+				Expect(err).Should(Succeed())
+				if len(results[i]) > 0 {
+					Expect(prods).Should(Equal(results[i]))
+				} else {
+					Expect(prods).Should(BeZero())
+				}
+			}
+		})
+
 	})
 
 })
