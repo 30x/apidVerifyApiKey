@@ -45,8 +45,21 @@ const (
 )
 
 const (
+	TypeDeveloper   = "developer"
+	TypeCompany     = "company"
+	TypeApp         = "app"
+	TypeConsumerKey = "consumerkey"
+)
+
+const (
 	AppTypeDeveloper = "DEVELOPER"
 	AppTypeCompany   = "COMPANY"
+)
+
+const (
+	StatusApproved = "APPROVED"
+	StatusRevoked  = "REVOKED"
+	StatusExpired  = "EXPIRED"
 )
 
 var (
@@ -250,8 +263,8 @@ func (a *ApiManager) getCompanyDeveloper(org string, ids map[string]string) (*Co
 
 	var details []*CompanyDeveloperDetails
 	for _, dev := range devs {
-		comName, err := a.DbMan.GetComNameByComId(dev.CompanyId)
-		if err != nil {
+		comName, err := a.DbMan.GetComNames(dev.CompanyId, TypeCompany)
+		if err != nil || len(comName) == 0 {
 			log.Errorf("getCompanyDeveloper: %v", err)
 			return nil, newDbError(err)
 		}
@@ -260,7 +273,7 @@ func (a *ApiManager) getCompanyDeveloper(org string, ids map[string]string) (*Co
 			log.Errorf("getCompanyDeveloper: %v", err)
 			return nil, newDbError(err)
 		}
-		detail := makeComDevDetails(&dev, comName, email)
+		detail := makeComDevDetails(&dev, comName[0], email)
 		details = append(details, detail)
 	}
 	return &CompanyDevelopersSuccessResponse{
@@ -293,12 +306,12 @@ func (a *ApiManager) getDeveloper(org string, ids map[string]string) (*Developer
 	dev := &devs[0]
 
 	attrs := a.DbMan.GetKmsAttributes(dev.TenantId, dev.Id)[dev.Id]
-	comNames, err := a.DbMan.GetComNamesByDevId(dev.Id)
+	comNames, err := a.DbMan.GetComNames(dev.Id, TypeDeveloper)
 	if err != nil {
 		log.Errorf("getDeveloper: %v", err)
 		return nil, newDbError(err)
 	}
-	appNames, err := a.DbMan.GetAppNamesByDevId(dev.Id)
+	appNames, err := a.DbMan.GetAppNames(dev.Id, TypeDeveloper)
 	if err != nil {
 		log.Errorf("getDeveloper: %v", err)
 		return nil, newDbError(err)
@@ -334,7 +347,7 @@ func (a *ApiManager) getCompany(org string, ids map[string]string) (*CompanySucc
 	com := &coms[0]
 
 	attrs := a.DbMan.GetKmsAttributes(com.TenantId, com.Id)[com.Id]
-	appNames, err := a.DbMan.GetAppNamesByComId(com.Id)
+	appNames, err := a.DbMan.GetAppNames(com.Id, TypeApp)
 	if err != nil {
 		log.Errorf("getCompany: %v", err)
 		return nil, newDbError(err)
@@ -420,7 +433,10 @@ func (a *ApiManager) getAppCredential(org string, ids map[string]string) (*AppCr
 		}, nil
 	}
 	app := &apps[0]
-	cd := a.getCredDetails(appCred, app.Status)
+	cd, errRes := a.getCredDetails(appCred, app.Status)
+	if errRes != nil {
+		return nil, errRes
+	}
 	devStatus := ""
 	if app.DeveloperId != "" {
 		devStatus, err = a.DbMan.GetStatus(app.DeveloperId, AppTypeDeveloper)
@@ -429,8 +445,7 @@ func (a *ApiManager) getAppCredential(org string, ids map[string]string) (*AppCr
 			return nil, newDbError(err)
 		}
 	}
-	//TODO: isValidKey
-	cks := makeConsumerKeyStatusDetails(app, cd, devStatus, "")
+	cks := makeConsumerKeyStatusDetails(app, cd, devStatus)
 	//TODO: redirectUris
 	details := makeAppCredentialDetails(appCred, cks, []string{}, attrs)
 	return &AppCredentialSuccessResponse{
@@ -466,7 +481,7 @@ func (a *ApiManager) getApp(org string, ids map[string]string) (*AppSuccessRespo
 
 	app = &apps[0]
 	attrs = a.DbMan.GetKmsAttributes(app.TenantId, app.Id)[app.Id]
-	prods, err := a.DbMan.GetApiProductNamesByAppId(app.Id)
+	prods, err := a.DbMan.GetApiProductNames(app.Id, TypeApp)
 	if err != nil {
 		log.Errorf("getApp error getting productNames: %v", err)
 		return nil, newDbError(err)
@@ -483,7 +498,11 @@ func (a *ApiManager) getApp(org string, ids map[string]string) (*AppSuccessRespo
 	}
 	var credDetails []*CredentialDetails
 	for _, cred := range creds {
-		credDetails = append(credDetails, a.getCredDetails(&cred, app.Status))
+		detail, errRes := a.getCredDetails(&cred, app.Status)
+		if errRes != nil {
+			return nil, errRes
+		}
+		credDetails = append(credDetails, detail)
 	}
 
 	details, errRes := makeAppDetails(app, parStatus, prods, credDetails, attrs)
@@ -500,7 +519,7 @@ func (a *ApiManager) getApp(org string, ids map[string]string) (*AppSuccessRespo
 	}, nil
 }
 
-func makeConsumerKeyStatusDetails(app *common.App, c *CredentialDetails, devStatus, isValidKey string) *ConsumerKeyStatusDetails {
+func makeConsumerKeyStatusDetails(app *common.App, c *CredentialDetails, devStatus string) *ConsumerKeyStatusDetails {
 	return &ConsumerKeyStatusDetails{
 		AppCredential:   c,
 		AppID:           c.AppID,
@@ -509,7 +528,7 @@ func makeConsumerKeyStatusDetails(app *common.App, c *CredentialDetails, devStat
 		AppType:         app.Type,
 		DeveloperID:     app.DeveloperId,
 		DeveloperStatus: devStatus,
-		IsValidKey:      isValidKey,
+		IsValidKey:      strings.EqualFold(c.Status, StatusApproved),
 	}
 }
 
@@ -641,10 +660,15 @@ func makeComDevDetails(comDev *common.CompanyDeveloper, comName, devEmail string
 	}
 }
 
-func (a *ApiManager) getCredDetails(cred *common.AppCredential, appStatus string) *CredentialDetails {
+func (a *ApiManager) getCredDetails(cred *common.AppCredential, appStatus string) (*CredentialDetails, *common.ErrorResponse) {
 
+	refs, err := a.DbMan.GetApiProductNames(cred.Id, TypeConsumerKey)
+	if err != nil {
+		log.Errorf("Error when getting product reference list")
+		return nil, newDbError(err)
+	}
 	return &CredentialDetails{
-		ApiProductReferences: []string{}, //TODO
+		ApiProductReferences: refs,
 		AppID:                cred.AppId,
 		AppStatus:            appStatus,
 		Attributes:           a.DbMan.GetKmsAttributes(cred.TenantId, cred.Id)[cred.Id],
@@ -655,7 +679,7 @@ func (a *ApiManager) getCredDetails(cred *common.AppCredential, appStatus string
 		MethodType:           cred.MethodType,
 		Scopes:               common.JsonToStringArray(cred.Scopes),
 		Status:               cred.Status,
-	}
+	}, nil
 }
 
 func parseIdentifiers(endpoint string, ids map[string]string) (valid bool, keyVals []string) {

@@ -1,3 +1,17 @@
+-- Copyright 2017 Google Inc.
+--
+-- Licensed under the Apache License, Version 2.0 (the "License");
+-- you may not use this file except in compliance with the License.
+-- You may obtain a copy of the License at
+--
+--      http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing, software
+-- distributed under the License is distributed on an "AS IS" BASIS,
+-- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-- See the License for the specific language governing permissions and
+-- limitations under the License.
+
 PRAGMA foreign_keys=OFF;
 BEGIN TRANSACTION;
 CREATE TABLE kms_app (id text,tenant_id text,name text,display_name text,access_type text,callback_url text,status text,app_family text,company_id text,developer_id text,parent_id text,type text,created_at blob,created_by text,updated_at blob,updated_by text,_change_selector text, primary key (id,tenant_id));
@@ -20,6 +34,7 @@ CREATE TABLE kms_company (id text,tenant_id text,name text,display_name text,sta
 INSERT INTO "kms_company" VALUES('8ba5b747-5104-4a40-89ca-a0a51798fe34','515211e9','DevCompany','East India Company','ACTIVE','2017-08-15 03:29:02.449+00:00','haoming@apid.git','2017-08-15 03:29:02.449+00:00','haoming@apid.git','515211e9');
 INSERT INTO "kms_company" VALUES('a94f75e2-69b0-44af-8776-155df7c7d22e','515211e9','testcompanyhflxv','testcompanyhflxv','ACTIVE','2017-11-02 16:00:16.287+00:00','haoming@apid.git','2017-11-02 16:00:16.287+00:00','haoming@apid.git','515211e9');
 CREATE TABLE kms_company_developer (tenant_id text,company_id text,developer_id text,roles text,created_at blob,created_by text,updated_at blob,updated_by text,_change_selector text, primary key (tenant_id,company_id,developer_id));
+INSERT INTO "kms_company_developer" VALUES('515211e9','a94f75e2-69b0-44af-8776-155df7c7d22e','590f33bf-f05c-48c1-bb93-183759bd9ee1','admin','2017-11-02 16:00:16.287+00:00','haoming@apid.git','2017-11-02 16:00:16.287+00:00','haoming@apid.git','515211e9');
 CREATE TABLE kms_developer (id text,tenant_id text,username text,first_name text,last_name text,password text,email text,status text,encrypted_password text,salt text,created_at blob,created_by text,updated_at blob,updated_by text,_change_selector text, primary key (id,tenant_id));
 INSERT INTO "kms_developer" VALUES('e41f04e8-9d3f-470a-8bfd-c7939945896c','515211e9','haoming','haoming','zhang','','bar@google.com','ACTIVE','','','2017-08-16 22:39:46.669+00:00','foo@google.com','2017-08-16 22:39:46.669+00:00','foo@google.com','515211e9');
 INSERT INTO "kms_developer" VALUES('47d862db-884f-4b8e-9649-fe6d0be1a739','515211e9','qwe','qwe','qwe','','barfoo@google.com','ACTIVE','','','2017-10-12 19:12:48.306+00:00','haoming@apid.git','2017-10-12 19:12:48.306+00:00','haoming@apid.git','515211e9');

@@ -1,3 +1,16 @@
+// Copyright 2017 Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package accessEntity
 
 import (
@@ -19,12 +32,9 @@ type DbManagerInterface interface {
 	GetAppCredentials(org, priKey, priVal, secKey, secVal string) (appCredentials []common.AppCredential, err error)
 	GetDevelopers(org, priKey, priVal, secKey, secVal string) (developers []common.Developer, err error)
 	// utils
-	GetApiProductNamesByAppId(appId string) ([]string, error)
-	GetAppNamesByComId(comId string) ([]string, error)
-	GetComNamesByDevId(devId string) ([]string, error)
-	GetAppNamesByDevId(devId string) ([]string, error)
-	GetComNameByComId(comId string) (string, error)
+	GetApiProductNames(id string, idType string) ([]string, error)
+	GetAppNames(id string, idType string) ([]string, error)
+	GetComNames(id string, idType string) ([]string, error)
 	GetDevEmailByDevId(devId string) (string, error)
 	GetStatus(id, t string) (string, error)
-	GetOrgName(tenantId string) (string, error)
 }

@@ -15,6 +15,7 @@ package accessEntity
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/apid/apidVerifyApiKey/common"
 	"strings"
 )
@@ -29,50 +30,29 @@ type DbManager struct {
 	common.DbManager
 }
 
-func (d *DbManager) GetOrgName(tenantId string) (string, error) {
-	row := d.GetDb().QueryRow(sql_select_org, tenantId)
-	org := sql.NullString{}
-	if err := row.Scan(&org); err != nil {
-		return "", err
+func (d *DbManager) GetApiProductNames(id string, idType string) ([]string, error) {
+	var query string
+	switch idType {
+	case TypeConsumerKey:
+		query = selectApiProductsById(
+			selectAppCredentialMapperByConsumerKey(
+				"'"+id+"'",
+				"apiprdt_id",
+			),
+			"name",
+		)
+	case TypeApp:
+		query = selectApiProductsById(
+			selectAppCredentialMapperByAppId(
+				"'"+id+"'",
+				"apiprdt_id",
+			),
+			"name",
+		)
+	default:
+		return nil, fmt.Errorf("unsupported idType")
 	}
-	if org.Valid {
-		return org.String, nil
-	}
-	return "", nil
-}
 
-func (d *DbManager) GetApiProductNamesByAppId(appId string) ([]string, error) {
-	query := selectApiProductsById(
-		selectAppCredentialMapperByAppId(
-			"'"+appId+"'",
-			"apiprdt_id",
-		),
-		"name",
-	)
-	rows, err := d.GetDb().Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var names []string
-	for rows.Next() {
-		name := sql.NullString{}
-		err = rows.Scan(&name)
-		if err != nil {
-			return nil, err
-		}
-		if name.Valid {
-			names = append(names, name.String)
-		}
-	}
-	return names, nil
-}
-
-func (d *DbManager) GetAppNamesByComId(comId string) ([]string, error) {
-	query := selectAppByComId(
-		"'"+comId+"'",
-		"name",
-	)
 	rows, err := d.GetDb().Query(query)
 	if err != nil {
 		return nil, err
@@ -118,14 +98,26 @@ func (d *DbManager) GetDevEmailByDevId(devId string) (string, error) {
 	return email.String, nil
 }
 
-func (d *DbManager) GetComNamesByDevId(devId string) ([]string, error) {
-	query := selectCompanyByComId(
-		selectCompanyDeveloperByDevId(
-			"'"+devId+"'",
-			"company_id",
-		),
-		"name",
-	)
+func (d *DbManager) GetComNames(id string, idType string) ([]string, error) {
+	var query string
+	switch idType {
+	case TypeDeveloper:
+		query = selectCompanyByComId(
+			selectCompanyDeveloperByDevId(
+				"'"+id+"'",
+				"company_id",
+			),
+			"name",
+		)
+	case TypeCompany:
+		query = selectCompanyByComId(
+			"'"+id+"'",
+			"name",
+		)
+	default:
+		return nil, fmt.Errorf("unsupported idType")
+	}
+
 	rows, err := d.GetDb().Query(query)
 	if err != nil {
 		return nil, err
@@ -145,11 +137,22 @@ func (d *DbManager) GetComNamesByDevId(devId string) ([]string, error) {
 	return names, nil
 }
 
-func (d *DbManager) GetAppNamesByDevId(devId string) ([]string, error) {
-	query := selectAppByDevId(
-		"'"+devId+"'",
-		"name",
-	)
+func (d *DbManager) GetAppNames(id string, t string) ([]string, error) {
+	var query string
+	switch t {
+	case TypeDeveloper:
+		query = selectAppByDevId(
+			"'"+id+"'",
+			"name",
+		)
+	case TypeCompany:
+		query = selectAppByComId(
+			"'"+id+"'",
+			"name",
+		)
+	default:
+		return nil, fmt.Errorf("app type not supported")
+	}
 	rows, err := d.GetDb().Query(query)
 	if err != nil {
 		return nil, err
@@ -178,7 +181,7 @@ func (d *DbManager) GetStatus(id, t string) (string, error) {
 			"status",
 		)
 	case AppTypeCompany:
-		query = selectDeveloperById(
+		query = selectCompanyByComId(
 			"'"+id+"'",
 			"status",
 		)
