@@ -276,8 +276,12 @@ func (d *DbManager) GetCompanyDevelopers(org, priKey, priVal, secKey, secVal str
 }
 
 func (d *DbManager) GetAppCredentials(org, priKey, priVal, secKey, secVal string) (appCredentials []common.AppCredential, err error) {
-	if priKey == IdentifierConsumerKey {
+
+	switch priKey {
+	case IdentifierConsumerKey:
 		return d.getAppCredentialByConsumerKey(priVal, org)
+	case IdentifierAppId:
+		return d.getAppCredentialByAppId(priVal, org)
 	}
 	return
 }
@@ -454,6 +458,20 @@ func (d *DbManager) getAppCredentialByConsumerKey(consumerKey, org string) (appC
 		cols...,
 	) + " AND ac.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getAppCredentialByConsumerKey: %v", query)
+	err = d.GetDb().QueryStructs(&appCredentials, query, org)
+	return
+}
+
+func (d *DbManager) getAppCredentialByAppId(appId, org string) (appCredentials []common.AppCredential, err error) {
+	cols := []string{"*"}
+	query := selectAppCredentialByConsumerKey(
+		selectAppCredentialMapperByAppId(
+			"'"+appId+"'",
+			"appcred_id",
+		),
+		cols...,
+	) + " AND ac.tenant_id IN " + sql_select_tenant_org
+	//log.Debugf("getAppCredentialByAppId: %v", query)
 	err = d.GetDb().QueryStructs(&appCredentials, query, org)
 	return
 }
