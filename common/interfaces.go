@@ -13,9 +13,6 @@
 // limitations under the License.
 package common
 
-import (
-	"github.com/apid/apid-core"
-)
 
 type ApiManagerInterface interface {
 	InitAPI()
@@ -23,7 +20,6 @@ type ApiManagerInterface interface {
 
 type DbManagerInterface interface {
 	SetDbVersion(string)
-	GetDb() apid.DB
 	GetDbVersion() string
 	GetKmsAttributes(tenantId string, entities ...string) map[string][]Attribute
 }

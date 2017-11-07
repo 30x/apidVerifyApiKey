@@ -316,7 +316,7 @@ func (d *DbManager) getApiProductsByAppId(appId string, org string) (apiProducts
 		),
 		cols...,
 	) + " AND ap.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getApiProductsByAppId: %v", query)
+	//log.Debugf("getApiProductsByAppId: %v", query)
 	err = d.GetDb().QueryStructs(&apiProducts, query, org)
 	return
 }
@@ -330,7 +330,7 @@ func (d *DbManager) getApiProductsByConsumerKey(consumerKey string, org string) 
 		),
 		cols...,
 	) + " AND ap.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getApiProductsByConsumerKey: %v", query)
+	//log.Debugf("getApiProductsByConsumerKey: %v", query)
 	err = d.GetDb().QueryStructs(&apiProducts, query, org)
 	return
 }
@@ -377,7 +377,7 @@ func (d *DbManager) getApiProductsByAppName(appName, devEmail, devId, comName, o
 		),
 		cols...,
 	) + " AND ap.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getApiProductsByAppName: %v", query)
+	//log.Debugf("getApiProductsByAppName: %v", query)
 	err = d.GetDb().QueryStructs(&apiProducts, query, org)
 	return
 }
@@ -388,7 +388,7 @@ func (d *DbManager) getAppByAppId(id, org string) (apps []common.App, err error)
 		"'"+id+"'",
 		cols...,
 	) + " AND a.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getAppByAppId: %v", query)
+	//log.Debugf("getAppByAppId: %v", query)
 	err = d.GetDb().QueryStructs(&apps, query, org)
 	return
 }
@@ -428,7 +428,7 @@ func (d *DbManager) getAppByAppName(appName, devEmail, devId, comName, org strin
 		)
 	}
 	query += " AND a.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getAppByAppName: %v", query)
+	//log.Debugf("getAppByAppName: %v", query)
 	err = d.GetDb().QueryStructs(&apps, query, org)
 	return
 }
@@ -442,7 +442,7 @@ func (d *DbManager) getAppByConsumerKey(consumerKey, org string) (apps []common.
 		),
 		cols...,
 	) + " AND a.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getAppByConsumerKey: %v", query)
+	//log.Debugf("getAppByConsumerKey: %v", query)
 	err = d.GetDb().QueryStructs(&apps, query, org)
 	return
 }
@@ -453,7 +453,7 @@ func (d *DbManager) getAppCredentialByConsumerKey(consumerKey, org string) (appC
 		"'"+consumerKey+"'",
 		cols...,
 	) + " AND ac.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getAppCredentialByConsumerKey: %v", query)
+	//log.Debugf("getAppCredentialByConsumerKey: %v", query)
 	err = d.GetDb().QueryStructs(&appCredentials, query, org)
 	return
 }
@@ -467,7 +467,7 @@ func (d *DbManager) getCompanyByAppId(appId, org string) (companies []common.Com
 		),
 		cols...,
 	) + " AND com.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getCompanyByAppId: %v", query)
+	//log.Debugf("getCompanyByAppId: %v", query)
 	err = d.GetDb().QueryStructs(&companies, query, org)
 	return
 }
@@ -478,7 +478,7 @@ func (d *DbManager) getCompanyByName(name, org string) (companies []common.Compa
 		"'"+name+"'",
 		cols...,
 	) + " AND com.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getCompanyByName: %v", query)
+	//log.Debugf("getCompanyByName: %v", query)
 	err = d.GetDb().QueryStructs(&companies, query, org)
 	return
 }
@@ -495,7 +495,7 @@ func (d *DbManager) getCompanyByConsumerKey(consumerKey, org string) (companies 
 		),
 		cols...,
 	) + " AND com.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getCompanyByConsumerKey: %v", query)
+	//log.Debugf("getCompanyByConsumerKey: %v", query)
 	err = d.GetDb().QueryStructs(&companies, query, org)
 	return
 }
@@ -509,7 +509,7 @@ func (d *DbManager) getCompanyDeveloperByComName(comName, org string) (companyDe
 		),
 		cols...,
 	) + " AND cd.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getCompanyDeveloperByComName: %v", query)
+	//log.Debugf("getCompanyDeveloperByComName: %v", query)
 	err = d.GetDb().QueryStructs(&companyDevelopers, query, org)
 	return
 }
@@ -523,7 +523,7 @@ func (d *DbManager) getDeveloperByAppId(appId, org string) (developers []common.
 		),
 		cols...,
 	) + " AND dev.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getDeveloperByAppId: %v", query)
+	//log.Debugf("getDeveloperByAppId: %v", query)
 	err = d.GetDb().QueryStructs(&developers, query, org)
 	return
 }
@@ -540,7 +540,7 @@ func (d *DbManager) getDeveloperByConsumerKey(consumerKey, org string) (develope
 		),
 		cols...,
 	) + " AND dev.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getDeveloperByConsumerKey: %v", query)
+	//log.Debugf("getDeveloperByConsumerKey: %v", query)
 	err = d.GetDb().QueryStructs(&developers, query, org)
 	return
 }
@@ -551,7 +551,7 @@ func (d *DbManager) getDeveloperByEmail(email, org string) (developers []common.
 		"'"+email+"'",
 		cols...,
 	) + " AND dev.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getDeveloperByEmail: %v", query)
+	//log.Debugf("getDeveloperByEmail: %v", query)
 	err = d.GetDb().QueryStructs(&developers, query, org)
 	return
 }
@@ -562,7 +562,7 @@ func (d *DbManager) getDeveloperById(id, org string) (developers []common.Develo
 		"'"+id+"'",
 		cols...,
 	) + " AND dev.tenant_id IN " + sql_select_tenant_org
-	log.Debugf("getDeveloperById: %v", query)
+	//log.Debugf("getDeveloperById: %v", query)
 	err = d.GetDb().QueryStructs(&developers, query, org)
 	return
 }
@@ -711,7 +711,7 @@ func selectAppCredentialByConsumerKey(consumerQuery string, colNames ...string) 
 }
 
 func filterApiProductsByResource(apiProducts []common.ApiProduct, resource string) []common.ApiProduct {
-	log.Debugf("Before filter: %v", apiProducts)
+	//log.Debugf("Before filter: %v", apiProducts)
 	var prods []common.ApiProduct
 	for _, prod := range apiProducts {
 		resources := common.JsonToStringArray(prod.ApiResources)
@@ -719,7 +719,7 @@ func filterApiProductsByResource(apiProducts []common.ApiProduct, resource strin
 			prods = append(prods, prod)
 		}
 	}
-	log.Debugf("After filter: %v", prods)
+	//log.Debugf("After filter: %v", prods)
 	return prods
 }
 

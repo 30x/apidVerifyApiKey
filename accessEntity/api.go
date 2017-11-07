@@ -80,6 +80,12 @@ var (
 		StatusCode:      http.StatusBadRequest,
 	}
 
+	ErrNotFound = &common.ErrorResponse{
+		ResponseCode:    strconv.Itoa(NOT_FOUND),
+		ResponseMessage: "Resource Not Found",
+		StatusCode:      http.StatusNotFound,
+	}
+
 	IdentifierTree = map[string]map[string][]string{
 		EndpointApiProduct: {
 			IdentifierApiProductName: {},
@@ -116,6 +122,7 @@ const (
 	INVALID_PARAMETERS = iota
 	DB_ERROR
 	DATA_ERROR
+	NOT_FOUND
 )
 
 type ApiManager struct {
@@ -255,10 +262,7 @@ func (a *ApiManager) getCompanyDeveloper(org string, ids map[string]string) (*Co
 	}
 
 	if len(devs) == 0 {
-		return &CompanyDevelopersSuccessResponse{
-			CompanyDevelopers: nil,
-			Organization:      org,
-		}, nil
+		return nil, ErrNotFound
 	}
 
 	var details []*CompanyDeveloperDetails
@@ -298,10 +302,7 @@ func (a *ApiManager) getDeveloper(org string, ids map[string]string) (*Developer
 	}
 
 	if len(devs) == 0 {
-		return &DeveloperSuccessResponse{
-			Developer:    nil,
-			Organization: org,
-		}, nil
+		return nil, ErrNotFound
 	}
 	dev := &devs[0]
 
@@ -339,10 +340,7 @@ func (a *ApiManager) getCompany(org string, ids map[string]string) (*CompanySucc
 	}
 
 	if len(coms) == 0 {
-		return &CompanySuccessResponse{
-			Company:      nil,
-			Organization: org,
-		}, nil
+		return nil, ErrNotFound
 	}
 	com := &coms[0]
 
@@ -376,10 +374,7 @@ func (a *ApiManager) getApiProduct(org string, ids map[string]string) (*ApiProdu
 
 	var attrs []common.Attribute
 	if len(prods) == 0 {
-		return &ApiProductSuccessResponse{
-			ApiProduct:   nil,
-			Organization: org,
-		}, nil
+		return nil, ErrNotFound
 	}
 	prod := &prods[0]
 	attrs = a.DbMan.GetKmsAttributes(prod.TenantId, prod.Id)[prod.Id]
@@ -412,10 +407,7 @@ func (a *ApiManager) getAppCredential(org string, ids map[string]string) (*AppCr
 	}
 
 	if len(appCreds) == 0 {
-		return &AppCredentialSuccessResponse{
-			AppCredential: nil,
-			Organization:  org,
-		}, nil
+		return nil, ErrNotFound
 	}
 	appCred := &appCreds[0]
 	attrs := a.DbMan.GetKmsAttributes(appCred.TenantId, appCred.Id)[appCred.Id]
@@ -447,7 +439,7 @@ func (a *ApiManager) getAppCredential(org string, ids map[string]string) (*AppCr
 	}
 	cks := makeConsumerKeyStatusDetails(app, cd, devStatus)
 	//TODO: redirectUris
-	details := makeAppCredentialDetails(appCred, cks, []string{}, attrs)
+	details := makeAppCredentialDetails(appCred, cks, []string{app.CallbackUrl}, attrs)
 	return &AppCredentialSuccessResponse{
 		AppCredential:          details,
 		Organization:           org,
@@ -473,10 +465,7 @@ func (a *ApiManager) getApp(org string, ids map[string]string) (*AppSuccessRespo
 	var attrs []common.Attribute
 
 	if len(apps) == 0 {
-		return &AppSuccessResponse{
-			App:          nil,
-			Organization: org,
-		}, nil
+		return nil, ErrNotFound
 	}
 
 	app = &apps[0]
