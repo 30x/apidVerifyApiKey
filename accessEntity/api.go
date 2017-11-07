@@ -345,7 +345,7 @@ func (a *ApiManager) getCompany(org string, ids map[string]string) (*CompanySucc
 	com := &coms[0]
 
 	attrs := a.DbMan.GetKmsAttributes(com.TenantId, com.Id)[com.Id]
-	appNames, err := a.DbMan.GetAppNames(com.Id, TypeApp)
+	appNames, err := a.DbMan.GetAppNames(com.Id, TypeCompany)
 	if err != nil {
 		log.Errorf("getCompany: %v", err)
 		return nil, newDbError(err)

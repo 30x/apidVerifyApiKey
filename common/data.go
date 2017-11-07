@@ -93,7 +93,6 @@ func (dbc *DbManager) GetKmsAttributes(tenantId string, entities ...string) map[
 			log.Debugf("Not valid. AttName: %s Entity_id: %s", attName.String, entity_id.String)
 		}
 	}
-	log.Debug("attributes returned for query ", sql, " are ", mapOfAttributes)
 	return mapOfAttributes
 }
 
@@ -107,6 +106,5 @@ func JsonToStringArray(fjson string) []string {
 	if utf8.RuneCountInString(s) > 0 {
 		array = strings.Split(s, ",")
 	}
-	log.Debug("unmarshall error for string, performing custom unmarshal ", fjson, " and result is : ", array)
 	return array
 }
