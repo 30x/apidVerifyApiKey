@@ -22,6 +22,7 @@ import (
 	"github.com/apid/apidVerifyApiKey/common"
 	"os"
 	"testing"
+	"time"
 )
 
 const testTempDirBase = "./tmp/"
@@ -30,13 +31,20 @@ var (
 	testTempDir string
 )
 
-var _ = BeforeSuite(func() {
-	_ = os.MkdirAll(testTempDirBase, os.ModePerm)
-	s := factory.DefaultServicesFactory()
-	apid.Initialize(s)
+func initSetup(s apid.Services) (apid.PluginData, error) {
 	SetApidServices(s, apid.Log())
 	common.SetApidServices(s, s.Log())
-})
+	return common.PluginData, nil
+}
+
+var _ = BeforeSuite(func() {
+	apid.RegisterPlugin(initSetup, common.PluginData)
+	_ = os.MkdirAll(testTempDirBase, os.ModePerm)
+	apid.Initialize(factory.DefaultServicesFactory())
+	apid.InitializePlugins("0.0.0")
+	go services.API().Listen()
+	time.Sleep(time.Second)
+}, 2)
 
 var _ = AfterSuite(func() {
 	apid.Events().Close()
@@ -45,5 +53,5 @@ var _ = AfterSuite(func() {
 
 func TestVerifyAPIKey(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "VerifyAPIKey Suite")
+	RunSpecs(t, "AccessEntity Suite")
 }

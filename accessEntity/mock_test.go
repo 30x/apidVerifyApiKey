@@ -13,7 +13,9 @@
 // limitations under the License.
 package accessEntity
 
-import "github.com/apid/apidVerifyApiKey/common"
+import (
+	"github.com/apid/apidVerifyApiKey/common"
+)
 
 type DummyDbMan struct {
 	apiProducts       []common.ApiProduct

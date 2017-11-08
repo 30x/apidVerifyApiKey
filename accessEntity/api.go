@@ -42,6 +42,7 @@ const (
 	IdentifierDeveloperEmail = "developeremail"
 	IdentifierConsumerKey    = "consumerkey"
 	IdentifierCompanyName    = "companyname"
+	IdentifierOrganization   = "organization"
 )
 
 const (
@@ -230,7 +231,7 @@ func (a *ApiManager) HandleAppCredentials(w http.ResponseWriter, r *http.Request
 
 func extractIdentifiers(pars map[string][]string) (map[string]string, string, error) {
 	m := make(map[string]string)
-	orgs := pars["organization"]
+	orgs := pars[IdentifierOrganization]
 	if len(orgs) == 0 {
 		return nil, "", fmt.Errorf("no org specified")
 	}
@@ -249,7 +250,7 @@ func extractIdentifiers(pars map[string][]string) (map[string]string, string, er
 }
 
 func (a *ApiManager) getCompanyDeveloper(org string, ids map[string]string) (*CompanyDevelopersSuccessResponse, *common.ErrorResponse) {
-	valid, keyVals := parseIdentifiers(EndpointDeveloper, ids)
+	valid, keyVals := parseIdentifiers(EndpointCompanyDeveloper, ids)
 	if !valid {
 		return nil, ErrInvalidPar
 	}

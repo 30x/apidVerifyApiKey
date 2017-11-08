@@ -344,10 +344,11 @@ var _ = Describe("DataTest", func() {
 				testData := [][]string{
 					// positive tests
 					{IdentifierConsumerKey, "abcd", "", "", "apid-haoming"},
-
+					{IdentifierAppId, "408ad853-3fa0-402f-90ee-103de98d71a5", "", "", "apid-haoming"},
 					// negative tests
 					{IdentifierConsumerKey, "abcd", "", "", "non-existent"},
 					{IdentifierConsumerKey, "non-existent", "", "", "apid-haoming"},
+					{IdentifierAppId, "non-existent", "", "", "apid-haoming"},
 				}
 
 				var expectedCred = common.AppCredential{
@@ -369,6 +370,8 @@ var _ = Describe("DataTest", func() {
 
 				results := [][]common.AppCredential{
 					{expectedCred},
+					{expectedCred},
+					nil,
 					nil,
 					nil,
 				}
@@ -481,7 +484,6 @@ func setupTestDb(db apid.DB) {
 	bytes, err := ioutil.ReadFile(fileDataTest)
 	Expect(err).Should(Succeed())
 	query := string(bytes)
-	log.Debug(query)
 	_, err = db.Exec(query)
 	Expect(err).Should(Succeed())
 }

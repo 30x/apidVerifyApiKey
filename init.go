@@ -28,7 +28,7 @@ var (
 )
 
 func init() {
-	apid.RegisterPlugin(initPlugin, pluginData)
+	apid.RegisterPlugin(initPlugin, common.PluginData)
 }
 
 func initPlugin(s apid.Services) (apid.PluginData, error) {
@@ -41,7 +41,7 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
 	initManagers(services)
 	log.Debug("end init")
 
-	return pluginData, nil
+	return common.PluginData, nil
 }
 
 func initManagers(services apid.Services) apigeeSyncHandler {
