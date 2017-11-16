@@ -137,7 +137,7 @@ type AppDetails struct {
 	AppCredentials []*CredentialDetails `json:"appCredentials"`
 	// app family
 	AppFamily string `json:"appFamily"`
-	// app parent Id
+	// app parent, developer's Id or company's name
 	AppParentID string `json:"appParentId"`
 	// app parent status
 	AppParentStatus string `json:"appParentStatus"`
@@ -155,16 +155,12 @@ type AppDetails struct {
 	DisplayName string `json:"displayName"`
 	// id
 	Id string `json:"id"`
-	// key expires in
-	KeyExpiresIn string `json:"keyExpiresIn"`
 	// ISO-8601
 	LastModifiedAt string `json:"lastModifiedAt"`
 	// last modified by
 	LastModifiedBy string `json:"lastModifiedBy"`
 	// name
 	Name string `json:"name"`
-	// scopes
-	Scopes []string `json:"scopes"`
 	// status
 	Status string `json:"status"`
 }

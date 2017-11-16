@@ -439,7 +439,6 @@ func (a *ApiManager) getAppCredential(org string, ids map[string]string) (*AppCr
 		}
 	}
 	cks := makeConsumerKeyStatusDetails(app, cd, devStatus)
-	//TODO: redirectUris
 	details := makeAppCredentialDetails(appCred, cks, []string{app.CallbackUrl}, attrs)
 	return &AppCredentialSuccessResponse{
 		AppCredential:          details,
@@ -495,7 +494,11 @@ func (a *ApiManager) getApp(org string, ids map[string]string) (*AppSuccessRespo
 		credDetails = append(credDetails, detail)
 	}
 
-	details, errRes := makeAppDetails(app, parStatus, prods, credDetails, attrs)
+	parent, errRes := a.getAppParent(app.ParentId, app.Type)
+	if errRes != nil {
+		return nil, errRes
+	}
+	details, errRes := makeAppDetails(app, parent, parStatus, prods, credDetails, attrs)
 	if errRes != nil {
 		return nil, errRes
 	}
@@ -507,6 +510,24 @@ func (a *ApiManager) getApp(org string, ids map[string]string) (*AppSuccessRespo
 		SecondaryIdentifierType:  secKey,
 		SecondaryIdentifierValue: secVal,
 	}, nil
+}
+
+func (a *ApiManager) getAppParent(id string, parentType string) (string, *common.ErrorResponse) {
+	switch parentType {
+	case AppTypeDeveloper:
+		return id, nil
+	case AppTypeCompany:
+		names, err := a.DbMan.GetComNames(id, TypeCompany)
+		if err != nil {
+			return "", newDbError(err)
+		}
+		if len(names) == 0 {
+			log.Warnf("getAppParent: No company with id=%v", id)
+			return "", nil
+		}
+		return names[0], nil
+	}
+	return "", nil
 }
 
 func makeConsumerKeyStatusDetails(app *common.App, c *CredentialDetails, devStatus string) *ConsumerKeyStatusDetails {
@@ -531,7 +552,7 @@ func makeAppCredentialDetails(ac *common.AppCredential, cks *ConsumerKeyStatusDe
 		ConsumerKeyStatus: cks,
 		ConsumerSecret:    ac.ConsumerSecret,
 		DeveloperID:       cks.DeveloperID,
-		RedirectUris:      redirectUrl, //TODO
+		RedirectUris:      redirectUrl,
 		Scopes:            common.JsonToStringArray(ac.Scopes),
 		Status:            ac.Status,
 	}
@@ -574,7 +595,7 @@ func makeApiProductDetails(prod *common.ApiProduct, attrs []common.Attribute) (*
 	return a, nil
 }
 
-func makeAppDetails(app *common.App, parentStatus string, prods []string, creds []*CredentialDetails, attrs []common.Attribute) (*AppDetails, *common.ErrorResponse) {
+func makeAppDetails(app *common.App, parent string, parentStatus string, prods []string, creds []*CredentialDetails, attrs []common.Attribute) (*AppDetails, *common.ErrorResponse) {
 	var a *AppDetails
 	if app != nil {
 		a = &AppDetails{
@@ -582,7 +603,7 @@ func makeAppDetails(app *common.App, parentStatus string, prods []string, creds 
 			ApiProducts:     prods,
 			AppCredentials:  creds,
 			AppFamily:       app.AppFamily,
-			AppParentID:     app.ParentId,
+			AppParentID:     parent,
 			AppParentStatus: parentStatus,
 			AppType:         app.Type,
 			Attributes:      attrs,
@@ -591,11 +612,9 @@ func makeAppDetails(app *common.App, parentStatus string, prods []string, creds 
 			CreatedBy:       app.CreatedBy,
 			DisplayName:     app.DisplayName,
 			Id:              app.Id,
-			KeyExpiresIn:    "", //TODO
 			LastModifiedAt:  app.UpdatedAt,
 			LastModifiedBy:  app.UpdatedBy,
 			Name:            app.Name,
-			Scopes:          []string{}, //TODO
 			Status:          app.Status,
 		}
 	} else {

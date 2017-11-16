@@ -185,6 +185,27 @@ var _ = Describe("API Tests", func() {
 			},
 		}
 
+		testComApp := []common.App{
+			{
+				Id:          testId,
+				TenantId:    "515211e9",
+				Name:        "apstest",
+				DisplayName: "apstest",
+				AccessType:  "READ",
+				CallbackUrl: "https://www.google.com",
+				Status:      "APPROVED",
+				AppFamily:   "default",
+				CompanyId:   "a94f75e2-69b0-44af-8776-155df7c7d22e",
+				DeveloperId: "",
+				ParentId:    "a94f75e2-69b0-44af-8776-155df7c7d22e",
+				Type:        "COMPANY",
+				CreatedAt:   "2017-08-18 22:13:18.325+00:00",
+				CreatedBy:   "haoming@apid.git",
+				UpdatedAt:   "2017-08-18 22:13:18.325+00:00",
+				UpdatedBy:   "haoming@apid.git",
+			},
+		}
+
 		testProductNames := []string{"foo", "bar"}
 		testStatus := "test-status"
 		testCreds := []common.AppCredential{
@@ -234,12 +255,51 @@ var _ = Describe("API Tests", func() {
 				CreatedBy:       testApp[0].CreatedBy,
 				DisplayName:     testApp[0].DisplayName,
 				Id:              testApp[0].Id,
-				KeyExpiresIn:    "", //TODO
 				LastModifiedAt:  testApp[0].UpdatedAt,
 				LastModifiedBy:  testApp[0].UpdatedBy,
 				Name:            testApp[0].Name,
-				Scopes:          []string{}, //TODO
 				Status:          testApp[0].Status,
+			},
+			Organization:             "test-org",
+			PrimaryIdentifierType:    IdentifierAppName,
+			PrimaryIdentifierValue:   "test-app",
+			SecondaryIdentifierType:  IdentifierDeveloperId,
+			SecondaryIdentifierValue: "test-dev",
+		}
+
+		expectedComApp := AppSuccessResponse{
+			App: &AppDetails{
+				AccessType:  testComApp[0].AccessType,
+				ApiProducts: testProductNames,
+				AppCredentials: []*CredentialDetails{
+					{
+						ApiProductReferences: testProductNames,
+						AppID:                testCreds[0].AppId,
+						AppStatus:            testComApp[0].Status,
+						Attributes:           attrs,
+						ConsumerKey:          testCreds[0].Id,
+						ConsumerSecret:       testCreds[0].ConsumerSecret,
+						ExpiresAt:            testCreds[0].ExpiresAt,
+						IssuedAt:             testCreds[0].IssuedAt,
+						MethodType:           testCreds[0].MethodType,
+						Scopes:               []string{"foo", "bar"},
+						Status:               testCreds[0].Status,
+					},
+				},
+				AppFamily:       testComApp[0].AppFamily,
+				AppParentID:     "testcompanyhflxv",
+				AppParentStatus: testStatus,
+				AppType:         testComApp[0].Type,
+				Attributes:      attrs,
+				CallbackUrl:     testComApp[0].CallbackUrl,
+				CreatedAt:       testComApp[0].CreatedAt,
+				CreatedBy:       testComApp[0].CreatedBy,
+				DisplayName:     testComApp[0].DisplayName,
+				Id:              testComApp[0].Id,
+				LastModifiedAt:  testComApp[0].UpdatedAt,
+				LastModifiedBy:  testComApp[0].UpdatedBy,
+				Name:            testComApp[0].Name,
+				Status:          testComApp[0].Status,
 			},
 			Organization:             "test-org",
 			PrimaryIdentifierType:    IdentifierAppName,
@@ -250,6 +310,7 @@ var _ = Describe("API Tests", func() {
 
 		testData := [][]common.App{
 			testApp,
+			testComApp,
 			nil,
 			testApp,
 			testApp,
@@ -257,6 +318,11 @@ var _ = Describe("API Tests", func() {
 
 		testPars := []map[string][]string{
 			// positive
+			{
+				IdentifierOrganization: {"test-org"},
+				IdentifierAppName:      {"test-app"},
+				IdentifierDeveloperId:  {"test-dev"},
+			},
 			{
 				IdentifierOrganization: {"test-org"},
 				IdentifierAppName:      {"test-app"},
@@ -279,6 +345,7 @@ var _ = Describe("API Tests", func() {
 
 		results := [][]interface{}{
 			{http.StatusOK, expected},
+			{http.StatusOK, expectedComApp},
 			{http.StatusNotFound, nil},
 			{http.StatusBadRequest, nil},
 			{http.StatusBadRequest, nil},
@@ -289,6 +356,7 @@ var _ = Describe("API Tests", func() {
 		dbMan.appCredentials = testCreds
 		for i, data := range testData {
 			dbMan.apps = data
+			dbMan.comNames = []string{"testcompanyhflxv"}
 			code, body := clientGet(apiMan.AccessEntityPath+EndpointApp, testPars[i])
 			Expect(code).Should(Equal(results[i][0]))
 			if results[i][1] != nil {
@@ -550,7 +618,7 @@ var _ = Describe("API Tests", func() {
 				},
 				ConsumerSecret: testAppCred[0].ConsumerSecret,
 				DeveloperID:    testApp[0].DeveloperId,
-				RedirectUris:   []string{testApp[0].CallbackUrl}, //TODO
+				RedirectUris:   []string{testApp[0].CallbackUrl},
 				Scopes:         []string{"foo", "bar"},
 				Status:         testAppCred[0].Status,
 			},
