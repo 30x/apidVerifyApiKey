@@ -27,7 +27,7 @@ type DbManager struct {
 	common.DbManager
 }
 
-func (dbc DbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) error {
+func (dbc *DbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) error {
 
 	db := dbc.Db
 
@@ -79,7 +79,7 @@ func (dbc DbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 	return err
 }
 
-func (dbc DbManager) getApiProductsForApiKey(key, tenantId string) []ApiProductDetails {
+func (dbc *DbManager) getApiProductsForApiKey(key, tenantId string) []ApiProductDetails {
 
 	db := dbc.Db
 	allProducts := []ApiProductDetails{}
