@@ -18,8 +18,8 @@ import "github.com/apid/apid-core"
 
 var PluginData = apid.PluginData{
 	Name:    "apidVerifyAPIKey",
-	Version: "0.0.4",
+	Version: "0.1.0",
 	ExtraData: map[string]interface{}{
-		"schemaVersion": "0.0.3",
+		"schemaVersion": "0.1.0",
 	},
 }

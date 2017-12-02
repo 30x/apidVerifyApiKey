@@ -291,6 +291,9 @@ func performTestOperation(jsonBody string, expectedResponseCode int) ([]byte, er
 	httpReq, err := http.NewRequest("POST", uri.String(), strings.NewReader(string(jsonBody)))
 	httpReq.Header.Set("Content-Type", "application/json")
 	res, err := client.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
 	defer res.Body.Close()
 	responseBody, err := ioutil.ReadAll(res.Body)
 

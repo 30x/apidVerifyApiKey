@@ -733,7 +733,7 @@ func filterApiProductsByResource(apiProducts []common.ApiProduct, resource strin
 	var prods []common.ApiProduct
 	for _, prod := range apiProducts {
 		resources := common.JsonToStringArray(prod.ApiResources)
-		if InSlice(resources, resource) {
+		if Contains(resources, resource) {
 			prods = append(prods, prod)
 		}
 	}
@@ -741,7 +741,7 @@ func filterApiProductsByResource(apiProducts []common.ApiProduct, resource strin
 	return prods
 }
 
-func InSlice(sl []string, str string) bool {
+func Contains(sl []string, str string) bool {
 	for _, s := range sl {
 		if s == str {
 			return true

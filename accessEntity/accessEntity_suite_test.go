@@ -20,16 +20,13 @@ import (
 	"github.com/apid/apid-core"
 	"github.com/apid/apid-core/factory"
 	"github.com/apid/apidVerifyApiKey/common"
+	"io/ioutil"
 	"os"
 	"testing"
 	"time"
 )
 
-const testTempDirBase = "./tmp/"
-
-var (
-	testTempDir string
-)
+var testTempDirBase string
 
 func initSetup(s apid.Services) (apid.PluginData, error) {
 	SetApidServices(s, apid.Log())
@@ -39,7 +36,9 @@ func initSetup(s apid.Services) (apid.PluginData, error) {
 
 var _ = BeforeSuite(func() {
 	apid.RegisterPlugin(initSetup, common.PluginData)
-	_ = os.MkdirAll(testTempDirBase, os.ModePerm)
+	var err error
+	testTempDirBase, err = ioutil.TempDir("", "verify_apikey_")
+	Expect(err).Should(Succeed())
 	apid.Initialize(factory.DefaultServicesFactory())
 	apid.InitializePlugins("0.0.0")
 	go services.API().Listen()
@@ -48,7 +47,7 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	apid.Events().Close()
-	os.RemoveAll(testTempDirBase)
+	Expect(os.RemoveAll(testTempDirBase)).Should(Succeed())
 })
 
 func TestVerifyAPIKey(t *testing.T) {

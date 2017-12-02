@@ -77,7 +77,7 @@ var (
 
 	ErrInvalidPar = &common.ErrorResponse{
 		ResponseCode:    strconv.Itoa(INVALID_PARAMETERS),
-		ResponseMessage: "invalid identifiers",
+		ResponseMessage: "Invalid Identifiers",
 		StatusCode:      http.StatusBadRequest,
 	}
 
@@ -121,8 +121,11 @@ var (
 
 const (
 	INVALID_PARAMETERS = iota
+	// Server DB Error
 	DB_ERROR
+	// Invalid/Wrong Data in DB data. This probably means something wrong happened in upstream PG/Transicator.
 	DATA_ERROR
+	// 404
 	NOT_FOUND
 )
 
@@ -146,12 +149,28 @@ func (a *ApiManager) InitAPI() {
 	log.Debug("API endpoints initialized")
 }
 
-func (a *ApiManager) HandleApps(w http.ResponseWriter, r *http.Request) {
+func (a *ApiManager) handelEndpoint(endpoint string, w http.ResponseWriter, r *http.Request) {
 	ids, org, err := extractIdentifiers(r.URL.Query())
 	if err != nil {
 		common.WriteError(w, err.Error(), INVALID_PARAMETERS, http.StatusBadRequest)
 	}
-	res, errRes := a.getApp(org, ids)
+	var res interface{}
+	var errRes *common.ErrorResponse
+	switch endpoint {
+	case EndpointApp:
+		res, errRes = a.getApp(org, ids)
+	case EndpointApiProduct:
+		res, errRes = a.getApiProduct(org, ids)
+	case EndpointCompany:
+		res, errRes = a.getCompany(org, ids)
+	case EndpointCompanyDeveloper:
+		res, errRes = a.getCompanyDeveloper(org, ids)
+	case EndpointDeveloper:
+		res, errRes = a.getDeveloper(org, ids)
+	case EndpointAppCredentials:
+		res, errRes = a.getAppCredential(org, ids)
+	}
+
 	if errRes != nil {
 		w.WriteHeader(errRes.StatusCode)
 		writeJson(errRes, w, r)
@@ -160,73 +179,27 @@ func (a *ApiManager) HandleApps(w http.ResponseWriter, r *http.Request) {
 	writeJson(res, w, r)
 }
 
+func (a *ApiManager) HandleApps(w http.ResponseWriter, r *http.Request) {
+	a.handelEndpoint(EndpointApp, w, r)
+}
+
 func (a *ApiManager) HandleApiProducts(w http.ResponseWriter, r *http.Request) {
-	ids, org, err := extractIdentifiers(r.URL.Query())
-	if err != nil {
-		common.WriteError(w, err.Error(), INVALID_PARAMETERS, http.StatusBadRequest)
-	}
-	details, errRes := a.getApiProduct(org, ids)
-	if errRes != nil {
-		w.WriteHeader(errRes.StatusCode)
-		writeJson(errRes, w, r)
-		return
-	}
-	writeJson(details, w, r)
+	a.handelEndpoint(EndpointApiProduct, w, r)
 }
 
 func (a *ApiManager) HandleCompanies(w http.ResponseWriter, r *http.Request) {
-	ids, org, err := extractIdentifiers(r.URL.Query())
-	if err != nil {
-		common.WriteError(w, err.Error(), INVALID_PARAMETERS, http.StatusBadRequest)
-	}
-	details, errRes := a.getCompany(org, ids)
-	if errRes != nil {
-		w.WriteHeader(errRes.StatusCode)
-		writeJson(errRes, w, r)
-		return
-	}
-	writeJson(details, w, r)
+	a.handelEndpoint(EndpointCompany, w, r)
 }
 
 func (a *ApiManager) HandleCompanyDevelopers(w http.ResponseWriter, r *http.Request) {
-	ids, org, err := extractIdentifiers(r.URL.Query())
-	if err != nil {
-		common.WriteError(w, err.Error(), INVALID_PARAMETERS, http.StatusBadRequest)
-	}
-	details, errRes := a.getCompanyDeveloper(org, ids)
-	if errRes != nil {
-		w.WriteHeader(errRes.StatusCode)
-		writeJson(errRes, w, r)
-		return
-	}
-	writeJson(details, w, r)
+	a.handelEndpoint(EndpointCompanyDeveloper, w, r)
 }
 func (a *ApiManager) HandleDevelopers(w http.ResponseWriter, r *http.Request) {
-	ids, org, err := extractIdentifiers(r.URL.Query())
-	if err != nil {
-		common.WriteError(w, err.Error(), INVALID_PARAMETERS, http.StatusBadRequest)
-	}
-	details, errRes := a.getDeveloper(org, ids)
-	if errRes != nil {
-		w.WriteHeader(errRes.StatusCode)
-		writeJson(errRes, w, r)
-		return
-	}
-	writeJson(details, w, r)
+	a.handelEndpoint(EndpointDeveloper, w, r)
 }
 
 func (a *ApiManager) HandleAppCredentials(w http.ResponseWriter, r *http.Request) {
-	ids, org, err := extractIdentifiers(r.URL.Query())
-	if err != nil {
-		common.WriteError(w, err.Error(), INVALID_PARAMETERS, http.StatusBadRequest)
-	}
-	details, errRes := a.getAppCredential(org, ids)
-	if errRes != nil {
-		w.WriteHeader(errRes.StatusCode)
-		writeJson(errRes, w, r)
-		return
-	}
-	writeJson(details, w, r)
+	a.handelEndpoint(EndpointAppCredentials, w, r)
 }
 
 func extractIdentifiers(pars map[string][]string) (map[string]string, string, error) {
@@ -254,9 +227,9 @@ func (a *ApiManager) getCompanyDeveloper(org string, ids map[string]string) (*Co
 	if !valid {
 		return nil, ErrInvalidPar
 	}
-	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
+	priKey, priVal := keyVals[0], keyVals[1]
 
-	devs, err := a.DbMan.GetCompanyDevelopers(org, priKey, priVal, secKey, secVal)
+	devs, err := a.DbMan.GetCompanyDevelopers(org, priKey, priVal, "", "")
 	if err != nil {
 		log.Errorf("getCompanyDeveloper: %v", err)
 		return nil, newDbError(err)
@@ -294,9 +267,9 @@ func (a *ApiManager) getDeveloper(org string, ids map[string]string) (*Developer
 	if !valid {
 		return nil, ErrInvalidPar
 	}
-	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
+	priKey, priVal := keyVals[0], keyVals[1]
 
-	devs, err := a.DbMan.GetDevelopers(org, priKey, priVal, secKey, secVal)
+	devs, err := a.DbMan.GetDevelopers(org, priKey, priVal, "", "")
 	if err != nil {
 		log.Errorf("getDeveloper: %v", err)
 		return nil, newDbError(err)
@@ -332,9 +305,9 @@ func (a *ApiManager) getCompany(org string, ids map[string]string) (*CompanySucc
 	if !valid {
 		return nil, ErrInvalidPar
 	}
-	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
+	priKey, priVal := keyVals[0], keyVals[1]
 
-	coms, err := a.DbMan.GetCompanies(org, priKey, priVal, secKey, secVal)
+	coms, err := a.DbMan.GetCompanies(org, priKey, priVal, "", "")
 	if err != nil {
 		log.Errorf("getCompany: %v", err)
 		return nil, newDbError(err)
@@ -365,8 +338,10 @@ func (a *ApiManager) getApiProduct(org string, ids map[string]string) (*ApiProdu
 	if !valid {
 		return nil, ErrInvalidPar
 	}
-	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
-
+	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], "", ""
+	if len(keyVals) > 2 {
+		secKey, secVal = keyVals[2], keyVals[3]
+	}
 	prods, err := a.DbMan.GetApiProducts(org, priKey, priVal, secKey, secVal)
 	if err != nil {
 		log.Errorf("getApiProduct: %v", err)
@@ -399,9 +374,9 @@ func (a *ApiManager) getAppCredential(org string, ids map[string]string) (*AppCr
 	if !valid {
 		return nil, ErrInvalidPar
 	}
-	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
+	priKey, priVal := keyVals[0], keyVals[1]
 
-	appCreds, err := a.DbMan.GetAppCredentials(org, priKey, priVal, secKey, secVal)
+	appCreds, err := a.DbMan.GetAppCredentials(org, priKey, priVal, "", "")
 	if err != nil {
 		log.Errorf("getAppCredential: %v", err)
 		return nil, newDbError(err)
@@ -453,7 +428,10 @@ func (a *ApiManager) getApp(org string, ids map[string]string) (*AppSuccessRespo
 	if !valid {
 		return nil, ErrInvalidPar
 	}
-	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], keyVals[2], keyVals[3]
+	priKey, priVal, secKey, secVal := keyVals[0], keyVals[1], "", ""
+	if len(keyVals) > 2 {
+		secKey, secVal = keyVals[2], keyVals[3]
+	}
 
 	apps, err := a.DbMan.GetApps(org, priKey, priVal, secKey, secVal)
 	if err != nil {
@@ -708,7 +686,6 @@ func parseIdentifiers(endpoint string, ids map[string]string) (valid bool, keyVa
 				if len(ids) == 2 {
 					return false, nil
 				}
-				keyVals = append(keyVals, "", "")
 				return true, keyVals
 			}
 		}

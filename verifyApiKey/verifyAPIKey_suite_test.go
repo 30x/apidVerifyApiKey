@@ -19,18 +19,21 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/apid/apid-core"
+	"io/ioutil"
 	"os"
 	"testing"
 )
 
-const testTempDirBase = "./tmp/"
+var testTempDirBase string
 
 var (
 	testTempDir string
 )
 
 var _ = BeforeSuite(func() {
-	_ = os.MkdirAll(testTempDirBase, os.ModePerm)
+	var err error
+	testTempDirBase, err = ioutil.TempDir("", "verify_apikey_")
+	Expect(err).Should(Succeed())
 })
 
 var _ = AfterSuite(func() {
@@ -38,8 +41,7 @@ var _ = AfterSuite(func() {
 	if testServer != nil {
 		testServer.Close()
 	}
-	os.RemoveAll(testTempDirBase)
-
+	Expect(os.RemoveAll(testTempDirBase)).Should(Succeed())
 })
 
 func TestVerifyAPIKey(t *testing.T) {
