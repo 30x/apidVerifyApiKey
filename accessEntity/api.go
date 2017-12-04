@@ -149,7 +149,7 @@ func (a *ApiManager) InitAPI() {
 	log.Debug("API endpoints initialized")
 }
 
-func (a *ApiManager) handelEndpoint(endpoint string, w http.ResponseWriter, r *http.Request) {
+func (a *ApiManager) handleEndpoint(endpoint string, w http.ResponseWriter, r *http.Request) {
 	ids, org, err := extractIdentifiers(r.URL.Query())
 	if err != nil {
 		common.WriteError(w, err.Error(), INVALID_PARAMETERS, http.StatusBadRequest)
@@ -180,26 +180,26 @@ func (a *ApiManager) handelEndpoint(endpoint string, w http.ResponseWriter, r *h
 }
 
 func (a *ApiManager) HandleApps(w http.ResponseWriter, r *http.Request) {
-	a.handelEndpoint(EndpointApp, w, r)
+	a.handleEndpoint(EndpointApp, w, r)
 }
 
 func (a *ApiManager) HandleApiProducts(w http.ResponseWriter, r *http.Request) {
-	a.handelEndpoint(EndpointApiProduct, w, r)
+	a.handleEndpoint(EndpointApiProduct, w, r)
 }
 
 func (a *ApiManager) HandleCompanies(w http.ResponseWriter, r *http.Request) {
-	a.handelEndpoint(EndpointCompany, w, r)
+	a.handleEndpoint(EndpointCompany, w, r)
 }
 
 func (a *ApiManager) HandleCompanyDevelopers(w http.ResponseWriter, r *http.Request) {
-	a.handelEndpoint(EndpointCompanyDeveloper, w, r)
+	a.handleEndpoint(EndpointCompanyDeveloper, w, r)
 }
 func (a *ApiManager) HandleDevelopers(w http.ResponseWriter, r *http.Request) {
-	a.handelEndpoint(EndpointDeveloper, w, r)
+	a.handleEndpoint(EndpointDeveloper, w, r)
 }
 
 func (a *ApiManager) HandleAppCredentials(w http.ResponseWriter, r *http.Request) {
-	a.handelEndpoint(EndpointAppCredentials, w, r)
+	a.handleEndpoint(EndpointAppCredentials, w, r)
 }
 
 func extractIdentifiers(pars map[string][]string) (map[string]string, string, error) {
