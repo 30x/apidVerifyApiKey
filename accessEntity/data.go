@@ -22,7 +22,6 @@ import (
 
 const (
 	sql_select_api_product = `SELECT * FROM kms_api_product AS ap `
-	sql_select_org         = `SELECT * FROM kms_organization AS o WHERE o.tenant_id=$1 LIMIT 1;`
 	sql_select_tenant_org  = ` (SELECT o.tenant_id FROM kms_organization AS o WHERE o.name=?)`
 )
 
@@ -36,7 +35,7 @@ func (d *DbManager) GetApiProductNames(id string, idType string) ([]string, erro
 	case TypeConsumerKey:
 		query = selectApiProductsById(
 			selectAppCredentialMapperByConsumerKey(
-				"'"+id+"'",
+				"?",
 				"apiprdt_id",
 			),
 			"name",
@@ -44,7 +43,7 @@ func (d *DbManager) GetApiProductNames(id string, idType string) ([]string, erro
 	case TypeApp:
 		query = selectApiProductsById(
 			selectAppCredentialMapperByAppId(
-				"'"+id+"'",
+				"?",
 				"apiprdt_id",
 			),
 			"name",
@@ -53,7 +52,7 @@ func (d *DbManager) GetApiProductNames(id string, idType string) ([]string, erro
 		return nil, fmt.Errorf("unsupported idType")
 	}
 
-	rows, err := d.GetDb().Query(query)
+	rows, err := d.GetDb().Query(query, id)
 	if err != nil {
 		return nil, err
 	}
@@ -74,11 +73,11 @@ func (d *DbManager) GetApiProductNames(id string, idType string) ([]string, erro
 
 func (d *DbManager) GetComNameByComId(comId string) (string, error) {
 	query := selectCompanyByComId(
-		"'"+comId+"'",
+		"?",
 		"name",
 	)
 	name := sql.NullString{}
-	err := d.GetDb().QueryRow(query).Scan(&name)
+	err := d.GetDb().QueryRow(query, comId).Scan(&name)
 	if err != nil || !name.Valid {
 		return "", err
 	}
@@ -87,11 +86,11 @@ func (d *DbManager) GetComNameByComId(comId string) (string, error) {
 
 func (d *DbManager) GetDevEmailByDevId(devId string) (string, error) {
 	query := selectDeveloperById(
-		"'"+devId+"'",
+		"?",
 		"email",
 	)
 	email := sql.NullString{}
-	err := d.GetDb().QueryRow(query).Scan(&email)
+	err := d.GetDb().QueryRow(query, devId).Scan(&email)
 	if err != nil || !email.Valid {
 		return "", err
 	}
@@ -104,21 +103,21 @@ func (d *DbManager) GetComNames(id string, idType string) ([]string, error) {
 	case TypeDeveloper:
 		query = selectCompanyByComId(
 			selectCompanyDeveloperByDevId(
-				"'"+id+"'",
+				"?",
 				"company_id",
 			),
 			"name",
 		)
 	case TypeCompany:
 		query = selectCompanyByComId(
-			"'"+id+"'",
+			"?",
 			"name",
 		)
 	default:
 		return nil, fmt.Errorf("unsupported idType")
 	}
 
-	rows, err := d.GetDb().Query(query)
+	rows, err := d.GetDb().Query(query, id)
 	if err != nil {
 		return nil, err
 	}
@@ -142,18 +141,18 @@ func (d *DbManager) GetAppNames(id string, t string) ([]string, error) {
 	switch t {
 	case TypeDeveloper:
 		query = selectAppByDevId(
-			"'"+id+"'",
+			"?",
 			"name",
 		)
 	case TypeCompany:
 		query = selectAppByComId(
-			"'"+id+"'",
+			"?",
 			"name",
 		)
 	default:
 		return nil, fmt.Errorf("app type not supported")
 	}
-	rows, err := d.GetDb().Query(query)
+	rows, err := d.GetDb().Query(query, id)
 	if err != nil {
 		return nil, err
 	}
@@ -177,17 +176,17 @@ func (d *DbManager) GetStatus(id, t string) (string, error) {
 	switch t {
 	case AppTypeDeveloper:
 		query = selectDeveloperById(
-			"'"+id+"'",
+			"?",
 			"status",
 		)
 	case AppTypeCompany:
 		query = selectCompanyByComId(
-			"'"+id+"'",
+			"?",
 			"status",
 		)
 	}
 	status := sql.NullString{}
-	err := d.GetDb().QueryRow(query).Scan(&status)
+	err := d.GetDb().QueryRow(query, id).Scan(&status)
 	if err != nil || !status.Valid {
 		return "", err
 	}
@@ -315,13 +314,13 @@ func (d *DbManager) getApiProductsByAppId(appId string, org string) (apiProducts
 	cols := []string{"*"}
 	query := selectApiProductsById(
 		selectAppCredentialMapperByAppId(
-			"'"+appId+"'",
+			"?",
 			"apiprdt_id",
 		),
 		cols...,
 	) + " AND ap.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getApiProductsByAppId: %v", query)
-	err = d.GetDb().QueryStructs(&apiProducts, query, org)
+	err = d.GetDb().QueryStructs(&apiProducts, query, appId, org)
 	return
 }
 
@@ -329,50 +328,56 @@ func (d *DbManager) getApiProductsByConsumerKey(consumerKey string, org string) 
 	cols := []string{"*"}
 	query := selectApiProductsById(
 		selectAppCredentialMapperByConsumerKey(
-			"'"+consumerKey+"'",
+			"?",
 			"apiprdt_id",
 		),
 		cols...,
 	) + " AND ap.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getApiProductsByConsumerKey: %v", query)
-	err = d.GetDb().QueryStructs(&apiProducts, query, org)
+	err = d.GetDb().QueryStructs(&apiProducts, query, consumerKey, org)
 	return
 }
 
 func (d *DbManager) getApiProductsByAppName(appName, devEmail, devId, comName, org string) (apiProducts []common.ApiProduct, err error) {
 	cols := []string{"*"}
 	var appQuery string
+	args := []interface{}{appName}
 	switch {
 	case devEmail != "":
 		appQuery = selectAppByNameAndDeveloperId(
-			"'"+appName+"'",
+			"?",
 			selectDeveloperByEmail(
-				"'"+devEmail+"'",
+				"?",
 				"id",
 			),
 			"id",
 		)
+		args = append(args, devEmail)
 	case devId != "":
 		appQuery = selectAppByNameAndDeveloperId(
-			"'"+appName+"'",
-			"'"+devId+"'",
+			"?",
+			"?",
 			"id",
 		)
+		args = append(args, devId)
 	case comName != "":
 		appQuery = selectAppByNameAndCompanyId(
-			"'"+appName+"'",
+			"?",
 			selectCompanyByName(
-				"'"+comName+"'",
+				"?",
 				"id",
 			),
 			"id",
 		)
+		args = append(args, comName)
 	default:
 		appQuery = selectAppByName(
-			"'"+appName+"'",
+			"?",
 			"id",
 		)
 	}
+
+	args = append(args, org)
 
 	query := selectApiProductsById(
 		selectAppCredentialMapperByAppId(
@@ -382,58 +387,65 @@ func (d *DbManager) getApiProductsByAppName(appName, devEmail, devId, comName, o
 		cols...,
 	) + " AND ap.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getApiProductsByAppName: %v", query)
-	err = d.GetDb().QueryStructs(&apiProducts, query, org)
+	err = d.GetDb().QueryStructs(&apiProducts, query, args...)
 	return
 }
 
 func (d *DbManager) getAppByAppId(id, org string) (apps []common.App, err error) {
 	cols := []string{"*"}
 	query := selectAppById(
-		"'"+id+"'",
+		"?",
 		cols...,
 	) + " AND a.tenant_id IN " + sql_select_tenant_org
-	//log.Debugf("getAppByAppId: %v", query)
-	err = d.GetDb().QueryStructs(&apps, query, org)
+	//log.Debugf("getAppByAppId: %v \n %v", query, id)
+	err = d.GetDb().QueryStructs(&apps, query, id, org)
 	return
 }
 
 func (d *DbManager) getAppByAppName(appName, devEmail, devId, comName, org string) (apps []common.App, err error) {
 	cols := []string{"*"}
 	var query string
+	args := []interface{}{appName}
 	switch {
 	case devEmail != "":
 		query = selectAppByNameAndDeveloperId(
-			"'"+appName+"'",
+			"?",
 			selectDeveloperByEmail(
-				"'"+devEmail+"'",
+				"?",
 				"id",
 			),
 			cols...,
 		)
+		args = append(args, devEmail)
 	case devId != "":
 		query = selectAppByNameAndDeveloperId(
-			"'"+appName+"'",
-			"'"+devId+"'",
+			"?",
+			"?",
 			cols...,
 		)
+		args = append(args, devId)
 	case comName != "":
 		query = selectAppByNameAndCompanyId(
-			"'"+appName+"'",
+			"?",
 			selectCompanyByName(
-				"'"+comName+"'",
+				"?",
 				"id",
 			),
 			cols...,
 		)
+		args = append(args, comName)
 	default:
 		query = selectAppByName(
-			"'"+appName+"'",
+			"?",
 			cols...,
 		)
 	}
+
+	args = append(args, org)
+
 	query += " AND a.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getAppByAppName: %v", query)
-	err = d.GetDb().QueryStructs(&apps, query, org)
+	err = d.GetDb().QueryStructs(&apps, query, args...)
 	return
 }
 
@@ -441,24 +453,24 @@ func (d *DbManager) getAppByConsumerKey(consumerKey, org string) (apps []common.
 	cols := []string{"*"}
 	query := selectAppById(
 		selectAppCredentialMapperByConsumerKey(
-			"'"+consumerKey+"'",
+			"?",
 			"app_id",
 		),
 		cols...,
 	) + " AND a.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getAppByConsumerKey: %v", query)
-	err = d.GetDb().QueryStructs(&apps, query, org)
+	err = d.GetDb().QueryStructs(&apps, query, consumerKey, org)
 	return
 }
 
 func (d *DbManager) getAppCredentialByConsumerKey(consumerKey, org string) (appCredentials []common.AppCredential, err error) {
 	cols := []string{"*"}
 	query := selectAppCredentialByConsumerKey(
-		"'"+consumerKey+"'",
+		"?",
 		cols...,
 	) + " AND ac.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getAppCredentialByConsumerKey: %v", query)
-	err = d.GetDb().QueryStructs(&appCredentials, query, org)
+	err = d.GetDb().QueryStructs(&appCredentials, query, consumerKey, org)
 	return
 }
 
@@ -466,13 +478,13 @@ func (d *DbManager) getAppCredentialByAppId(appId, org string) (appCredentials [
 	cols := []string{"*"}
 	query := selectAppCredentialByConsumerKey(
 		selectAppCredentialMapperByAppId(
-			"'"+appId+"'",
+			"?",
 			"appcred_id",
 		),
 		cols...,
 	) + " AND ac.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getAppCredentialByAppId: %v", query)
-	err = d.GetDb().QueryStructs(&appCredentials, query, org)
+	err = d.GetDb().QueryStructs(&appCredentials, query, appId, org)
 	return
 }
 
@@ -480,24 +492,24 @@ func (d *DbManager) getCompanyByAppId(appId, org string) (companies []common.Com
 	cols := []string{"*"}
 	query := selectCompanyByComId(
 		selectAppById(
-			"'"+appId+"'",
+			"?",
 			"company_id",
 		),
 		cols...,
 	) + " AND com.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getCompanyByAppId: %v", query)
-	err = d.GetDb().QueryStructs(&companies, query, org)
+	err = d.GetDb().QueryStructs(&companies, query, appId, org)
 	return
 }
 
 func (d *DbManager) getCompanyByName(name, org string) (companies []common.Company, err error) {
 	cols := []string{"*"}
 	query := selectCompanyByName(
-		"'"+name+"'",
+		"?",
 		cols...,
 	) + " AND com.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getCompanyByName: %v", query)
-	err = d.GetDb().QueryStructs(&companies, query, org)
+	err = d.GetDb().QueryStructs(&companies, query, name, org)
 	return
 }
 
@@ -506,7 +518,7 @@ func (d *DbManager) getCompanyByConsumerKey(consumerKey, org string) (companies 
 	query := selectCompanyByComId(
 		selectAppById(
 			selectAppCredentialMapperByConsumerKey(
-				"'"+consumerKey+"'",
+				"?",
 				"app_id",
 			),
 			"company_id",
@@ -514,7 +526,7 @@ func (d *DbManager) getCompanyByConsumerKey(consumerKey, org string) (companies 
 		cols...,
 	) + " AND com.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getCompanyByConsumerKey: %v", query)
-	err = d.GetDb().QueryStructs(&companies, query, org)
+	err = d.GetDb().QueryStructs(&companies, query, consumerKey, org)
 	return
 }
 
@@ -522,13 +534,13 @@ func (d *DbManager) getCompanyDeveloperByComName(comName, org string) (companyDe
 	cols := []string{"*"}
 	query := selectCompanyDeveloperByComId(
 		selectCompanyByName(
-			"'"+comName+"'",
+			"?",
 			"id",
 		),
 		cols...,
 	) + " AND cd.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getCompanyDeveloperByComName: %v", query)
-	err = d.GetDb().QueryStructs(&companyDevelopers, query, org)
+	err = d.GetDb().QueryStructs(&companyDevelopers, query, comName, org)
 	return
 }
 
@@ -536,13 +548,13 @@ func (d *DbManager) getDeveloperByAppId(appId, org string) (developers []common.
 	cols := []string{"*"}
 	query := selectDeveloperById(
 		selectAppById(
-			"'"+appId+"'",
+			"?",
 			"developer_id",
 		),
 		cols...,
 	) + " AND dev.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getDeveloperByAppId: %v", query)
-	err = d.GetDb().QueryStructs(&developers, query, org)
+	err = d.GetDb().QueryStructs(&developers, query, appId, org)
 	return
 }
 
@@ -551,7 +563,7 @@ func (d *DbManager) getDeveloperByConsumerKey(consumerKey, org string) (develope
 	query := selectDeveloperById(
 		selectAppById(
 			selectAppCredentialMapperByConsumerKey(
-				"'"+consumerKey+"'",
+				"?",
 				"app_id",
 			),
 			"developer_id",
@@ -559,29 +571,29 @@ func (d *DbManager) getDeveloperByConsumerKey(consumerKey, org string) (develope
 		cols...,
 	) + " AND dev.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getDeveloperByConsumerKey: %v", query)
-	err = d.GetDb().QueryStructs(&developers, query, org)
+	err = d.GetDb().QueryStructs(&developers, query, consumerKey, org)
 	return
 }
 
 func (d *DbManager) getDeveloperByEmail(email, org string) (developers []common.Developer, err error) {
 	cols := []string{"*"}
 	query := selectDeveloperByEmail(
-		"'"+email+"'",
+		"?",
 		cols...,
 	) + " AND dev.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getDeveloperByEmail: %v", query)
-	err = d.GetDb().QueryStructs(&developers, query, org)
+	err = d.GetDb().QueryStructs(&developers, query, email, org)
 	return
 }
 
 func (d *DbManager) getDeveloperById(id, org string) (developers []common.Developer, err error) {
 	cols := []string{"*"}
 	query := selectDeveloperById(
-		"'"+id+"'",
+		"?",
 		cols...,
 	) + " AND dev.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getDeveloperById: %v", query)
-	err = d.GetDb().QueryStructs(&developers, query, org)
+	err = d.GetDb().QueryStructs(&developers, query, id, org)
 	return
 }
 

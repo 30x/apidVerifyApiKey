@@ -24,6 +24,10 @@ import (
 
 const (
 	fileDataTest = "data_test.sql"
+	// SQL Injection
+	// If select foo from bar where id in (' + condition + ') is used,
+	// the hacked sql would be like "select XXX from XXX where id in ('1') or ('1'=='1');"
+	sqlInjectionStmt = "1') or ('1'=='1"
 )
 
 var _ = Describe("DataTest", func() {
@@ -73,6 +77,15 @@ var _ = Describe("DataTest", func() {
 					{IdentifierAppName, "non-existent", IdentifierDeveloperEmail, "non-existent", "apid-haoming"},
 					{IdentifierAppName, "non-existent", IdentifierCompanyName, "non-existent", "apid-haoming"},
 					{IdentifierAppName, "non-existent", IdentifierApiResource, "non-existent", "apid-haoming"},
+					// SQL Injection
+					{IdentifierApiProductName, "apstest", "", "", sqlInjectionStmt},
+					{IdentifierApiProductName, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierAppId, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierAppName, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierConsumerKey, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierAppName, "apstest", IdentifierDeveloperId, sqlInjectionStmt, "apid-haoming"},
+					{IdentifierAppName, "testappahhis", IdentifierDeveloperEmail, sqlInjectionStmt, "apid-haoming"},
+					{IdentifierAppName, "apstest", IdentifierCompanyName, sqlInjectionStmt, "apid-haoming"},
 				}
 
 				var expectedDevApiProd = common.ApiProduct{
@@ -137,6 +150,14 @@ var _ = Describe("DataTest", func() {
 					nil,
 					nil,
 					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
 				}
 
 				for i, data := range testData {
@@ -168,6 +189,14 @@ var _ = Describe("DataTest", func() {
 					{IdentifierAppName, "non-existent", IdentifierDeveloperEmail, "non-existent", "apid-haoming"},
 					{IdentifierAppName, "non-existent", IdentifierCompanyName, "non-existent", "apid-haoming"},
 					{IdentifierConsumerKey, "non-existent", "", "", "apid-haoming"},
+					// SQL Injection
+					{IdentifierAppId, "408ad853-3fa0-402f-90ee-103de98d71a5", "", "", sqlInjectionStmt},
+					{IdentifierAppId, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierAppName, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierAppName, "apstest", IdentifierDeveloperId, sqlInjectionStmt, "apid-haoming"},
+					{IdentifierAppName, "apstest", IdentifierDeveloperEmail, sqlInjectionStmt, "apid-haoming"},
+					{IdentifierAppName, "testappahhis", IdentifierCompanyName, sqlInjectionStmt, "apid-haoming"},
+					{IdentifierConsumerKey, sqlInjectionStmt, "", "", "apid-haoming"},
 				}
 
 				var expectedDevApp = common.App{
@@ -222,6 +251,13 @@ var _ = Describe("DataTest", func() {
 					nil,
 					nil,
 					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
 				}
 
 				for i, data := range testData {
@@ -247,6 +283,11 @@ var _ = Describe("DataTest", func() {
 					{IdentifierAppId, "non-existent", "", "", "apid-haoming"},
 					{IdentifierCompanyName, "non-existent", "", "", "apid-haoming"},
 					{IdentifierConsumerKey, "non-existent", "", "", "apid-haoming"},
+					// SQL Injection
+					{IdentifierAppId, "35608afe-2715-4064-bb4d-3cbb4e82c474", "", "", sqlInjectionStmt},
+					{IdentifierAppId, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierCompanyName, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierConsumerKey, sqlInjectionStmt, "", "", "apid-haoming"},
 				}
 
 				var expectedCom = common.Company{
@@ -265,6 +306,10 @@ var _ = Describe("DataTest", func() {
 					{expectedCom},
 					{expectedCom},
 					{expectedCom},
+					nil,
+					nil,
+					nil,
+					nil,
 					nil,
 					nil,
 					nil,
@@ -297,6 +342,12 @@ var _ = Describe("DataTest", func() {
 					{IdentifierConsumerKey, "non-existent", "", "", "apid-haoming"},
 					{IdentifierDeveloperEmail, "non-existent", "", "", "apid-haoming"},
 					{IdentifierDeveloperId, "non-existent", "", "", "apid-haoming"},
+					// SQL Injection
+					{IdentifierAppId, "408ad853-3fa0-402f-90ee-103de98d71a5", "", "", sqlInjectionStmt},
+					{IdentifierAppId, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierConsumerKey, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierDeveloperEmail, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierDeveloperId, sqlInjectionStmt, "", "", "apid-haoming"},
 				}
 
 				var expectedDev = common.Developer{
@@ -326,6 +377,11 @@ var _ = Describe("DataTest", func() {
 					nil,
 					nil,
 					nil,
+					nil,
+					nil,
+					nil,
+					nil,
+					nil,
 				}
 
 				for i, data := range testData {
@@ -349,6 +405,10 @@ var _ = Describe("DataTest", func() {
 					{IdentifierConsumerKey, "abcd", "", "", "non-existent"},
 					{IdentifierConsumerKey, "non-existent", "", "", "apid-haoming"},
 					{IdentifierAppId, "non-existent", "", "", "apid-haoming"},
+					// SQL Injection
+					{IdentifierConsumerKey, "abcd", "", "", sqlInjectionStmt},
+					{IdentifierConsumerKey, sqlInjectionStmt, "", "", "apid-haoming"},
+					{IdentifierAppId, sqlInjectionStmt, "", "", "apid-haoming"},
 				}
 
 				var expectedCred = common.AppCredential{
@@ -374,6 +434,9 @@ var _ = Describe("DataTest", func() {
 					nil,
 					nil,
 					nil,
+					nil,
+					nil,
+					nil,
 				}
 
 				for i, data := range testData {
@@ -392,10 +455,12 @@ var _ = Describe("DataTest", func() {
 				testData := [][]string{
 					// positive tests
 					{IdentifierCompanyName, "testcompanyhflxv", "", "", "apid-haoming"},
-
 					// negative tests
 					{IdentifierCompanyName, "testcompanyhflxv", "", "", "non-existent"},
 					{IdentifierCompanyName, "non-existent", "", "", "apid-haoming"},
+					// SQL Injection
+					{IdentifierCompanyName, "testcompanyhflxv", "", "", sqlInjectionStmt},
+					{IdentifierCompanyName, sqlInjectionStmt, "", "", "apid-haoming"},
 				}
 
 				var expectedComDev = common.CompanyDeveloper{
@@ -411,6 +476,8 @@ var _ = Describe("DataTest", func() {
 
 				results := [][]common.CompanyDeveloper{
 					{expectedComDev},
+					nil,
+					nil,
 					nil,
 					nil,
 				}
