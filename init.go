@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package apidVerifyApiKey
+package apidApiMetadata
 
 import (
 	"github.com/apid/apid-core"
-	"github.com/apid/apidVerifyApiKey/accessEntity"
-	"github.com/apid/apidVerifyApiKey/common"
-	"github.com/apid/apidVerifyApiKey/verifyApiKey"
+	"github.com/apid/apidApiMetadata/accessEntity"
+	"github.com/apid/apidApiMetadata/common"
+	"github.com/apid/apidApiMetadata/verifyApiKey"
 	"sync"
 )
 

@@ -16,7 +16,7 @@ package verifyApiKey
 import (
 	"github.com/apid/apid-core"
 	"github.com/apid/apid-core/factory"
-	"github.com/apid/apidVerifyApiKey/common"
+	"github.com/apid/apidApiMetadata/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io/ioutil"

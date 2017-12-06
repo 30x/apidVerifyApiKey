@@ -19,7 +19,7 @@ import (
 
 	"github.com/apid/apid-core"
 	"github.com/apid/apid-core/factory"
-	"github.com/apid/apidVerifyApiKey/common"
+	"github.com/apid/apidApiMetadata/common"
 	"io/ioutil"
 	"os"
 	"testing"
