@@ -15,13 +15,11 @@
 package apidVerifyApiKey
 
 import (
-	"sync"
-
 	"github.com/apid/apid-core"
-)
-
-const (
-	apiPath = "/verifiers/apikey"
+	"github.com/apid/apidVerifyApiKey/accessEntity"
+	"github.com/apid/apidVerifyApiKey/common"
+	"github.com/apid/apidVerifyApiKey/verifyApiKey"
+	"sync"
 )
 
 var (
@@ -30,33 +28,50 @@ var (
 )
 
 func init() {
-	apid.RegisterPlugin(initPlugin, pluginData)
+	apid.RegisterPlugin(initPlugin, common.PluginData)
 }
 
 func initPlugin(s apid.Services) (apid.PluginData, error) {
 	services = s
-
-	log = services.Log().ForModule("apidVerifyAPIKey")
+	log = services.Log().ForModule("apidApiMetadata")
+	verifyApiKey.SetApidServices(services, log)
+	accessEntity.SetApidServices(services, log)
+	common.SetApidServices(services, log)
 	log.Debug("start init")
+	initManagers(services)
+	log.Debug("end init")
 
-	log = services.Log()
-	dbMan := &dbManager{
-		data:  services.Data(),
-		dbMux: sync.RWMutex{},
+	return common.PluginData, nil
+}
+
+func initManagers(services apid.Services) apigeeSyncHandler {
+	verifyDbMan := &verifyApiKey.DbManager{
+		DbManager: common.DbManager{
+			Data:  services.Data(),
+			DbMux: sync.RWMutex{},
+		},
 	}
-	apiMan := apiManager{
-		dbMan:             dbMan,
-		verifiersEndpoint: apiPath,
+	verifyApiMan := &verifyApiKey.ApiManager{
+		DbMan:             verifyDbMan,
+		VerifiersEndpoint: verifyApiKey.ApiPath,
+	}
+
+	entityDbMan := &accessEntity.DbManager{
+		DbManager: common.DbManager{
+			Data:  services.Data(),
+			DbMux: sync.RWMutex{},
+		},
+	}
+
+	entityApiMan := &accessEntity.ApiManager{
+		DbMan:            entityDbMan,
+		AccessEntityPath: accessEntity.AccessEntityPath,
 	}
 
 	syncHandler := apigeeSyncHandler{
-		dbMan:  dbMan,
-		apiMan: apiMan,
+		dbMans:  []common.DbManagerInterface{verifyDbMan, entityDbMan},
+		apiMans: []common.ApiManagerInterface{verifyApiMan, entityApiMan},
 	}
-
 	syncHandler.initListener(services)
-
-	log.Debug("end init")
-
-	return pluginData, nil
+	return syncHandler
 }

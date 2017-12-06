@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package apidVerifyApiKey
+package verifyApiKey
 
 // TODO: end to end IT tests
 // 1. happy path for developer
@@ -25,6 +25,7 @@ import (
 	"errors"
 	"github.com/apid/apid-core"
 	"github.com/apid/apid-core/factory"
+	"github.com/apid/apidVerifyApiKey/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
@@ -42,34 +43,36 @@ var (
 
 var _ = Describe("end to end tests", func() {
 	var dataTestTempDir string
-	var dbMan *dbManager
+	var dbMan *DbManager
 
 	var _ = BeforeEach(func() {
 		var err error
 		dataTestTempDir, err = ioutil.TempDir(testTempDirBase, "api_test_sqlite3")
+		Expect(err).NotTo(HaveOccurred())
 		serviceFactoryForTest := factory.DefaultServicesFactory()
 		apid.Initialize(serviceFactoryForTest)
 		config := apid.Config()
 		config.Set("data_path", testTempDir)
 		config.Set("log_level", "DEBUG")
 		serviceFactoryForTest.Config().Set("local_storage_path", dataTestTempDir)
+		common.SetApidServices(serviceFactoryForTest, serviceFactoryForTest.Log())
 
-		Expect(err).NotTo(HaveOccurred())
-
-		dbMan = &dbManager{
-			data:  serviceFactoryForTest.Data(),
-			dbMux: sync.RWMutex{},
+		dbMan = &DbManager{
+			DbManager: common.DbManager{
+				Data:  serviceFactoryForTest.Data(),
+				DbMux: sync.RWMutex{},
+			},
 		}
-		dbMan.setDbVersion(dataTestTempDir)
+		dbMan.SetDbVersion(dataTestTempDir)
 
-		apiMan := apiManager{
-			dbMan:             dbMan,
-			verifiersEndpoint: apiPath,
+		apiMan := ApiManager{
+			DbMan:             dbMan,
+			VerifiersEndpoint: ApiPath,
 		}
 
 		testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			if req.URL.Path == apiPath {
-				apiMan.handleRequest(w, req)
+			if req.URL.Path == ApiPath {
+				apiMan.HandleRequest(w, req)
 			}
 		}))
 
@@ -77,7 +80,7 @@ var _ = Describe("end to end tests", func() {
 
 	Context("veriifyApiKey Api test ", func() {
 		It("should return validation error for missing input fields", func() {
-			var respObj ErrorResponse
+			var respObj common.ErrorResponse
 			reqInput := VerifyApiKeyRequest{
 				Key: "test",
 			}
@@ -91,7 +94,7 @@ var _ = Describe("end to end tests", func() {
 			Expect(respObj.ResponseCode).Should(Equal("Missing mandatory fields in the request : action organizationName uriPath"))
 		})
 		It("should return validation error for inavlid key", func() {
-			var respObj ErrorResponse
+			var respObj common.ErrorResponse
 			reqInput := VerifyApiKeyRequest{
 				Key:              "invalid-key",
 				Action:           "verify",
@@ -112,8 +115,8 @@ var _ = Describe("end to end tests", func() {
 			Expect(respObj.ResponseCode).Should(Equal("oauth.v2.InvalidApiKey"))
 		})
 		It("should return validation error for inavlid env", func() {
-			setupApikeyDeveloperTestDb(dbMan.db)
-			var respObj ErrorResponse
+			setupApikeyDeveloperTestDb(dbMan.Db)
+			var respObj common.ErrorResponse
 			reqInput := VerifyApiKeyRequest{
 				Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
 				Action:           "verify",
@@ -134,8 +137,8 @@ var _ = Describe("end to end tests", func() {
 			Expect(respObj.ResponseCode).Should(Equal("oauth.v2.InvalidApiKeyForGivenResource"))
 		})
 		It("should return validation error for inavlid resource", func() {
-			setupApikeyDeveloperTestDb(dbMan.db)
-			var respObj ErrorResponse
+			setupApikeyDeveloperTestDb(dbMan.Db)
+			var respObj common.ErrorResponse
 			reqInput := VerifyApiKeyRequest{
 				Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
 				Action:           "verify",
@@ -156,8 +159,8 @@ var _ = Describe("end to end tests", func() {
 			Expect(respObj.ResponseCode).Should(Equal("oauth.v2.InvalidApiKeyForGivenResource"))
 		})
 		It("should return validation error for inavlid proxies", func() {
-			setupApikeyDeveloperTestDb(dbMan.db)
-			var respObj ErrorResponse
+			setupApikeyDeveloperTestDb(dbMan.Db)
+			var respObj common.ErrorResponse
 			reqInput := VerifyApiKeyRequest{
 				Key:              "63tHSNLKJkcc6GENVWGT1Zw5gek7kVJ0",
 				Action:           "verify",
@@ -178,7 +181,7 @@ var _ = Describe("end to end tests", func() {
 			Expect(respObj.ResponseCode).Should(Equal("oauth.v2.InvalidApiKeyForGivenResource"))
 		})
 		It("should peform verify api key for developer happy path", func() {
-			setupApikeyDeveloperTestDb(dbMan.db)
+			setupApikeyDeveloperTestDb(dbMan.Db)
 			var respObj VerifyApiKeySuccessResponse
 
 			reqInput := VerifyApiKeyRequest{
@@ -229,7 +232,7 @@ var _ = Describe("end to end tests", func() {
 		})
 
 		It("should peform verify api key for company happy path", func() {
-			setupApikeyCompanyTestDb(dbMan.db)
+			setupApikeyCompanyTestDb(dbMan.Db)
 			var respObj VerifyApiKeySuccessResponse
 
 			reqInput := VerifyApiKeyRequest{
@@ -283,11 +286,14 @@ var _ = Describe("end to end tests", func() {
 
 func performTestOperation(jsonBody string, expectedResponseCode int) ([]byte, error) {
 	uri, err := url.Parse(testServer.URL)
-	uri.Path = apiPath
+	uri.Path = ApiPath
 	client := &http.Client{}
 	httpReq, err := http.NewRequest("POST", uri.String(), strings.NewReader(string(jsonBody)))
 	httpReq.Header.Set("Content-Type", "application/json")
 	res, err := client.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
 	defer res.Body.Close()
 	responseBody, err := ioutil.ReadAll(res.Body)
 

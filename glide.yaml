@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package: github.com/apid/apidVerifyAPIKey
+package: github.com/apid/apidVerifyApiKey
 import:
 - package: github.com/apid/apid-core
   version: master

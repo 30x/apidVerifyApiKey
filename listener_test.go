@@ -17,12 +17,11 @@ package apidVerifyApiKey
 import (
 	"github.com/apid/apid-core"
 	"github.com/apid/apid-core/factory"
-	"github.com/apigee-labs/transicator/common"
+	tran "github.com/apigee-labs/transicator/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
 	"os"
-	"sync"
 )
 
 var _ = Describe("listener", func() {
@@ -39,22 +38,7 @@ var _ = Describe("listener", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		apid.InitializePlugins("")
-
-		db, err := apid.Data().DB()
-		Expect(err).NotTo(HaveOccurred())
-
-		dbMan := &dbManager{
-			data:  s.Data(),
-			dbMux: sync.RWMutex{},
-			db:    db,
-		}
-
-		listnerTestSyncHandler = apigeeSyncHandler{
-			dbMan:  dbMan,
-			apiMan: apiManager{},
-		}
-
-		listnerTestSyncHandler.initListener(s)
+		listnerTestSyncHandler = initManagers(s)
 	})
 
 	var _ = AfterEach(func() {
@@ -64,24 +48,28 @@ var _ = Describe("listener", func() {
 	Context("Apigee Sync Event Processing", func() {
 
 		It("should set DB to appropriate version", func() {
-			s := &common.Snapshot{
+			s := &tran.Snapshot{
 				SnapshotInfo: "test_snapshot",
-				Tables:       []common.Table{},
+				Tables:       []tran.Table{},
 			}
 			listnerTestSyncHandler.Handle(s)
-			Expect(listnerTestSyncHandler.dbMan.getDbVersion()).Should(BeEquivalentTo(s.SnapshotInfo))
+			for _, dbMan := range listnerTestSyncHandler.dbMans {
+				Expect(dbMan.GetDbVersion()).Should(BeEquivalentTo(s.SnapshotInfo))
+			}
 
 		})
 
 		It("should not change version for chang event", func() {
 
-			version := listnerTestSyncHandler.dbMan.getDbVersion()
-			s := &common.Change{
+			version := listnerTestSyncHandler.dbMans[0].GetDbVersion()
+			s := &tran.Change{
 				ChangeSequence: 12321,
 				Table:          "",
 			}
-			testSyncHandler.Handle(s)
-			Expect(listnerTestSyncHandler.dbMan.getDbVersion() == version).Should(BeTrue())
+			listnerTestSyncHandler.Handle(s)
+			for _, dbMan := range listnerTestSyncHandler.dbMans {
+				Expect(dbMan.GetDbVersion() == version).Should(BeTrue())
+			}
 
 		})
 

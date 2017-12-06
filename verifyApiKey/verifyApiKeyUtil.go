@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package apidVerifyApiKey
+package verifyApiKey
 
 import (
-	"encoding/json"
 	"regexp"
 	"strings"
-	"unicode/utf8"
 )
 
 /*
@@ -54,20 +52,6 @@ func validatePath(fs []string, requestBase string) bool {
 	}
 	/* if the i/p resource is empty, no checks need to be made */
 	return len(fs) == 0
-}
-
-func jsonToStringArray(fjson string) []string {
-	var array []string
-	if err := json.Unmarshal([]byte(fjson), &array); err == nil {
-		return array
-	}
-	s := strings.TrimPrefix(fjson, "{")
-	s = strings.TrimSuffix(s, "}")
-	if utf8.RuneCountInString(s) > 0 {
-		array = strings.Split(s, ",")
-	}
-	log.Debug("unmarshall error for string, performing custom unmarshal ", fjson, " and result is : ", array)
-	return array
 }
 
 func contains(givenArray []string, searchString string) bool {

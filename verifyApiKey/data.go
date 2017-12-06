@@ -11,90 +11,25 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package apidVerifyApiKey
+package verifyApiKey
 
 import (
-	"database/sql"
 	"errors"
-	"github.com/apid/apid-core"
-	"strings"
-	"sync"
+	"github.com/apid/apidVerifyApiKey/common"
 )
 
-type dbManager struct {
-	data      apid.DataService
-	db        apid.DB
-	dbMux     sync.RWMutex
-	dbVersion string
-}
-
-func (dbc *dbManager) setDbVersion(version string) {
-	db, err := dbc.data.DBVersion(version)
-	if err != nil {
-		log.Panicf("Unable to access database: %v", err)
-	}
-	dbc.dbMux.Lock()
-	dbc.db = db
-	dbc.dbMux.Unlock()
-	dbc.dbVersion = version
-	// TODO : check if we need to release old db here...
-}
-
-func (dbc *dbManager) getDb() apid.DB {
-	dbc.dbMux.RLock()
-	defer dbc.dbMux.RUnlock()
-	return dbc.db
-}
-
-func (dbc *dbManager) getDbVersion() string {
-	return dbc.dbVersion
-}
-
-type dbManagerInterface interface {
-	setDbVersion(string)
-	getDb() apid.DB
-	getDbVersion() string
-	getKmsAttributes(tenantId string, entities ...string) map[string][]Attribute
+type DbManagerInterface interface {
+	common.DbManagerInterface
 	getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) error
 }
 
-func (dbc *dbManager) getKmsAttributes(tenantId string, entities ...string) map[string][]Attribute {
-
-	db := dbc.db
-	var attName, attValue, entity_id sql.NullString
-	// TODO : is there no other better way to do in caluse???
-	sql := sql_GET_KMS_ATTRIBUTES_FOR_TENANT + ` and entity_id in ('` + strings.Join(entities, `','`) + `')`
-	mapOfAttributes := make(map[string][]Attribute)
-	attributes, err := db.Query(sql, tenantId)
-	defer attributes.Close()
-	if err != nil {
-		log.Error("Error while fetching attributes for tenant id : %s and entityId : %s", tenantId, err)
-		return mapOfAttributes
-	}
-	for attributes.Next() {
-		err := attributes.Scan(
-			&entity_id,
-			&attName,
-			&attValue,
-		)
-		if err != nil {
-			log.Error("error fetching attributes for entityid ", entities, err)
-			return nil
-		}
-		if attName.Valid && entity_id.Valid {
-			att := Attribute{Name: attName.String, Value: attValue.String}
-			mapOfAttributes[entity_id.String] = append(mapOfAttributes[entity_id.String], att)
-		} else {
-			log.Debugf("Not valid. AttName: %s Entity_id: %s", attName.String, entity_id.String)
-		}
-	}
-	log.Debug("attributes returned for query ", sql, " are ", mapOfAttributes)
-	return mapOfAttributes
+type DbManager struct {
+	common.DbManager
 }
 
-func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) error {
+func (dbc DbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDataWrapper) error {
 
-	db := dbc.db
+	db := dbc.Db
 
 	err := db.QueryRow(sql_GET_API_KEY_DETAILS_SQL, dataWrapper.verifyApiKeyRequest.Key, dataWrapper.verifyApiKeyRequest.OrganizationName).
 		Scan(
@@ -144,9 +79,9 @@ func (dbc dbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseDa
 	return err
 }
 
-func (dbc dbManager) getApiProductsForApiKey(key, tenantId string) []ApiProductDetails {
+func (dbc DbManager) getApiProductsForApiKey(key, tenantId string) []ApiProductDetails {
 
-	db := dbc.db
+	db := dbc.Db
 	allProducts := []ApiProductDetails{}
 	var proxies, environments, resources string
 
@@ -174,9 +109,9 @@ func (dbc dbManager) getApiProductsForApiKey(key, tenantId string) []ApiProductD
 			&environments,
 			&resources,
 		)
-		apiProductDetais.Apiproxies = jsonToStringArray(proxies)
-		apiProductDetais.Environments = jsonToStringArray(environments)
-		apiProductDetais.Resources = jsonToStringArray(resources)
+		apiProductDetais.Apiproxies = common.JsonToStringArray(proxies)
+		apiProductDetais.Environments = common.JsonToStringArray(environments)
+		apiProductDetais.Resources = common.JsonToStringArray(resources)
 
 		allProducts = append(allProducts, apiProductDetais)
 	}

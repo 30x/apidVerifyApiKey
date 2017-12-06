@@ -16,7 +16,8 @@ package apidVerifyApiKey
 
 import (
 	"github.com/apid/apid-core"
-	"github.com/apigee-labs/transicator/common"
+	"github.com/apid/apidVerifyApiKey/common"
+	tran "github.com/apigee-labs/transicator/common"
 )
 
 const (
@@ -24,8 +25,8 @@ const (
 )
 
 type apigeeSyncHandler struct {
-	dbMan  dbManagerInterface
-	apiMan apiManager
+	dbMans  []common.DbManagerInterface
+	apiMans []common.ApiManagerInterface
 }
 
 func (h *apigeeSyncHandler) initListener(services apid.Services) {
@@ -36,16 +37,22 @@ func (h *apigeeSyncHandler) String() string {
 	return "verifyAPIKey"
 }
 
-func (h *apigeeSyncHandler) processSnapshot(snapshot *common.Snapshot) {
+func (h *apigeeSyncHandler) processSnapshot(snapshot *tran.Snapshot) {
 	log.Debugf("Snapshot received. Switching to DB version: %s", snapshot.SnapshotInfo)
-	h.dbMan.setDbVersion(snapshot.SnapshotInfo)
-	h.apiMan.InitAPI()
+	// set db version for all packages
+	for _, dbMan := range h.dbMans {
+		dbMan.SetDbVersion(snapshot.SnapshotInfo)
+	}
+	// idempotent init api for all packages
+	for _, apiMan := range h.apiMans {
+		apiMan.InitAPI()
+	}
 	log.Debug("Snapshot processed")
 }
 
 func (h *apigeeSyncHandler) Handle(e apid.Event) {
 
-	if snapData, ok := e.(*common.Snapshot); ok {
+	if snapData, ok := e.(*tran.Snapshot); ok {
 		h.processSnapshot(snapData)
 	} else {
 		log.Debugf("Received event. No action required for verifyApiKey plugin. Ignoring. %v", e)

@@ -11,39 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+package common
 
-package apidVerifyApiKey
+type ApiManagerInterface interface {
+	InitAPI()
+}
 
-import (
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
-	"github.com/apid/apid-core"
-	"os"
-	"testing"
-)
-
-const testTempDirBase = "./tmp/"
-
-var (
-	testTempDir     string
-	testSyncHandler apigeeSyncHandler
-)
-
-var _ = BeforeSuite(func() {
-	_ = os.MkdirAll(testTempDirBase, os.ModePerm)
-})
-
-var _ = AfterSuite(func() {
-	apid.Events().Close()
-	if testServer != nil {
-		testServer.Close()
-	}
-	os.RemoveAll(testTempDirBase)
-
-})
-
-func TestVerifyAPIKey(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "VerifyAPIKey Suite")
+type DbManagerInterface interface {
+	SetDbVersion(string)
+	GetDbVersion() string
+	GetKmsAttributes(tenantId string, entities ...string) map[string][]Attribute
 }

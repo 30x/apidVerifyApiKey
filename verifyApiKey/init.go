@@ -11,15 +11,22 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+package verifyApiKey
 
-package apidVerifyApiKey
+import (
+	"github.com/apid/apid-core"
+)
 
-import "github.com/apid/apid-core"
+const (
+	ApiPath = "/verifiers/apikey"
+)
 
-var pluginData = apid.PluginData{
-	Name:    "apidVerifyAPIKey",
-	Version: "0.0.4",
-	ExtraData: map[string]interface{}{
-		"schemaVersion": "0.0.3",
-	},
+var (
+	services apid.Services
+	log      apid.LogService
+)
+
+func SetApidServices(s apid.Services, l apid.LogService) {
+	services = s
+	log = l
 }

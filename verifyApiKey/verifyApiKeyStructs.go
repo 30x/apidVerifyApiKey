@@ -11,9 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package apidVerifyApiKey
+package verifyApiKey
 
-import "errors"
+import (
+	"errors"
+	"github.com/apid/apidVerifyApiKey/common"
+)
 
 type ClientIdDetails struct {
 	ClientId     string   `json:"clientId,omitempty"`
@@ -21,7 +24,7 @@ type ClientIdDetails struct {
 	RedirectURIs []string `json:"redirectURIs,omitempty"`
 	Status       string   `json:"status,omitempty"`
 	// Attributes associated with the client Id.
-	Attributes []Attribute `json:"attributes,omitempty"`
+	Attributes []common.Attribute `json:"attributes,omitempty"`
 }
 
 type ApiProductDetails struct {
@@ -40,8 +43,8 @@ type ApiProductDetails struct {
 	Environments   []string `json:"environments,omitempty"`
 	Apiproxies     []string `json:"apiproxies,omitempty"`
 	// Attributes associated with the apiproduct.
-	Attributes []Attribute `json:"attributes,omitempty"`
-	Resources  []string    `json:"-"`
+	Attributes []common.Attribute `json:"attributes,omitempty"`
+	Resources  []string           `json:"-"`
 }
 
 type AppDetails struct {
@@ -59,13 +62,7 @@ type AppDetails struct {
 	LastmodifiedBy string   `json:"lastmodified_by,omitempty"`
 	Company        string   `json:"company,omitempty"`
 	// Attributes associated with the app.
-	Attributes []Attribute `json:"attributes,omitempty"`
-}
-
-type Attribute struct {
-	Name  string `json:"name,omitempty"`
-	Value string `json:"value,omitempty"`
-	Kind  string `json:"kind,omitempty"`
+	Attributes []common.Attribute `json:"attributes,omitempty"`
 }
 
 type CompanyDetails struct {
@@ -79,7 +76,7 @@ type CompanyDetails struct {
 	LastmodifiedAt string   `json:"lastmodified_at,omitempty"`
 	LastmodifiedBy string   `json:"lastmodified_by,omitempty"`
 	// Attributes associated with the company.
-	Attributes []Attribute `json:"attributes,omitempty"`
+	Attributes []common.Attribute `json:"attributes,omitempty"`
 }
 
 type DeveloperDetails struct {
@@ -96,14 +93,7 @@ type DeveloperDetails struct {
 	LastmodifiedBy string   `json:"lastmodified_by,omitempty"`
 	Company        string   `json:"company,omitempty"`
 	// Attributes associated with the developer.
-	Attributes []Attribute `json:"attributes,omitempty"`
-}
-
-type ErrorResponse struct {
-	ResponseCode    string `json:"response_code,omitempty"`
-	ResponseMessage string `json:"response_message,omitempty"`
-	StatusCode      int    `json:"-"`
-	Kind            string `json:"kind,omitempty"`
+	Attributes []common.Attribute `json:"attributes,omitempty"`
 }
 
 type VerifyApiKeyRequest struct {
