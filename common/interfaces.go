@@ -13,7 +13,6 @@
 // limitations under the License.
 package common
 
-
 type ApiManagerInterface interface {
 	InitAPI()
 }

@@ -12,4 +12,4 @@ install:
   - glide up --strip-vendor
 
 script:
-  - go test $(glide novendor)
+  - go test -covermode=atomic $(glide novendor)
