@@ -17,7 +17,7 @@ package accessEntity
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/apid/apidVerifyApiKey/common"
+	"github.com/apid/apidApiMetadata/common"
 	"net/http"
 	"strconv"
 	"strings"

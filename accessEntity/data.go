@@ -16,7 +16,7 @@ package accessEntity
 import (
 	"database/sql"
 	"fmt"
-	"github.com/apid/apidVerifyApiKey/common"
+	"github.com/apid/apidApiMetadata/common"
 	"strings"
 )
 

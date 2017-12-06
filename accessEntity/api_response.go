@@ -14,7 +14,7 @@
 
 package accessEntity
 
-import "github.com/apid/apidVerifyApiKey/common"
+import "github.com/apid/apidApiMetadata/common"
 
 type ApiProductSuccessResponse struct {
 	// api product
