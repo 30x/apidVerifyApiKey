@@ -48,7 +48,7 @@ var _ = Describe("DataTest", func() {
 
 		})
 
-		It("should get compnay getApiKeyDetails for happy path", func() {
+		It("should get company getApiKeyDetails for happy path", func() {
 			setupApikeyCompanyTestDb(dbMan.Db)
 
 			dataWrapper := VerifyApiKeyRequestResponseDataWrapper{

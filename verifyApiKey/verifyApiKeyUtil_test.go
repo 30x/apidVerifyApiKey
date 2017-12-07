@@ -43,19 +43,19 @@ var _ = Describe("Validate Env", func() {
 
 var _ = Describe("Validate common.JsonToStringArray", func() {
 
-	It("should tranform simple valid json", func() {
+	It("should transform simple valid json", func() {
 		array := common.JsonToStringArray("[\"test-1\", \"test-2\"]")
 		Expect(reflect.DeepEqual(array, []string{"test-1", "test-2"})).Should(BeTrue())
 	})
-	It("should tranform simple single valid json", func() {
+	It("should transform simple single valid json", func() {
 		array := common.JsonToStringArray("[\"test-1\"]")
 		Expect(reflect.DeepEqual(array, []string{"test-1"})).Should(BeTrue())
 	})
-	It("should tranform simple fake json", func() {
+	It("should transform simple fake json", func() {
 		s := common.JsonToStringArray("{test-1,test-2}")
 		Expect(reflect.DeepEqual(s, []string{"test-1", "test-2"})).Should(BeTrue())
 	})
-	It("should tranform simple single valued fake json", func() {
+	It("should transform simple single valued fake json", func() {
 		s := common.JsonToStringArray("{test-1}")
 		Expect(reflect.DeepEqual(s, []string{"test-1"})).Should(BeTrue())
 	})
