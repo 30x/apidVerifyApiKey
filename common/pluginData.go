@@ -17,9 +17,9 @@ package common
 import "github.com/apid/apid-core"
 
 var PluginData = apid.PluginData{
-	Name:    "apidVerifyAPIKey",
-	Version: "0.1.0",
+	Name:    "apidApiMetadata",
+	Version: "0.2.0",
 	ExtraData: map[string]interface{}{
-		"schemaVersion": "0.1.0",
+		"schemaVersion": "0.2.0",
 	},
 }
