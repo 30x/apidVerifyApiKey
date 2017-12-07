@@ -16,7 +16,7 @@ package verifyApiKey
 
 import (
 	"encoding/json"
-	"github.com/apid/apidVerifyApiKey/common"
+	"github.com/apid/apidApiMetadata/common"
 	"io"
 	"io/ioutil"
 	"net/http"

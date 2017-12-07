@@ -15,7 +15,7 @@ package verifyApiKey
 
 import (
 	"errors"
-	"github.com/apid/apidVerifyApiKey/common"
+	"github.com/apid/apidApiMetadata/common"
 )
 
 type DbManagerInterface interface {

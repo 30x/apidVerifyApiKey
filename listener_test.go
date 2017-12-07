@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package apidVerifyApiKey
+package apidApiMetadata
 
 import (
 	"github.com/apid/apid-core"

@@ -14,7 +14,7 @@
 package accessEntity
 
 import (
-	"github.com/apid/apidVerifyApiKey/common"
+	"github.com/apid/apidApiMetadata/common"
 )
 
 type DummyDbMan struct {
