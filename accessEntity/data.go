@@ -27,6 +27,7 @@ const (
 
 type DbManager struct {
 	common.DbManager
+	cipherManager common.CipherManagerInterface
 }
 
 func (d *DbManager) GetApiProductNames(id string, idType string) ([]string, error) {
