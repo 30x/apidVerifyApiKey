@@ -14,9 +14,8 @@
 package common
 
 type Attribute struct {
-	Name  string `json:"name,omitempty"`
-	Value string `json:"value,omitempty"`
-	Kind  string `json:"kind,omitempty"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 type ErrorResponse struct {
