@@ -36,5 +36,5 @@ var _ = AfterSuite(func() {
 
 func TestApiMetadata(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "VerifyAPIKey Suite")
+	RunSpecs(t, "apiMetadata Suite")
 }

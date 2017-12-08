@@ -34,7 +34,7 @@ func (h *apigeeSyncHandler) initListener(services apid.Services) {
 }
 
 func (h *apigeeSyncHandler) String() string {
-	return "verifyAPIKey"
+	return "apiMetadata"
 }
 
 func (h *apigeeSyncHandler) processSnapshot(snapshot *tran.Snapshot) {
@@ -55,6 +55,6 @@ func (h *apigeeSyncHandler) Handle(e apid.Event) {
 	if snapData, ok := e.(*tran.Snapshot); ok {
 		h.processSnapshot(snapData)
 	} else {
-		log.Debugf("Received event. No action required for verifyApiKey plugin. Ignoring. %v", e)
+		log.Debugf("Received event. No action required for apiMetadata plugin. Ignoring. %v", e)
 	}
 }
