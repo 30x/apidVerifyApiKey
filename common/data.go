@@ -99,7 +99,7 @@ func (dbc *DbManager) GetKmsAttributes(tenantId string, entities ...string) map[
 
 func (dbc *DbManager) GetOrgs() (orgs []string, err error) {
 	db := dbc.GetDb()
-	rows, err := db.Query(`SELECT name FROM kms_organization`)
+	rows, err := db.Query(`SELECT DISTINCT org FROM edgex_data_scope`)
 	if err != nil {
 		return nil, err
 	}

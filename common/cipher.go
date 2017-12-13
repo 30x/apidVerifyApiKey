@@ -26,10 +26,12 @@ import (
 )
 
 const RegEncrypted = `^\{[0-9A-Za-z]+/[0-9A-Za-z]+/[0-9A-Za-z]+\}.`
-const retrieveEncryptKeyPath = "/encryption/key"
+const retrieveEncryptKeyPath = "/encryptionkey"
 const EncryptAes = "AES"
 const retrieveKeyRetryInterval = time.Duration(5 * time.Second)
 const retrieveKeyTimeout = time.Duration(5 * time.Minute)
+const parameterOrganization = "organization"
+const configBearerToken = "apigeesync_bearer_token"
 
 var RegexpEncrypted = regexp.MustCompile(RegEncrypted)
 
@@ -88,8 +90,12 @@ func (c *KmsCipherManager) startRetrieve(org string, interval time.Duration, tim
 
 func (c *KmsCipherManager) retrieveKey(org string) error {
 	var key []byte
-	log.Debugf("Retrieving key from: %s", c.serverUrlBase+retrieveEncryptKeyPath)
 	req, err := http.NewRequest(http.MethodGet, c.serverUrlBase+retrieveEncryptKeyPath, nil)
+	pars := req.URL.Query()
+	pars[parameterOrganization] = []string{org}
+	req.URL.RawQuery = pars.Encode()
+	req.Header.Set("Authorization", "Bearer "+services.Config().GetString(configBearerToken))
+	log.Debugf("Retrieving key: %s", req.URL.String())
 	if err != nil {
 		return fmt.Errorf("failed to create retrieving key request for org=%s : %v", org, err)
 	}
