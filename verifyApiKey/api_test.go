@@ -59,8 +59,9 @@ var _ = Describe("end to end tests", func() {
 
 		dbMan = &DbManager{
 			DbManager: common.DbManager{
-				Data:  serviceFactoryForTest.Data(),
-				DbMux: sync.RWMutex{},
+				Data:          serviceFactoryForTest.Data(),
+				DbMux:         sync.RWMutex{},
+				CipherManager: &DummyCipherMan{},
 			},
 		}
 		dbMan.SetDbVersion(dataTestTempDir)

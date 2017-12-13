@@ -25,8 +25,9 @@ const (
 )
 
 type apigeeSyncHandler struct {
-	dbMans  []common.DbManagerInterface
-	apiMans []common.ApiManagerInterface
+	dbMans    []common.DbManagerInterface
+	apiMans   []common.ApiManagerInterface
+	cipherMan common.CipherManagerInterface
 }
 
 func (h *apigeeSyncHandler) initListener(services apid.Services) {
@@ -43,6 +44,12 @@ func (h *apigeeSyncHandler) processSnapshot(snapshot *tran.Snapshot) {
 	for _, dbMan := range h.dbMans {
 		dbMan.SetDbVersion(snapshot.SnapshotInfo)
 	}
+	// retrieve encryption keys
+	orgs, err := h.dbMans[0].GetOrgs()
+	if err != nil {
+		log.Panicf("Failed to get orgs: %v", err)
+	}
+	h.cipherMan.AddOrgs(orgs)
 	// idempotent init api for all packages
 	for _, apiMan := range h.apiMans {
 		apiMan.InitAPI()
@@ -54,7 +61,7 @@ func (h *apigeeSyncHandler) Handle(e apid.Event) {
 
 	if snapData, ok := e.(*tran.Snapshot); ok {
 		h.processSnapshot(snapData)
-	} else {
+	} else { //TODO handle changelist and retrieve key for new orgs
 		log.Debugf("Received event. No action required for verifyApiKey plugin. Ignoring. %v", e)
 	}
 }

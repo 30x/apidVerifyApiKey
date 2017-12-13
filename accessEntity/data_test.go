@@ -43,8 +43,9 @@ var _ = Describe("DataTest", func() {
 
 			dbMan = &DbManager{
 				DbManager: common.DbManager{
-					Data:  services.Data(),
-					DbMux: sync.RWMutex{},
+					Data:          services.Data(),
+					DbMux:         sync.RWMutex{},
+					CipherManager: &DummyCipherMan{},
 				},
 			}
 			dbMan.SetDbVersion(dataTestTempDir)

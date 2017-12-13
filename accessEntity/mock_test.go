@@ -14,8 +14,23 @@
 package accessEntity
 
 import (
+	"github.com/apid/apid-core/cipher"
 	"github.com/apid/apidApiMetadata/common"
 )
+
+type DummyCipherMan struct {
+}
+
+func (c *DummyCipherMan) AddOrgs(orgs []string) {
+}
+
+func (d *DummyCipherMan) TryDecryptBase64(input string, org string) (string, error) {
+	return input, nil
+}
+
+func (d *DummyCipherMan) EncryptBase64(input string, org string, mode cipher.Mode, padding cipher.Padding) (string, error) {
+	return input, nil
+}
 
 type DummyDbMan struct {
 	apiProducts       []common.ApiProduct
@@ -31,6 +46,10 @@ type DummyDbMan struct {
 	status            string
 	attrs             map[string][]common.Attribute
 	err               error
+}
+
+func (d *DummyDbMan) GetOrgs() (orgs []string, err error) {
+	return
 }
 
 func (d *DummyDbMan) SetDbVersion(string) {

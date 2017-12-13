@@ -16,6 +16,8 @@ package accessEntity
 import (
 	"database/sql"
 	"fmt"
+	"github.com/apid/apid-core/cipher"
+	"github.com/apid/apid-core/util"
 	"github.com/apid/apidApiMetadata/common"
 	"strings"
 )
@@ -27,7 +29,6 @@ const (
 
 type DbManager struct {
 	common.DbManager
-	cipherManager common.CipherManagerInterface
 }
 
 func (d *DbManager) GetApiProductNames(id string, idType string) ([]string, error) {
@@ -209,7 +210,12 @@ func (d *DbManager) GetApiProducts(org, priKey, priVal, secKey, secVal string) (
 	} else if priKey == IdentifierAppName {
 		switch secKey {
 		case IdentifierDeveloperEmail:
-			apiProducts, err = d.getApiProductsByAppName(priVal, secVal, "", "", org)
+			var email string
+			email, err = d.CipherManager.EncryptBase64(secVal, org, cipher.ModeEcb, cipher.PaddingPKCS5)
+			if err != nil {
+				return
+			}
+			apiProducts, err = d.getApiProductsByAppName(priVal, email, "", "", org)
 		case IdentifierDeveloperId:
 			apiProducts, err = d.getApiProductsByAppName(priVal, "", secVal, "", org)
 		case IdentifierCompanyName:
@@ -242,7 +248,12 @@ func (d *DbManager) GetApps(org, priKey, priVal, secKey, secVal string) (apps []
 	case IdentifierAppName:
 		switch secKey {
 		case IdentifierDeveloperEmail:
-			return d.getAppByAppName(priVal, secVal, "", "", org)
+			var email string
+			email, err = d.CipherManager.EncryptBase64(secVal, org, cipher.ModeEcb, cipher.PaddingPKCS5)
+			if err != nil {
+				return
+			}
+			return d.getAppByAppName(priVal, email, "", "", org)
 		case IdentifierDeveloperId:
 			return d.getAppByAppName(priVal, "", secVal, "", org)
 		case IdentifierCompanyName:
@@ -279,24 +290,47 @@ func (d *DbManager) GetAppCredentials(org, priKey, priVal, secKey, secVal string
 
 	switch priKey {
 	case IdentifierConsumerKey:
-		return d.getAppCredentialByConsumerKey(priVal, org)
+		appCredentials, err = d.getAppCredentialByConsumerKey(priVal, org)
 	case IdentifierAppId:
-		return d.getAppCredentialByAppId(priVal, org)
+		appCredentials, err = d.getAppCredentialByAppId(priVal, org)
 	}
+
+	var plaintext string
+	for i := range appCredentials {
+		if plaintext, err = d.CipherManager.TryDecryptBase64(appCredentials[i].ConsumerSecret, org); err != nil {
+			return
+		}
+		appCredentials[i].ConsumerSecret = plaintext
+	}
+
 	return
 }
 
 func (d *DbManager) GetDevelopers(org, priKey, priVal, secKey, secVal string) (developers []common.Developer, err error) {
 	switch priKey {
 	case IdentifierAppId:
-		return d.getDeveloperByAppId(priVal, org)
+		developers, err = d.getDeveloperByAppId(priVal, org)
 	case IdentifierDeveloperEmail:
-		return d.getDeveloperByEmail(priVal, org)
+		var email string
+		email, err = d.CipherManager.EncryptBase64(priVal, org, cipher.ModeEcb, cipher.PaddingPKCS5)
+		if err != nil {
+			return
+		}
+		developers, err = d.getDeveloperByEmail(email, org)
 	case IdentifierConsumerKey:
-		return d.getDeveloperByConsumerKey(priVal, org)
+		developers, err = d.getDeveloperByConsumerKey(priVal, org)
 	case IdentifierDeveloperId:
-		return d.getDeveloperById(priVal, org)
+		developers, err = d.getDeveloperById(priVal, org)
 	}
+
+	var plaintext string
+	for i := range developers {
+		if plaintext, err = d.CipherManager.TryDecryptBase64(developers[i].Email, org); err != nil {
+			return
+		}
+		developers[i].Email = plaintext
+	}
+
 	return
 }
 
@@ -746,19 +780,10 @@ func filterApiProductsByResource(apiProducts []common.ApiProduct, resource strin
 	var prods []common.ApiProduct
 	for _, prod := range apiProducts {
 		resources := common.JsonToStringArray(prod.ApiResources)
-		if Contains(resources, resource) {
+		if util.Contains(resources, resource) {
 			prods = append(prods, prod)
 		}
 	}
 	//log.Debugf("After filter: %v", prods)
 	return prods
-}
-
-func Contains(sl []string, str string) bool {
-	for _, s := range sl {
-		if s == str {
-			return true
-		}
-	}
-	return false
 }

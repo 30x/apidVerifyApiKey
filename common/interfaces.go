@@ -23,9 +23,11 @@ type DbManagerInterface interface {
 	SetDbVersion(string)
 	GetDbVersion() string
 	GetKmsAttributes(tenantId string, entities ...string) map[string][]Attribute
+	GetOrgs() (orgs []string, err error)
 }
 
 type CipherManagerInterface interface {
+	AddOrgs(orgs []string)
 	// If input is encrypted, it decodes the input with base64,
 	// and then decrypt it. Otherwise, original input is returned.
 	// An encrypted input should be ciphertext prepended with algorithm. An unencrypted input can have any other format.

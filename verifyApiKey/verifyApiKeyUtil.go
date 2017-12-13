@@ -53,12 +53,3 @@ func validatePath(fs []string, requestBase string) bool {
 	/* if the i/p resource is empty, no checks need to be made */
 	return len(fs) == 0
 }
-
-func contains(givenArray []string, searchString string) bool {
-	for _, element := range givenArray {
-		if element == searchString {
-			return true
-		}
-	}
-	return false
-}

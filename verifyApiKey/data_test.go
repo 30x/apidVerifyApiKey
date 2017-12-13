@@ -40,8 +40,9 @@ var _ = Describe("DataTest", func() {
 
 			dbMan = &DbManager{
 				DbManager: common.DbManager{
-					Data:  s.Data(),
-					DbMux: sync.RWMutex{},
+					Data:          s.Data(),
+					DbMux:         sync.RWMutex{},
+					CipherManager: &DummyCipherMan{},
 				},
 			}
 			dbMan.SetDbVersion(dataTestTempDir)
@@ -183,18 +184,5 @@ var _ = Describe("DataTest", func() {
 			Expect(len(apiProducts)).Should(BeEquivalentTo(0))
 
 		})
-
-		It("should get kms attributes", func() {
-
-			setupKmsAttributesdata(dbMan.Db)
-			attributes := dbMan.GetKmsAttributes("bc811169", "40753e12-a50a-429d-9121-e571eb4e43a9", "85629786-37c5-4e8c-bb45-208f3360d005", "50321842-d6ee-4e92-91b9-37234a7920c1", "test-invalid")
-			Expect(len(attributes)).Should(BeEquivalentTo(3))
-			Expect(len(attributes["40753e12-a50a-429d-9121-e571eb4e43a9"])).Should(BeEquivalentTo(1))
-			Expect(len(attributes["85629786-37c5-4e8c-bb45-208f3360d005"])).Should(BeEquivalentTo(2))
-			Expect(len(attributes["50321842-d6ee-4e92-91b9-37234a7920c1"])).Should(BeEquivalentTo(5))
-			Expect(len(attributes["test-invalid"])).Should(BeEquivalentTo(0))
-
-		})
-
 	})
 })

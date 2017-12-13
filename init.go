@@ -16,10 +16,20 @@ package apidApiMetadata
 
 import (
 	"github.com/apid/apid-core"
+	"github.com/apid/apid-core/util"
 	"github.com/apid/apidApiMetadata/accessEntity"
 	"github.com/apid/apidApiMetadata/common"
 	"github.com/apid/apidApiMetadata/verifyApiKey"
+	"net/http"
 	"sync"
+	"time"
+)
+
+const (
+	maxIdleConnsPerHost      = 1
+	httpTimeout              = 5 * time.Minute
+	configBearerToken        = "apigeesync_bearer_token"
+	configRetrieveEncKeyBase = "apimetadata_encryption_key_server_base"
 )
 
 var (
@@ -44,11 +54,30 @@ func initPlugin(s apid.Services) (apid.PluginData, error) {
 	return common.PluginData, nil
 }
 
-func initManagers(services apid.Services) apigeeSyncHandler {
+// init http client
+func createHttpClient() *http.Client {
+	tr := util.Transport(services.Config().GetString(util.ConfigfwdProxyPortURL))
+	tr.MaxIdleConnsPerHost = maxIdleConnsPerHost
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   httpTimeout,
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			req.Header.Set("Authorization", "Bearer "+services.Config().GetString(configBearerToken))
+			return nil
+		},
+	}
+	return client
+}
+
+func initManagers(services apid.Services) *apigeeSyncHandler {
+
+	cipherMan := common.CreateCipherManager(createHttpClient(), services.Config().GetString(configRetrieveEncKeyBase))
+
 	verifyDbMan := &verifyApiKey.DbManager{
 		DbManager: common.DbManager{
-			Data:  services.Data(),
-			DbMux: sync.RWMutex{},
+			Data:          services.Data(),
+			DbMux:         sync.RWMutex{},
+			CipherManager: cipherMan,
 		},
 	}
 	verifyApiMan := &verifyApiKey.ApiManager{
@@ -58,8 +87,9 @@ func initManagers(services apid.Services) apigeeSyncHandler {
 
 	entityDbMan := &accessEntity.DbManager{
 		DbManager: common.DbManager{
-			Data:  services.Data(),
-			DbMux: sync.RWMutex{},
+			Data:          services.Data(),
+			DbMux:         sync.RWMutex{},
+			CipherManager: cipherMan,
 		},
 	}
 
@@ -68,9 +98,10 @@ func initManagers(services apid.Services) apigeeSyncHandler {
 		AccessEntityPath: accessEntity.AccessEntityPath,
 	}
 
-	syncHandler := apigeeSyncHandler{
-		dbMans:  []common.DbManagerInterface{verifyDbMan, entityDbMan},
-		apiMans: []common.ApiManagerInterface{verifyApiMan, entityApiMan},
+	syncHandler := &apigeeSyncHandler{
+		dbMans:    []common.DbManagerInterface{verifyDbMan, entityDbMan},
+		apiMans:   []common.ApiManagerInterface{verifyApiMan, entityApiMan},
+		cipherMan: cipherMan,
 	}
 	syncHandler.initListener(services)
 	return syncHandler
