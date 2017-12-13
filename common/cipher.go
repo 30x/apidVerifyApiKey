@@ -105,7 +105,7 @@ func (c *KmsCipherManager) retrieveKey(org string) error {
 	}
 	if res.StatusCode != http.StatusOK {
 		err = fmt.Errorf("failed to retrieve key for org [%v] with status: %v", org, res.Status)
-		return fmt.Errorf("failed to create retrieving key request for org=%s : %v", org, err)
+		return fmt.Errorf("failed to retrieve key for org [%v] with status: %v", org, res.Status)
 	}
 
 	log.Debugf("Downloaded Encryption Key for org %s", org)

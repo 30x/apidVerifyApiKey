@@ -16,7 +16,10 @@ package accessEntity
 import (
 	"github.com/apid/apid-core/cipher"
 	"github.com/apid/apidApiMetadata/common"
+	"strings"
 )
+
+const dummyEncryptPrefix = "encrypted:"
 
 type DummyCipherMan struct {
 }
@@ -25,11 +28,14 @@ func (c *DummyCipherMan) AddOrgs(orgs []string) {
 }
 
 func (d *DummyCipherMan) TryDecryptBase64(input string, org string) (string, error) {
+	if strings.HasPrefix(input, dummyEncryptPrefix) {
+		return input[len(dummyEncryptPrefix):], nil
+	}
 	return input, nil
 }
 
 func (d *DummyCipherMan) EncryptBase64(input string, org string, mode cipher.Mode, padding cipher.Padding) (string, error) {
-	return input, nil
+	return dummyEncryptPrefix + input, nil
 }
 
 type DummyDbMan struct {
@@ -99,7 +105,7 @@ func (d *DummyDbMan) GetComNames(id string, idType string) ([]string, error) {
 	return d.comNames, d.err
 }
 
-func (d *DummyDbMan) GetDevEmailByDevId(devId string) (string, error) {
+func (d *DummyDbMan) GetDevEmailByDevId(devId string, org string) (string, error) {
 	return d.email, d.err
 }
 

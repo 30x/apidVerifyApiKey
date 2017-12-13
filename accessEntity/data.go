@@ -86,7 +86,7 @@ func (d *DbManager) GetComNameByComId(comId string) (string, error) {
 	return name.String, nil
 }
 
-func (d *DbManager) GetDevEmailByDevId(devId string) (string, error) {
+func (d *DbManager) GetDevEmailByDevId(devId string, org string) (string, error) {
 	query := selectDeveloperById(
 		"?",
 		"email",
@@ -96,7 +96,9 @@ func (d *DbManager) GetDevEmailByDevId(devId string) (string, error) {
 	if err != nil || !email.Valid {
 		return "", err
 	}
-	return email.String, nil
+	// decryption
+	ret, err := d.CipherManager.TryDecryptBase64(email.String, org)
+	return ret, err
 }
 
 func (d *DbManager) GetComNames(id string, idType string) ([]string, error) {
@@ -210,12 +212,7 @@ func (d *DbManager) GetApiProducts(org, priKey, priVal, secKey, secVal string) (
 	} else if priKey == IdentifierAppName {
 		switch secKey {
 		case IdentifierDeveloperEmail:
-			var email string
-			email, err = d.CipherManager.EncryptBase64(secVal, org, cipher.ModeEcb, cipher.PaddingPKCS5)
-			if err != nil {
-				return
-			}
-			apiProducts, err = d.getApiProductsByAppName(priVal, email, "", "", org)
+			apiProducts, err = d.getApiProductsByAppName(priVal, secVal, "", "", org)
 		case IdentifierDeveloperId:
 			apiProducts, err = d.getApiProductsByAppName(priVal, "", secVal, "", org)
 		case IdentifierCompanyName:
@@ -248,12 +245,7 @@ func (d *DbManager) GetApps(org, priKey, priVal, secKey, secVal string) (apps []
 	case IdentifierAppName:
 		switch secKey {
 		case IdentifierDeveloperEmail:
-			var email string
-			email, err = d.CipherManager.EncryptBase64(secVal, org, cipher.ModeEcb, cipher.PaddingPKCS5)
-			if err != nil {
-				return
-			}
-			return d.getAppByAppName(priVal, email, "", "", org)
+			return d.getAppByAppName(priVal, secVal, "", "", org)
 		case IdentifierDeveloperId:
 			return d.getAppByAppName(priVal, "", secVal, "", org)
 		case IdentifierCompanyName:
@@ -311,12 +303,7 @@ func (d *DbManager) GetDevelopers(org, priKey, priVal, secKey, secVal string) (d
 	case IdentifierAppId:
 		developers, err = d.getDeveloperByAppId(priVal, org)
 	case IdentifierDeveloperEmail:
-		var email string
-		email, err = d.CipherManager.EncryptBase64(priVal, org, cipher.ModeEcb, cipher.PaddingPKCS5)
-		if err != nil {
-			return
-		}
-		developers, err = d.getDeveloperByEmail(email, org)
+		developers, err = d.getDeveloperByEmail(priVal, org)
 	case IdentifierConsumerKey:
 		developers, err = d.getDeveloperByConsumerKey(priVal, org)
 	case IdentifierDeveloperId:
@@ -382,12 +369,17 @@ func (d *DbManager) getApiProductsByAppName(appName, devEmail, devId, comName, o
 		appQuery = selectAppByNameAndDeveloperId(
 			"?",
 			selectDeveloperByEmail(
-				"?",
+				"?, ?",
 				"id",
 			),
 			"id",
 		)
-		args = append(args, devEmail)
+		var encrypted string
+		encrypted, err = d.CipherManager.EncryptBase64(devEmail, org, cipher.ModeEcb, cipher.PaddingPKCS5)
+		if err != nil {
+			return
+		}
+		args = append(args, devEmail, encrypted)
 	case devId != "":
 		appQuery = selectAppByNameAndDeveloperId(
 			"?",
@@ -446,12 +438,17 @@ func (d *DbManager) getAppByAppName(appName, devEmail, devId, comName, org strin
 		query = selectAppByNameAndDeveloperId(
 			"?",
 			selectDeveloperByEmail(
-				"?",
+				"?, ?",
 				"id",
 			),
 			cols...,
 		)
-		args = append(args, devEmail)
+		var encrypted string
+		encrypted, err = d.CipherManager.EncryptBase64(devEmail, org, cipher.ModeEcb, cipher.PaddingPKCS5)
+		if err != nil {
+			return
+		}
+		args = append(args, devEmail, encrypted)
 	case devId != "":
 		query = selectAppByNameAndDeveloperId(
 			"?",
@@ -613,11 +610,16 @@ func (d *DbManager) getDeveloperByConsumerKey(consumerKey, org string) (develope
 func (d *DbManager) getDeveloperByEmail(email, org string) (developers []common.Developer, err error) {
 	cols := []string{"*"}
 	query := selectDeveloperByEmail(
-		"?",
+		"?, ?",
 		cols...,
 	) + " AND dev.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getDeveloperByEmail: %v", query)
-	err = d.GetDb().QueryStructs(&developers, query, email, org)
+	var encrypted string
+	encrypted, err = d.CipherManager.EncryptBase64(email, org, cipher.ModeEcb, cipher.PaddingPKCS5)
+	if err != nil {
+		return
+	}
+	err = d.GetDb().QueryStructs(&developers, query, email, encrypted, org)
 	return
 }
 

@@ -246,7 +246,7 @@ func (a *ApiManager) getCompanyDeveloper(org string, ids map[string]string) (*Co
 			log.Errorf("getCompanyDeveloper: %v", err)
 			return nil, newDbError(err)
 		}
-		email, err := a.DbMan.GetDevEmailByDevId(dev.DeveloperId)
+		email, err := a.DbMan.GetDevEmailByDevId(dev.DeveloperId, org)
 		if err != nil {
 			log.Errorf("getCompanyDeveloper: %v", err)
 			return nil, newDbError(err)

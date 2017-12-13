@@ -35,6 +35,6 @@ type DbManagerInterface interface {
 	GetApiProductNames(id string, idType string) ([]string, error)
 	GetAppNames(id string, idType string) ([]string, error)
 	GetComNames(id string, idType string) ([]string, error)
-	GetDevEmailByDevId(devId string) (string, error)
+	GetDevEmailByDevId(devId string, org string) (string, error)
 	GetStatus(id, t string) (string, error)
 }
