@@ -19,6 +19,7 @@ import (
 	. "github.com/onsi/gomega"
 	"io/ioutil"
 	"reflect"
+	"sort"
 	"sync"
 )
 
@@ -51,6 +52,13 @@ var _ = Describe("DataTest", func() {
 			Expect(len(attributes["85629786-37c5-4e8c-bb45-208f3360d005"])).Should(BeEquivalentTo(2))
 			Expect(len(attributes["50321842-d6ee-4e92-91b9-37234a7920c1"])).Should(BeEquivalentTo(5))
 			Expect(len(attributes["test-invalid"])).Should(BeEquivalentTo(0))
+		})
+
+		It("Should get all orgs", func() {
+			orgs, err := testDbMan.GetOrgs()
+			Expect(err).Should(Succeed())
+			sort.Strings(orgs)
+			Expect(orgs).Should(Equal([]string{"apid-haoming", "apid-test"}))
 		})
 
 	})

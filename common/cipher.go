@@ -15,6 +15,8 @@ package common
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"github.com/apid/apid-core/cipher"
 	"io/ioutil"
@@ -26,12 +28,21 @@ import (
 )
 
 const RegEncrypted = `^\{[0-9A-Za-z]+/[0-9A-Za-z]+/[0-9A-Za-z]+\}.`
-const retrieveEncryptKeyPath = "/encryptionkey"
+const retrieveEncryptKeyPath = "/config/organizations/{org}/kmsencryptionkey"
 const EncryptAes = "AES"
-const retrieveKeyRetryInterval = time.Duration(5 * time.Second)
-const retrieveKeyTimeout = time.Duration(5 * time.Minute)
+
+const (
+	retrieveKeyRetryInterval = time.Duration(5 * time.Second)
+	retrieveKeyTimeout       = time.Duration(5 * time.Minute)
+)
 const parameterOrganization = "organization"
 const configBearerToken = "apigeesync_bearer_token"
+const headerContentType = "Content-Type"
+const (
+	typeJson = "application/json"
+	typeXml  = "text/xml"
+)
+const errorCodeNoKey = "organizations.EncryptionKeyDoesNotExist"
 
 var RegexpEncrypted = regexp.MustCompile(RegEncrypted)
 
@@ -80,6 +91,7 @@ func (c *KmsCipherManager) startRetrieve(org string, interval time.Duration, tim
 			return
 		case <-ticker.C:
 			if err := c.retrieveKey(org); err != nil {
+
 				log.Error(err)
 			} else {
 				return
@@ -90,10 +102,11 @@ func (c *KmsCipherManager) startRetrieve(org string, interval time.Duration, tim
 
 func (c *KmsCipherManager) retrieveKey(org string) error {
 	var key []byte
-	req, err := http.NewRequest(http.MethodGet, c.serverUrlBase+retrieveEncryptKeyPath, nil)
-	pars := req.URL.Query()
-	pars[parameterOrganization] = []string{org}
-	req.URL.RawQuery = pars.Encode()
+	path := strings.Replace(retrieveEncryptKeyPath, "{org}", org, 1)
+	req, err := http.NewRequest(http.MethodGet, c.serverUrlBase+path, nil)
+	//pars := req.URL.Query()
+	//pars[parameterOrganization] = []string{org}
+	//req.URL.RawQuery = pars.Encode()
 	req.Header.Set("Authorization", "Bearer "+services.Config().GetString(configBearerToken))
 	log.Debugf("Retrieving key: %s", req.URL.String())
 	if err != nil {
@@ -103,6 +116,21 @@ func (c *KmsCipherManager) retrieveKey(org string) error {
 	if err != nil {
 		return fmt.Errorf("failed to retrieve key for org=%s : %v", org, err)
 	}
+
+	// if 404
+	if res.StatusCode == http.StatusNotFound {
+		e, err := parseErrorResponse(res)
+		if err != nil {
+			log.Errorf("Failed to parse error response: %v", err)
+			return err
+		}
+		// is this org has no key, stop retrying
+		if e.Code == errorCodeNoKey {
+			log.Debugf("No key is associated with org %v", org)
+			return nil
+		}
+	}
+
 	if res.StatusCode != http.StatusOK {
 		err = fmt.Errorf("failed to retrieve key for org [%v] with status: %v", org, res.Status)
 		return fmt.Errorf("failed to retrieve key for org [%v] with status: %v", org, res.Status)
@@ -130,6 +158,7 @@ func (c *KmsCipherManager) retrieveKey(org string) error {
 	return nil
 }
 
+// return val is nullable
 func (c *KmsCipherManager) getAesCipher(org string) *cipher.AesCipher {
 	// if exists
 	c.mutex.RLock()
@@ -139,7 +168,10 @@ func (c *KmsCipherManager) getAesCipher(org string) *cipher.AesCipher {
 	}
 	// if not exists
 	c.mutex.RUnlock()
-	c.startRetrieve(org, c.interval, c.timeout)
+	if err := c.retrieveKey(org); err != nil {
+		log.Errorf("Failed to get encryption key for org=%s : %v", org, err)
+		return nil
+	}
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	return c.aes[org]
@@ -165,7 +197,12 @@ func (c *KmsCipherManager) TryDecryptBase64(input string, org string) (output st
 		log.Errorf("Decode base64 of [%v] failed: [%v], considered as unencrypted!", text, err)
 		return
 	}
-	plaintext, err := c.getAesCipher(org).Decrypt(bytes, mode, padding)
+	aes := c.getAesCipher(org)
+	if aes == nil {
+		err = fmt.Errorf("failed to get decryption key for org: %s", org)
+		return
+	}
+	plaintext, err := aes.Decrypt(bytes, mode, padding)
 	if err != nil {
 		log.Errorf("Decrypt of [%v] failed: [%v], considered as unencrypted!", bytes, err)
 		return
@@ -178,7 +215,13 @@ func (c *KmsCipherManager) TryDecryptBase64(input string, org string) (output st
 // The returned string is the base64 encoding of the encrypted input, prepended with algorithm.
 // An example output is "{AES/ECB/PKCS5Padding}2jX3V3dQ5xB9C9Zl9sqyo8pmkvVP10rkEVPVhmnLHw4="
 func (c *KmsCipherManager) EncryptBase64(input string, org string, mode cipher.Mode, padding cipher.Padding) (output string, err error) {
-	ciphertext, err := c.getAesCipher(org).Encrypt([]byte(input), mode, padding)
+	aes := c.getAesCipher(org)
+	// TODO: make sure this logic is expected
+	// if failed to get key and cipher, considered this org as unencrypted
+	if aes == nil {
+		return input, nil
+	}
+	ciphertext, err := aes.Encrypt([]byte(input), mode, padding)
 	if err != nil {
 		return
 	}
@@ -213,4 +256,26 @@ func GetCiphertext(input string) (ciphertext string, mode cipher.Mode, padding c
 	// padding
 	padding = cipher.Padding(l[2])
 	return
+}
+
+type ErrorRes struct {
+	Code    string
+	Message string
+}
+
+func parseErrorResponse(res *http.Response) (*ErrorRes, error) {
+	contentType := res.Header.Get("Content-Type")
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	ret := &ErrorRes{}
+	if contentType == typeJson {
+		return ret, json.Unmarshal(body, ret)
+	} else if contentType == typeXml {
+		return ret, xml.Unmarshal(body, ret)
+	} else {
+		return nil, fmt.Errorf("unknown error: %v", string(body))
+	}
 }
