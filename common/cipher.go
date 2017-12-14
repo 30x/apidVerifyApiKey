@@ -28,7 +28,7 @@ import (
 )
 
 const RegEncrypted = `^\{[0-9A-Za-z]+/[0-9A-Za-z]+/[0-9A-Za-z]+\}.`
-const retrieveEncryptKeyPath = "/config/organizations/{org}/kmsencryptionkey"
+const retrieveEncryptKeyPath = "/encryptionkey"
 const EncryptAes = "AES"
 
 const (
@@ -102,11 +102,10 @@ func (c *KmsCipherManager) startRetrieve(org string, interval time.Duration, tim
 
 func (c *KmsCipherManager) retrieveKey(org string) error {
 	var key []byte
-	path := strings.Replace(retrieveEncryptKeyPath, "{org}", org, 1)
-	req, err := http.NewRequest(http.MethodGet, c.serverUrlBase+path, nil)
-	//pars := req.URL.Query()
-	//pars[parameterOrganization] = []string{org}
-	//req.URL.RawQuery = pars.Encode()
+	req, err := http.NewRequest(http.MethodGet, c.serverUrlBase+retrieveEncryptKeyPath, nil)
+	pars := req.URL.Query()
+	pars[parameterOrganization] = []string{org}
+	req.URL.RawQuery = pars.Encode()
 	req.Header.Set("Authorization", "Bearer "+services.Config().GetString(configBearerToken))
 	log.Debugf("Retrieving key: %s", req.URL.String())
 	if err != nil {
