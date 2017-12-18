@@ -15,6 +15,8 @@ package common
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"github.com/apid/apid-core/cipher"
 	. "github.com/onsi/ginkgo"
@@ -61,47 +63,155 @@ var _ = Describe("Cipher Test", func() {
 
 	Context("Retrieve new key", func() {
 		var server *httptest.Server
-		BeforeEach(func() {
-			// set key server
-			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				defer GinkgoRecover()
-				Expect(r.URL.Path).Should(Equal(retrieveEncryptKeyPath))
-				Expect(r.URL.Query().Get(parameterOrganization)).Should(Equal(testOrg))
-				Expect(w.Write([]byte(base64.StdEncoding.EncodeToString(key)))).Should(Equal(24))
-			}))
-			time.Sleep(100 * time.Millisecond)
-			testCipherMan = CreateCipherManager(&http.Client{}, server.URL)
-		})
-
-		AfterEach(func() {
-			server.Close()
-		})
-
-		It("Encryption", func() {
-			Expect(testCipherMan.EncryptBase64(plaingtext, testOrg, cipher.ModeEcb, cipher.PaddingPKCS5)).
-				Should(Equal(cipher64))
-		})
-
-		It("Decryption", func() {
-			Expect(testCipherMan.TryDecryptBase64(cipher64, testOrg)).Should(Equal(plaingtext))
-		})
-
-		It("Retrieve Key", func() {
-			testCipherMan.AddOrgs([]string{testOrg})
-			for {
+		Context("Retrieve new key with lazy method", func() {
+			BeforeEach(func() {
+				// set key server
+				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					defer GinkgoRecover()
+					Expect(r.URL.Path).Should(Equal(retrieveEncryptKeyPath))
+					Expect(r.URL.Query().Get(parameterOrganization)).Should(Equal(testOrg))
+					Expect(w.Write([]byte(base64.StdEncoding.EncodeToString(key)))).Should(Equal(24))
+				}))
 				time.Sleep(100 * time.Millisecond)
-				testCipherMan.mutex.RLock()
-				aesCipher := testCipherMan.aes[testOrg]
-				testCipherMan.mutex.RUnlock()
-				if aesCipher != nil {
-					//close server to make sure key was retrieved by "AddOrgs"
-					server.Close()
-					Expect(testCipherMan.EncryptBase64(plaingtext, testOrg, cipher.ModeEcb, cipher.PaddingPKCS5)).
-						Should(Equal(cipher64))
-					return
+				testCipherMan = CreateCipherManager(&http.Client{}, server.URL)
+			})
+
+			AfterEach(func() {
+				server.Close()
+			})
+
+			It("Encryption", func() {
+				Expect(testCipherMan.EncryptBase64(plaingtext, testOrg, cipher.ModeEcb, cipher.PaddingPKCS5)).
+					Should(Equal(cipher64))
+			})
+
+			It("Decryption", func() {
+				Expect(testCipherMan.TryDecryptBase64(cipher64, testOrg)).Should(Equal(plaingtext))
+			})
+		})
+
+		Context("Retrieve new keys during initialization", func() {
+
+			AfterEach(func() {
+				server.Close()
+			})
+
+			It("Retrieve Key happy path", func() {
+				// set key server
+				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					defer GinkgoRecover()
+					Expect(r.URL.Path).Should(Equal(retrieveEncryptKeyPath))
+					Expect(r.URL.Query().Get(parameterOrganization)).Should(HavePrefix(testOrg))
+					Expect(w.Write([]byte(base64.StdEncoding.EncodeToString(key)))).Should(Equal(24))
+				}))
+				time.Sleep(100 * time.Millisecond)
+				testCipherMan = CreateCipherManager(&http.Client{}, server.URL)
+
+				//test 2 orgs
+				testOrg1 := testOrg + "_1"
+				testCipherMan.AddOrgs([]string{testOrg, testOrg1})
+				for {
+					time.Sleep(100 * time.Millisecond)
+					testCipherMan.mutex.RLock()
+					l := len(testCipherMan.aes)
+					testCipherMan.mutex.RUnlock()
+					if l == 2 {
+						//close server to make sure key was retrieved by "AddOrgs"
+						server.Close()
+						Expect(testCipherMan.EncryptBase64(plaingtext, testOrg, cipher.ModeEcb, cipher.PaddingPKCS5)).
+							Should(Equal(cipher64))
+						Expect(testCipherMan.EncryptBase64(plaingtext, testOrg1, cipher.ModeEcb, cipher.PaddingPKCS5)).
+							Should(Equal(cipher64))
+						return
+					}
 				}
-			}
-		}, 2)
+			}, 2)
+
+			It("Retrieve Key should retry for internal server error", func() {
+				// set key server
+				count := 0
+				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					defer GinkgoRecover()
+					Expect(r.URL.Path).Should(Equal(retrieveEncryptKeyPath))
+					Expect(r.URL.Query().Get(parameterOrganization)).Should(Equal(testOrg))
+					count++
+					if count == 1 {
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					if count == 2 {
+						w.WriteHeader(http.StatusNotFound)
+						return
+					}
+					Expect(w.Write([]byte(base64.StdEncoding.EncodeToString(key)))).Should(Equal(24))
+				}))
+				time.Sleep(100 * time.Millisecond)
+				testCipherMan = CreateCipherManager(&http.Client{}, server.URL)
+				testCipherMan.interval = 100 * time.Millisecond
+				//should retry in case of error
+				testCipherMan.AddOrgs([]string{testOrg})
+				for {
+					time.Sleep(100 * time.Millisecond)
+					testCipherMan.mutex.RLock()
+					aes := testCipherMan.aes[testOrg]
+					testCipherMan.mutex.RUnlock()
+					if aes != nil {
+						//close server to make sure key was retrieved by "AddOrgs"
+						server.Close()
+						Expect(testCipherMan.EncryptBase64(plaingtext, testOrg, cipher.ModeEcb, cipher.PaddingPKCS5)).
+							Should(Equal(cipher64))
+						return
+					}
+				}
+			}, 2)
+
+			It("Retrieve Key should stop retrying for JSON organizations.EncryptionKeyDoesNotExist", func() {
+				// set key server
+				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					defer GinkgoRecover()
+					Expect(r.URL.Path).Should(Equal(retrieveEncryptKeyPath))
+					Expect(r.URL.Query().Get(parameterOrganization)).Should(Equal(testOrg))
+
+					response := KeyErrorResponse{
+						Code:    errorCodeNoKey,
+						Message: fmt.Sprintf("Encryption key does not exist for the org [%s].", testOrg),
+					}
+					bytes, err := json.Marshal(response)
+					Expect(err).Should(Succeed())
+					w.Header().Set(headerContentType, typeJson)
+					w.WriteHeader(http.StatusNotFound)
+					Expect(w.Write(bytes)).Should(Equal(len(bytes)))
+				}))
+				time.Sleep(100 * time.Millisecond)
+				testCipherMan = CreateCipherManager(&http.Client{}, server.URL)
+				//should stop retrying after one try
+				testCipherMan.startRetrieve(testOrg, 100*time.Millisecond, 10*time.Minute)
+			}, 2)
+
+			It("Retrieve Key should stop retrying for XML organizations.EncryptionKeyDoesNotExist", func() {
+				// set key server
+				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					defer GinkgoRecover()
+					Expect(r.URL.Path).Should(Equal(retrieveEncryptKeyPath))
+					Expect(r.URL.Query().Get(parameterOrganization)).Should(Equal(testOrg))
+
+					response := KeyErrorResponse{
+						Code:    errorCodeNoKey,
+						Message: fmt.Sprintf("Encryption key does not exist for the org [%s].", testOrg),
+					}
+					bytes, err := xml.Marshal(response)
+					Expect(err).Should(Succeed())
+					w.Header().Set(headerContentType, typeXml)
+					w.WriteHeader(http.StatusNotFound)
+					Expect(w.Write(bytes)).Should(Equal(len(bytes)))
+				}))
+				time.Sleep(100 * time.Millisecond)
+				testCipherMan = CreateCipherManager(&http.Client{}, server.URL)
+				//should stop retrying after one try
+				testCipherMan.startRetrieve(testOrg, 100*time.Millisecond, 10*time.Minute)
+			}, 2)
+		})
+
 	})
 
 	Context("IsEncrypted", func() {

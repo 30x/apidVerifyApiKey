@@ -74,7 +74,7 @@ func (c *KmsCipherManager) AddOrgs(orgs []string) {
 }
 
 func (c *KmsCipherManager) startRetrieve(org string, interval time.Duration, timeout time.Duration) {
-
+	timeoutChan := time.After(timeout)
 	if err := c.retrieveKey(org); err != nil {
 		log.Error(err)
 	} else {
@@ -83,7 +83,7 @@ func (c *KmsCipherManager) startRetrieve(org string, interval time.Duration, tim
 	ticker := time.NewTicker(interval)
 	for {
 		select {
-		case <-time.After(timeout):
+		case <-timeoutChan:
 			log.Error("timeout when retrieving key")
 			return
 		case <-ticker.C:
@@ -116,7 +116,7 @@ func (c *KmsCipherManager) retrieveKey(org string) error {
 	if res.StatusCode == http.StatusNotFound {
 		e, err := parseErrorResponse(res)
 		if err != nil {
-			log.Errorf("Failed to parse error response: %v", err)
+			log.Errorf("Failed to parse 404 error response for org %s: %v", org, err)
 			return err
 		}
 		// is this org has no key, stop retrying
@@ -251,8 +251,8 @@ func GetCiphertext(input string) (ciphertext string, mode cipher.Mode, padding c
 }
 
 type KeyErrorResponse struct {
-	Code    string
-	Message string
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 func parseErrorResponse(res *http.Response) (*KeyErrorResponse, error) {
