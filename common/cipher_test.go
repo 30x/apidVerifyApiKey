@@ -40,7 +40,6 @@ var _ = Describe("Cipher Test", func() {
 		BeforeEach(func() {
 			testCipherMan = CreateCipherManager(nil, "")
 			// set key locally
-			testCipherMan.key[testOrg] = key
 			var err error
 			testCipherMan.aes[testOrg], err = cipher.CreateAesCipher(key)
 			Expect(err).Should(Succeed())
@@ -66,6 +65,8 @@ var _ = Describe("Cipher Test", func() {
 			// set key server
 			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				defer GinkgoRecover()
+				Expect(r.URL.Path).Should(Equal(retrieveEncryptKeyPath))
+				Expect(r.URL.Query().Get(parameterOrganization)).Should(Equal(testOrg))
 				Expect(w.Write([]byte(base64.StdEncoding.EncodeToString(key)))).Should(Equal(24))
 			}))
 			time.Sleep(100 * time.Millisecond)
@@ -83,6 +84,40 @@ var _ = Describe("Cipher Test", func() {
 
 		It("Decryption", func() {
 			Expect(testCipherMan.TryDecryptBase64(cipher64, testOrg)).Should(Equal(plaingtext))
+		})
+
+		It("Retrieve Key", func() {
+			testCipherMan.AddOrgs([]string{testOrg})
+			for {
+				time.Sleep(100 * time.Millisecond)
+				testCipherMan.mutex.RLock()
+				aesCipher := testCipherMan.aes[testOrg]
+				testCipherMan.mutex.RUnlock()
+				if aesCipher != nil {
+					//close server to make sure key was retrieved by "AddOrgs"
+					server.Close()
+					Expect(testCipherMan.EncryptBase64(plaingtext, testOrg, cipher.ModeEcb, cipher.PaddingPKCS5)).
+						Should(Equal(cipher64))
+					return
+				}
+			}
+		}, 2)
+	})
+
+	Context("IsEncrypted", func() {
+		It("IsEncrypted", func() {
+			testData := [][]interface{}{
+				{"{AES/ECB/PKCS5Padding}foo", true},
+				{"AES/ECB/PKCS5Padding}foo", false},
+				{"{AES/ECB/PKCS5Paddingfoo", false},
+				{"{AES/ECB/}foo", false},
+				{"{AES/PKCS5Padding}foo", false},
+				{"{AES//PKCS5Padding}foo", false},
+				{"foo", false},
+			}
+			for i := range testData {
+				Expect(IsEncrypted(testData[i][0].(string))).Should(Equal(testData[i][1]))
+			}
 		})
 	})
 })

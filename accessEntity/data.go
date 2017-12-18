@@ -16,7 +16,6 @@ package accessEntity
 import (
 	"database/sql"
 	"fmt"
-	"github.com/apid/apid-core/cipher"
 	"github.com/apid/apid-core/util"
 	"github.com/apid/apidApiMetadata/common"
 	"strings"
@@ -96,9 +95,7 @@ func (d *DbManager) GetDevEmailByDevId(devId string, org string) (string, error)
 	if err != nil || !email.Valid {
 		return "", err
 	}
-	// decryption
-	ret, err := d.CipherManager.TryDecryptBase64(email.String, org)
-	return ret, err
+	return email.String, err
 }
 
 func (d *DbManager) GetComNames(id string, idType string) ([]string, error) {
@@ -287,6 +284,10 @@ func (d *DbManager) GetAppCredentials(org, priKey, priVal, secKey, secVal string
 		appCredentials, err = d.getAppCredentialByAppId(priVal, org)
 	}
 
+	if err != nil {
+		return
+	}
+
 	var plaintext string
 	for i := range appCredentials {
 		if plaintext, err = d.CipherManager.TryDecryptBase64(appCredentials[i].ConsumerSecret, org); err != nil {
@@ -309,15 +310,6 @@ func (d *DbManager) GetDevelopers(org, priKey, priVal, secKey, secVal string) (d
 	case IdentifierDeveloperId:
 		developers, err = d.getDeveloperById(priVal, org)
 	}
-
-	var plaintext string
-	for i := range developers {
-		if plaintext, err = d.CipherManager.TryDecryptBase64(developers[i].Email, org); err != nil {
-			return
-		}
-		developers[i].Email = plaintext
-	}
-
 	return
 }
 
@@ -369,17 +361,12 @@ func (d *DbManager) getApiProductsByAppName(appName, devEmail, devId, comName, o
 		appQuery = selectAppByNameAndDeveloperId(
 			"?",
 			selectDeveloperByEmail(
-				"?, ?",
+				"?",
 				"id",
 			),
 			"id",
 		)
-		var encrypted string
-		encrypted, err = d.CipherManager.EncryptBase64(devEmail, org, cipher.ModeEcb, cipher.PaddingPKCS5)
-		if err != nil {
-			return
-		}
-		args = append(args, devEmail, encrypted)
+		args = append(args, devEmail)
 	case devId != "":
 		appQuery = selectAppByNameAndDeveloperId(
 			"?",
@@ -438,17 +425,12 @@ func (d *DbManager) getAppByAppName(appName, devEmail, devId, comName, org strin
 		query = selectAppByNameAndDeveloperId(
 			"?",
 			selectDeveloperByEmail(
-				"?, ?",
+				"?",
 				"id",
 			),
 			cols...,
 		)
-		var encrypted string
-		encrypted, err = d.CipherManager.EncryptBase64(devEmail, org, cipher.ModeEcb, cipher.PaddingPKCS5)
-		if err != nil {
-			return
-		}
-		args = append(args, devEmail, encrypted)
+		args = append(args, devEmail)
 	case devId != "":
 		query = selectAppByNameAndDeveloperId(
 			"?",
@@ -610,16 +592,11 @@ func (d *DbManager) getDeveloperByConsumerKey(consumerKey, org string) (develope
 func (d *DbManager) getDeveloperByEmail(email, org string) (developers []common.Developer, err error) {
 	cols := []string{"*"}
 	query := selectDeveloperByEmail(
-		"?, ?",
+		"?",
 		cols...,
 	) + " AND dev.tenant_id IN " + sql_select_tenant_org
 	//log.Debugf("getDeveloperByEmail: %v", query)
-	var encrypted string
-	encrypted, err = d.CipherManager.EncryptBase64(email, org, cipher.ModeEcb, cipher.PaddingPKCS5)
-	if err != nil {
-		return
-	}
-	err = d.GetDb().QueryStructs(&developers, query, email, encrypted, org)
+	err = d.GetDb().QueryStructs(&developers, query, email, org)
 	return
 }
 

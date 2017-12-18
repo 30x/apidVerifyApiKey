@@ -27,7 +27,7 @@ import (
 	"time"
 )
 
-const RegEncrypted = `^\{[0-9A-Za-z]+/[0-9A-Za-z]+/[0-9A-Za-z]+\}.`
+const regEncrypted = `^\{[0-9A-Za-z]+/[0-9A-Za-z]+/[0-9A-Za-z]+\}.`
 const retrieveEncryptKeyPath = "/encryptionkey"
 const EncryptAes = "AES"
 
@@ -44,12 +44,11 @@ const (
 )
 const errorCodeNoKey = "organizations.EncryptionKeyDoesNotExist"
 
-var RegexpEncrypted = regexp.MustCompile(RegEncrypted)
+var RegexpEncrypted = regexp.MustCompile(regEncrypted)
 
 func CreateCipherManager(client *http.Client, serverUrlBase string) *KmsCipherManager {
 	return &KmsCipherManager{
 		serverUrlBase: serverUrlBase,
-		key:           make(map[string][]byte),
 		aes:           make(map[string]*cipher.AesCipher),
 		mutex:         &sync.RWMutex{},
 		client:        client,
@@ -60,8 +59,6 @@ func CreateCipherManager(client *http.Client, serverUrlBase string) *KmsCipherMa
 
 type KmsCipherManager struct {
 	serverUrlBase string
-	// org-level key map {organization: key}
-	key map[string][]byte
 	// org-level AesCipher map {organization: AesCipher}
 	aes      map[string]*cipher.AesCipher
 	mutex    *sync.RWMutex
@@ -91,7 +88,6 @@ func (c *KmsCipherManager) startRetrieve(org string, interval time.Duration, tim
 			return
 		case <-ticker.C:
 			if err := c.retrieveKey(org); err != nil {
-
 				log.Error(err)
 			} else {
 				return
@@ -103,14 +99,14 @@ func (c *KmsCipherManager) startRetrieve(org string, interval time.Duration, tim
 func (c *KmsCipherManager) retrieveKey(org string) error {
 	var key []byte
 	req, err := http.NewRequest(http.MethodGet, c.serverUrlBase+retrieveEncryptKeyPath, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create retrieving key request for org=%s : %v", org, err)
+	}
 	pars := req.URL.Query()
 	pars[parameterOrganization] = []string{org}
 	req.URL.RawQuery = pars.Encode()
 	req.Header.Set("Authorization", "Bearer "+services.Config().GetString(configBearerToken))
 	log.Debugf("Retrieving key: %s", req.URL.String())
-	if err != nil {
-		return fmt.Errorf("failed to create retrieving key request for org=%s : %v", org, err)
-	}
 	res, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve key for org=%s : %v", org, err)
@@ -131,7 +127,6 @@ func (c *KmsCipherManager) retrieveKey(org string) error {
 	}
 
 	if res.StatusCode != http.StatusOK {
-		err = fmt.Errorf("failed to retrieve key for org [%v] with status: %v", org, res.Status)
 		return fmt.Errorf("failed to retrieve key for org [%v] with status: %v", org, res.Status)
 	}
 
@@ -151,7 +146,6 @@ func (c *KmsCipherManager) retrieveKey(org string) error {
 		return fmt.Errorf("CreateAesCipher error for org [%v] when CreateAesCipher: %v", org, err)
 	}
 	c.mutex.Lock()
-	c.key[org] = key
 	c.aes[org] = a
 	c.mutex.Unlock()
 	return nil
@@ -228,48 +222,47 @@ func (c *KmsCipherManager) EncryptBase64(input string, org string, mode cipher.M
 	return
 }
 
-// TODO: make sure this regex has no false positive for all possible inputs
 func IsEncrypted(input string) (encrypted bool) {
 	return RegexpEncrypted.Match([]byte(input))
 }
 
 func GetCiphertext(input string) (ciphertext string, mode cipher.Mode, padding cipher.Padding, err error) {
-	l := strings.SplitN(input, "}", 2)
-	if len(l) != 2 {
+	list := strings.SplitN(input, "}", 2)
+	if len(list) != 2 {
 		err = fmt.Errorf("invalid input for GetCiphertext: %v", input)
 		return
 	}
-	ciphertext = l[1]
-	l = strings.Split(strings.TrimLeft(l[0], "{"), "/")
-	if len(l) != 3 {
+	ciphertext = list[1]
+	list = strings.Split(strings.TrimLeft(list[0], "{"), "/")
+	if len(list) != 3 {
 		err = fmt.Errorf("invalid input for GetCiphertext: %v", input)
 		return
 	}
 	// encryption algorithm
-	if l[0] != EncryptAes {
-		err = fmt.Errorf("unsupported algorithm for GetCiphertext: %v", l[0])
+	if list[0] != EncryptAes {
+		err = fmt.Errorf("unsupported algorithm for GetCiphertext: %v", list[0])
 		return
 	}
 	// mode
-	mode = cipher.Mode(l[1])
+	mode = cipher.Mode(list[1])
 	// padding
-	padding = cipher.Padding(l[2])
+	padding = cipher.Padding(list[2])
 	return
 }
 
-type ErrorRes struct {
+type KeyErrorResponse struct {
 	Code    string
 	Message string
 }
 
-func parseErrorResponse(res *http.Response) (*ErrorRes, error) {
-	contentType := res.Header.Get("Content-Type")
+func parseErrorResponse(res *http.Response) (*KeyErrorResponse, error) {
+	contentType := res.Header.Get(headerContentType)
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
-	ret := &ErrorRes{}
+	ret := &KeyErrorResponse{}
 	if contentType == typeJson {
 		return ret, json.Unmarshal(body, ret)
 	} else if contentType == typeXml {
