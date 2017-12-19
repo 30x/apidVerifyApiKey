@@ -68,6 +68,13 @@ func (dbc *DbManager) getApiKeyDetails(dataWrapper *VerifyApiKeyRequestResponseD
 		return errors.New("InvalidApiKey")
 	}
 
+	secret, err := dbc.CipherManager.TryDecryptBase64(dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientSecret,
+		dataWrapper.verifyApiKeyRequest.OrganizationName)
+	if err != nil {
+		return err
+	}
+	dataWrapper.verifyApiKeySuccessResponse.ClientId.ClientSecret = secret
+
 	if dataWrapper.verifyApiKeySuccessResponse.App.CallbackUrl != "" {
 		dataWrapper.verifyApiKeySuccessResponse.ClientId.RedirectURIs = []string{dataWrapper.verifyApiKeySuccessResponse.App.CallbackUrl}
 	}

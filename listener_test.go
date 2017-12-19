@@ -17,6 +17,7 @@ package apidApiMetadata
 import (
 	"github.com/apid/apid-core"
 	"github.com/apid/apid-core/factory"
+	"github.com/apid/apidApiMetadata/common"
 	tran "github.com/apigee-labs/transicator/common"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -26,7 +27,7 @@ import (
 
 var _ = Describe("listener", func() {
 
-	var listnerTestSyncHandler apigeeSyncHandler
+	var listenerTestSyncHandler *apigeeSyncHandler
 	var listnerTestTempDir string
 	var _ = BeforeEach(func() {
 		var err error
@@ -38,7 +39,12 @@ var _ = Describe("listener", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		apid.InitializePlugins("")
-		listnerTestSyncHandler = initManagers(s)
+		listenerTestSyncHandler = &apigeeSyncHandler{
+			dbMans:    []common.DbManagerInterface{&DummyDbMan{}, &DummyDbMan{}},
+			apiMans:   []common.ApiManagerInterface{},
+			cipherMan: &DummyCipherMan{},
+		}
+		listenerTestSyncHandler.initListener(services)
 	})
 
 	var _ = AfterEach(func() {
@@ -52,22 +58,22 @@ var _ = Describe("listener", func() {
 				SnapshotInfo: "test_snapshot",
 				Tables:       []tran.Table{},
 			}
-			listnerTestSyncHandler.Handle(s)
-			for _, dbMan := range listnerTestSyncHandler.dbMans {
+			listenerTestSyncHandler.Handle(s)
+			for _, dbMan := range listenerTestSyncHandler.dbMans {
 				Expect(dbMan.GetDbVersion()).Should(BeEquivalentTo(s.SnapshotInfo))
 			}
 
 		})
 
-		It("should not change version for chang event", func() {
+		It("should not change version for change event", func() {
 
-			version := listnerTestSyncHandler.dbMans[0].GetDbVersion()
+			version := listenerTestSyncHandler.dbMans[0].GetDbVersion()
 			s := &tran.Change{
 				ChangeSequence: 12321,
 				Table:          "",
 			}
-			listnerTestSyncHandler.Handle(s)
-			for _, dbMan := range listnerTestSyncHandler.dbMans {
+			listenerTestSyncHandler.Handle(s)
+			for _, dbMan := range listenerTestSyncHandler.dbMans {
 				Expect(dbMan.GetDbVersion() == version).Should(BeTrue())
 			}
 

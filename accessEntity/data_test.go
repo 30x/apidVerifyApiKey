@@ -43,8 +43,9 @@ var _ = Describe("DataTest", func() {
 
 			dbMan = &DbManager{
 				DbManager: common.DbManager{
-					Data:  services.Data(),
-					DbMux: sync.RWMutex{},
+					Data:          services.Data(),
+					DbMux:         sync.RWMutex{},
+					CipherManager: &DummyCipherMan{},
 				},
 			}
 			dbMan.SetDbVersion(dataTestTempDir)
@@ -529,7 +530,7 @@ var _ = Describe("DataTest", func() {
 			It("GetDevEmailByDevId", func() {
 				data := "e41f04e8-9d3f-470a-8bfd-c7939945896c"
 				expected := "bar@google.com"
-				Expect(dbMan.GetDevEmailByDevId(data)).Should(Equal(expected))
+				Expect(dbMan.GetDevEmailByDevId(data, "apid-haoming")).Should(Equal(expected))
 			})
 
 			It("GetStatus", func() {

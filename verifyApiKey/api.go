@@ -16,6 +16,7 @@ package verifyApiKey
 
 import (
 	"encoding/json"
+	"github.com/apid/apid-core/util"
 	"github.com/apid/apidApiMetadata/common"
 	"io"
 	"io/ioutil"
@@ -173,8 +174,8 @@ func shortListApiProduct(details []ApiProductDetails, verifyApiKeyReq VerifyApiK
 
 	for _, apiProd := range details {
 		if len(apiProd.Resources) == 0 || validatePath(apiProd.Resources, verifyApiKeyReq.UriPath) {
-			if len(apiProd.Apiproxies) == 0 || contains(apiProd.Apiproxies, verifyApiKeyReq.ApiProxyName) {
-				if len(apiProd.Environments) == 0 || contains(apiProd.Environments, verifyApiKeyReq.EnvironmentName) {
+			if len(apiProd.Apiproxies) == 0 || util.Contains(apiProd.Apiproxies, verifyApiKeyReq.ApiProxyName) {
+				if len(apiProd.Environments) == 0 || util.Contains(apiProd.Environments, verifyApiKeyReq.EnvironmentName) {
 					bestMathcedProduct = apiProd
 					return bestMathcedProduct
 					// set rank 1 or just return
@@ -254,7 +255,7 @@ func (apiM ApiManager) performValidations(dataWrapper VerifyApiKeyRequestRespons
 		return &ee
 	}
 
-	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && (len(apiProductDetails.Apiproxies) > 0 && !contains(apiProductDetails.Apiproxies, verifyApiKeyReq.ApiProxyName)) {
+	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && (len(apiProductDetails.Apiproxies) > 0 && !util.Contains(apiProductDetails.Apiproxies, verifyApiKeyReq.ApiProxyName)) {
 		reason = "Proxy Validation Failed (" + strings.Join(apiProductDetails.Apiproxies, ", ") + " vs " + verifyApiKeyReq.ApiProxyName + ")"
 		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
 		log.Debug("Validation error occoured ", errorCode, " ", reason)
@@ -262,7 +263,7 @@ func (apiM ApiManager) performValidations(dataWrapper VerifyApiKeyRequestRespons
 		return &ee
 	}
 	/* Verify if the ENV matches */
-	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && (len(apiProductDetails.Environments) > 0 && !contains(apiProductDetails.Environments, verifyApiKeyReq.EnvironmentName)) {
+	if verifyApiKeyReq.ValidateAgainstApiProxiesAndEnvs && (len(apiProductDetails.Environments) > 0 && !util.Contains(apiProductDetails.Environments, verifyApiKeyReq.EnvironmentName)) {
 		reason = "ENV Validation Failed (" + strings.Join(apiProductDetails.Environments, ", ") + " vs " + verifyApiKeyReq.EnvironmentName + ")"
 		errorCode = "oauth.v2.InvalidApiKeyForGivenResource"
 		log.Debug("Validation error occoured ", errorCode, " ", reason)

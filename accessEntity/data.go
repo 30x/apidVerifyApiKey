@@ -16,6 +16,7 @@ package accessEntity
 import (
 	"database/sql"
 	"fmt"
+	"github.com/apid/apid-core/util"
 	"github.com/apid/apidApiMetadata/common"
 	"strings"
 )
@@ -84,7 +85,7 @@ func (d *DbManager) GetComNameByComId(comId string) (string, error) {
 	return name.String, nil
 }
 
-func (d *DbManager) GetDevEmailByDevId(devId string) (string, error) {
+func (d *DbManager) GetDevEmailByDevId(devId string, org string) (string, error) {
 	query := selectDeveloperById(
 		"?",
 		"email",
@@ -94,7 +95,7 @@ func (d *DbManager) GetDevEmailByDevId(devId string) (string, error) {
 	if err != nil || !email.Valid {
 		return "", err
 	}
-	return email.String, nil
+	return email.String, err
 }
 
 func (d *DbManager) GetComNames(id string, idType string) ([]string, error) {
@@ -278,23 +279,36 @@ func (d *DbManager) GetAppCredentials(org, priKey, priVal, secKey, secVal string
 
 	switch priKey {
 	case IdentifierConsumerKey:
-		return d.getAppCredentialByConsumerKey(priVal, org)
+		appCredentials, err = d.getAppCredentialByConsumerKey(priVal, org)
 	case IdentifierAppId:
-		return d.getAppCredentialByAppId(priVal, org)
+		appCredentials, err = d.getAppCredentialByAppId(priVal, org)
 	}
+
+	if err != nil {
+		return
+	}
+
+	var plaintext string
+	for i := range appCredentials {
+		if plaintext, err = d.CipherManager.TryDecryptBase64(appCredentials[i].ConsumerSecret, org); err != nil {
+			return
+		}
+		appCredentials[i].ConsumerSecret = plaintext
+	}
+
 	return
 }
 
 func (d *DbManager) GetDevelopers(org, priKey, priVal, secKey, secVal string) (developers []common.Developer, err error) {
 	switch priKey {
 	case IdentifierAppId:
-		return d.getDeveloperByAppId(priVal, org)
+		developers, err = d.getDeveloperByAppId(priVal, org)
 	case IdentifierDeveloperEmail:
-		return d.getDeveloperByEmail(priVal, org)
+		developers, err = d.getDeveloperByEmail(priVal, org)
 	case IdentifierConsumerKey:
-		return d.getDeveloperByConsumerKey(priVal, org)
+		developers, err = d.getDeveloperByConsumerKey(priVal, org)
 	case IdentifierDeveloperId:
-		return d.getDeveloperById(priVal, org)
+		developers, err = d.getDeveloperById(priVal, org)
 	}
 	return
 }
@@ -745,19 +759,10 @@ func filterApiProductsByResource(apiProducts []common.ApiProduct, resource strin
 	var prods []common.ApiProduct
 	for _, prod := range apiProducts {
 		resources := common.JsonToStringArray(prod.ApiResources)
-		if Contains(resources, resource) {
+		if util.Contains(resources, resource) {
 			prods = append(prods, prod)
 		}
 	}
 	//log.Debugf("After filter: %v", prods)
 	return prods
-}
-
-func Contains(sl []string, str string) bool {
-	for _, s := range sl {
-		if s == str {
-			return true
-		}
-	}
-	return false
 }

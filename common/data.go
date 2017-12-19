@@ -23,10 +23,11 @@ import (
 )
 
 type DbManager struct {
-	Data      apid.DataService
-	Db        apid.DB
-	DbMux     sync.RWMutex
-	dbVersion string
+	Data          apid.DataService
+	Db            apid.DB
+	DbMux         sync.RWMutex
+	CipherManager CipherManagerInterface
+	dbVersion     string
 }
 
 const (
@@ -94,6 +95,26 @@ func (dbc *DbManager) GetKmsAttributes(tenantId string, entities ...string) map[
 		}
 	}
 	return mapOfAttributes
+}
+
+func (dbc *DbManager) GetOrgs() (orgs []string, err error) {
+	db := dbc.GetDb()
+	rows, err := db.Query(`SELECT DISTINCT org FROM edgex_data_scope`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var tmp sql.NullString
+		if err = rows.Scan(&tmp); err != nil {
+			return nil, err
+		}
+		if tmp.Valid {
+			orgs = append(orgs, tmp.String)
+		}
+	}
+	err = rows.Err()
+	return
 }
 
 func JsonToStringArray(fjson string) []string {
