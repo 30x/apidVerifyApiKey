@@ -43,6 +43,7 @@ var _ = Describe("API Tests", func() {
 		uri.RawQuery = query.Encode()
 		httpReq, err := http.NewRequest("GET", uri.String(), nil)
 		Expect(err).Should(Succeed())
+		httpReq.Header.Set(headerRequestId, strconv.Itoa(testCount))
 		res, err := client.Do(httpReq)
 		Expect(err).Should(Succeed())
 		defer res.Body.Close()
