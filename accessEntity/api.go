@@ -730,16 +730,13 @@ func writeJson(code int, obj interface{}, w http.ResponseWriter, r *http.Request
 			ResponseMessage: fmt.Sprintf("JSON Marshal Error %v for object: %v", err, obj),
 			StatusCode:      http.StatusInternalServerError,
 		}
-		if bytes, err = json.Marshal(jsonError); err != nil {
+		if bytes, err = json.Marshal(jsonError); err != nil { // this should never happen
 			log.Errorf("unable to marshal JSON error response for request_id=[%s]: %v", requestId, err)
-			w.Header().Set("Content-Type", "text/plain")
-			bytes = []byte("unable to marshal errorResponse : " + err.Error())
-		} else {
-			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
-	} else { // success
-		w.Header().Set("Content-Type", "application/json")
 	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	log.Debugf("Sending response_code=%d for request_id=[%s]: %s", code, requestId, bytes)
 	if l, err := w.Write(bytes); err != nil || l != len(bytes) {
