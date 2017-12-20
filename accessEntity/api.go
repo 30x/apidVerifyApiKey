@@ -742,5 +742,7 @@ func writeJson(code int, obj interface{}, w http.ResponseWriter, r *http.Request
 	}
 	w.WriteHeader(code)
 	log.Debugf("Sending response_code=%d for request_id=[%s]: %s", code, requestId, bytes)
-	w.Write(bytes)
+	if l, err := w.Write(bytes); err != nil || l != len(bytes) {
+		log.Errorf("error writing response for request_id=[%s]: error=%v, bytes_written=%d", requestId, err, l)
+	}
 }
