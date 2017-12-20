@@ -63,6 +63,8 @@ const (
 	StatusExpired  = "EXPIRED"
 )
 
+const headerRequestId = "X-Gateway-Request-Id"
+
 var (
 	Identifiers = map[string]bool{
 		"appid":          true,
@@ -152,7 +154,12 @@ func (a *ApiManager) InitAPI() {
 func (a *ApiManager) handleEndpoint(endpoint string, w http.ResponseWriter, r *http.Request) {
 	ids, org, err := extractIdentifiers(r.URL.Query())
 	if err != nil {
-		common.WriteError(w, err.Error(), INVALID_PARAMETERS, http.StatusBadRequest)
+		writeJson(http.StatusBadRequest,
+			common.ErrorResponse{
+				ResponseCode:    strconv.Itoa(INVALID_PARAMETERS),
+				ResponseMessage: err.Error(),
+				StatusCode:      http.StatusBadRequest,
+			}, w, r)
 	}
 	var res interface{}
 	var errRes *common.ErrorResponse
@@ -172,11 +179,10 @@ func (a *ApiManager) handleEndpoint(endpoint string, w http.ResponseWriter, r *h
 	}
 
 	if errRes != nil {
-		w.WriteHeader(errRes.StatusCode)
-		writeJson(errRes, w, r)
+		writeJson(errRes.StatusCode, errRes, w, r)
 		return
 	}
-	writeJson(res, w, r)
+	writeJson(http.StatusOK, res, w, r)
 }
 
 func (a *ApiManager) HandleApps(w http.ResponseWriter, r *http.Request) {
@@ -709,13 +715,19 @@ func newDataError(err error) *common.ErrorResponse {
 	}
 }
 
-func writeJson(obj interface{}, w http.ResponseWriter, r *http.Request) {
+func writeJson(code int, obj interface{}, w http.ResponseWriter, r *http.Request) {
+
+	requestId := r.Header.Get(headerRequestId)
 	bytes, err := json.Marshal(obj)
 	if err != nil {
-		log.Error("unable to marshal errorResponse: " + err.Error())
-		w.Write([]byte("unable to marshal errorResponse: " + err.Error()))
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Errorf("unable to marshal errorResponse for request_id=[%s]: %v", requestId, err)
+		w.Write([]byte("unable to marshal errorResponse : " + err.Error()))
 	} else {
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(code)
+		log.Debugf("Sending response_code=%d for request_id=[%s]: %s", code, requestId, bytes)
 		w.Write(bytes)
 	}
 }
