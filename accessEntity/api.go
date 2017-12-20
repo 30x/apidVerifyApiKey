@@ -129,6 +129,8 @@ const (
 	DATA_ERROR
 	// 404
 	NOT_FOUND
+	// json Marshal Error
+	JSON_MARSHAL_ERROR
 )
 
 type ApiManager struct {
@@ -719,15 +721,26 @@ func writeJson(code int, obj interface{}, w http.ResponseWriter, r *http.Request
 
 	requestId := r.Header.Get(headerRequestId)
 	bytes, err := json.Marshal(obj)
+	// JSON error
 	if err != nil {
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusInternalServerError)
+		code = http.StatusInternalServerError
 		log.Errorf("unable to marshal errorResponse for request_id=[%s]: %v", requestId, err)
-		w.Write([]byte("unable to marshal errorResponse : " + err.Error()))
-	} else {
+		jsonError := &common.ErrorResponse{
+			ResponseCode:    strconv.Itoa(JSON_MARSHAL_ERROR),
+			ResponseMessage: fmt.Sprintf("JSON Marshal Error %v for object: %v", err, obj),
+			StatusCode:      http.StatusInternalServerError,
+		}
+		if bytes, err = json.Marshal(jsonError); err != nil {
+			log.Errorf("unable to marshal JSON error response for request_id=[%s]: %v", requestId, err)
+			w.Header().Set("Content-Type", "text/plain")
+			bytes = []byte("unable to marshal errorResponse : " + err.Error())
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+		}
+	} else { // success
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		log.Debugf("Sending response_code=%d for request_id=[%s]: %s", code, requestId, bytes)
-		w.Write(bytes)
 	}
+	w.WriteHeader(code)
+	log.Debugf("Sending response_code=%d for request_id=[%s]: %s", code, requestId, bytes)
+	w.Write(bytes)
 }
