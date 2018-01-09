@@ -46,6 +46,7 @@ func (h *apigeeSyncHandler) processSnapshot(snapshot *tran.Snapshot) {
 	}
 	// add indexes
 	if err := common.AddIndexes(snapshot.SnapshotInfo); err != nil {
+		// not on critical path, continue in case of error
 		log.Errorf("Failed to add KMS indexes: %v", err)
 	}
 	// retrieve encryption keys
