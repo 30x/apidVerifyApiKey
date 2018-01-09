@@ -61,6 +61,10 @@ var _ = Describe("DataTest", func() {
 			Expect(orgs).Should(Equal([]string{"apid-haoming", "apid-test"}))
 		})
 
+		It("Add indexes", func() {
+			Expect(AddIndexes(testDbMan.GetDbVersion())).Should(Succeed())
+		})
+
 	})
 
 	Context("Validate common.JsonToStringArray", func() {

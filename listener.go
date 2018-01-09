@@ -44,6 +44,10 @@ func (h *apigeeSyncHandler) processSnapshot(snapshot *tran.Snapshot) {
 	for _, dbMan := range h.dbMans {
 		dbMan.SetDbVersion(snapshot.SnapshotInfo)
 	}
+	// add indexes
+	if err := common.AddIndexes(snapshot.SnapshotInfo); err != nil {
+		log.Errorf("Failed to add KMS indexes: %v", err)
+	}
 	// retrieve encryption keys
 	orgs, err := h.dbMans[0].GetOrgs()
 	if err != nil {
