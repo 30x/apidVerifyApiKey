@@ -117,6 +117,44 @@ func (dbc *DbManager) GetOrgs() (orgs []string, err error) {
 	return
 }
 
+func AddIndexes(version string) error {
+	db, err := services.Data().DBVersion(version)
+	if err != nil {
+		log.Errorf("Unable to access database: %v", err)
+		return err
+	}
+	log.Debugf("adding indexes to sqlite file")
+	tx, err := db.Begin()
+	if err != nil {
+		log.Errorf("AddIndexes: Unable to get DB tx Err: {%v}", err)
+		return err
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec(`
+	CREATE INDEX IF NOT EXISTS mp_appcred_id on KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER (appcred_id);
+	CREATE INDEX IF NOT EXISTS mp_app_id on KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER (app_id);
+	CREATE INDEX IF NOT EXISTS mp_apiprdt_id on KMS_APP_CREDENTIAL_APIPRODUCT_MAPPER (apiprdt_id);
+	CREATE INDEX IF NOT EXISTS app_name on KMS_APP (name);
+	CREATE INDEX IF NOT EXISTS app_company_id on KMS_APP (company_id);
+	CREATE INDEX IF NOT EXISTS app_developer_id on KMS_APP (developer_id);
+	CREATE INDEX IF NOT EXISTS dev_email on KMS_DEVELOPER (email);
+	CREATE INDEX IF NOT EXISTS com_name on KMS_COMPANY (name);
+	CREATE INDEX IF NOT EXISTS com_dev_com_id on KMS_COMPANY_DEVELOPER (company_id);
+	CREATE INDEX IF NOT EXISTS com_dev_dev_id on KMS_COMPANY_DEVELOPER (developer_id);
+	CREATE INDEX IF NOT EXISTS cred_app_id on KMS_APP_CREDENTIAL (app_id);
+	CREATE INDEX IF NOT EXISTS org_tenant_id on KMS_ORGANIZATION (tenant_id);
+	CREATE INDEX IF NOT EXISTS org_name on KMS_ORGANIZATION (name);
+	`)
+	if err != nil {
+		log.Errorf("AddIndexes: Tx Exec Err: {%v}", err)
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		log.Errorf("Commit error in AddIndexes: %v", err)
+	}
+	return err
+}
+
 func JsonToStringArray(fjson string) []string {
 	var array []string
 	if err := json.Unmarshal([]byte(fjson), &array); err == nil {
